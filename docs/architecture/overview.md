@@ -125,6 +125,7 @@ See [ADR 0012](../adr/0012-deployment-model.md).
 
 | Phase | Status |
 |---|---|
-| 0 — foundation | in progress |
-| 1 — skeleton + auth | in progress |
-| 2–8 | not started |
+| 0 — foundation | complete |
+| 1 — skeleton + auth | complete |
+| 2 — SSH connections | next |
+| 3–8 | not started |
