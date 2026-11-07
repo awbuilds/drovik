@@ -22,8 +22,9 @@ and authentication, and a deliberate React frontend with setup/login flows.
 - Secret scan is clean; no private data in the repository or history.
 - First-run setup, login, logout, restart persistence and session revocation are covered by tests.
 - A deliberate panic in a request is recovered, logged and does not terminate the process.
-- Docker Compose, Caddy and Nginx examples exist; a container smoke test is the remaining
-  environment-dependent verification.
+- Docker Compose, Caddy and Nginx examples exist. The image builds and passed a container smoke
+  test under Colima: non-root, read-only root filesystem, dropped capabilities, healthcheck,
+  setup/login/logout, CSRF rejection and restart persistence.
 - The latest handoff note records exact commands run and any gaps.
 
 ## Scope
