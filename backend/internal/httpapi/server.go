@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -20,12 +21,13 @@ type Server struct {
 	logger *slog.Logger
 	db     *sql.DB
 
-	users    *storage.UserRepository
-	sessions *storage.SessionRepository
-	audit    *audit.Service
-	auth     *auth.SessionManager
-	limiter  *security.LoginLimiter
-	version  version.Info
+	users        *storage.UserRepository
+	sessions     *storage.SessionRepository
+	audit        *audit.Service
+	auth         *auth.SessionManager
+	limiter      *security.LoginLimiter
+	setupLimiter *security.LoginLimiter
+	version      version.Info
 }
 
 func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audit.Service) *Server {
@@ -46,8 +48,9 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 			cfg.CookieSecure,
 			logger,
 		),
-		limiter: security.NewLoginLimiter(cfg.LoginRateLimit, cfg.LoginRateWindow),
-		version: version.Get(),
+		limiter:      security.NewLoginLimiter(cfg.LoginRateLimit, cfg.LoginRateWindow),
+		setupLimiter: security.NewLoginLimiter(5, 10*time.Minute),
+		version:      version.Get(),
 	}
 }
 

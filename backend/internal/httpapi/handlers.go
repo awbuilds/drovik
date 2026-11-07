@@ -91,6 +91,14 @@ func (s *Server) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
+	setupKey := "setup|" + security.ClientIP(r)
+	if allowed, retry := s.setupLimiter.Allow(setupKey); !allowed {
+		w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds()+0.5)))
+		s.record(r, "", "setup.failed", "", "denied", CodeRateLimited)
+		writeError(w, r, NewAPIError(http.StatusTooManyRequests, CodeRateLimited, "Too many setup attempts. Try again shortly."))
+		return
+	}
+
 	var request setupRequest
 	if err := decodeJSON(r, &request); err != nil {
 		writeError(w, r, err)
@@ -169,7 +177,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := security.ClientIP(r) + "|" + strings.ToLower(request.Username)
+	key := security.ClientIP(r)
 	if allowed, retry := s.limiter.Allow(key); !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds()+0.5)))
 		s.record(r, "", "auth.login_failed", request.Username, "denied", CodeRateLimited)

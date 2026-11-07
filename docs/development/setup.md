@@ -48,6 +48,8 @@ working directory, so run it from `backend/` for local development. The relative
 example file assume that working directory.
 
 The backend reads configuration from environment variables. Secrets are never printed in logs.
+Complete first-run setup before exposing a new instance beyond localhost or a trusted private
+network; the setup route is rate-limited but is not a substitute for network exposure control.
 
 ## Backend
 

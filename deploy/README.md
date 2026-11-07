@@ -34,7 +34,10 @@ path is Docker Compose behind a TLS reverse proxy.
    - [`deploy/caddy/Caddyfile`](../caddy/Caddyfile)
    - [`deploy/nginx/drovik.conf`](../nginx/drovik.conf)
 
-6. Open the public URL and complete first-run setup.
+6. Open the public URL and complete first-run setup **before exposing the instance to untrusted
+   users**. Setup is disabled after the first administrator and is rate-limited per IP, but an
+   unconfigured installation should still be reached only over a trusted network or a private
+   tunnel.
 
 The container runs as non-root on a distroless image, with a read-only root
 filesystem, no Linux capabilities, and `no-new-privileges`. The database and

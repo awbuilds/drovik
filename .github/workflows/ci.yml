@@ -101,9 +101,25 @@ jobs:
         if: hashFiles('frontend/package.json') != ''
         run: cd frontend && pnpm build
 
+      - name: Audit dependencies
+        if: hashFiles('frontend/package.json') != ''
+        run: cd frontend && pnpm audit --audit-level high
+
       - name: Skip notice
         if: hashFiles('frontend/package.json') == ''
         run: echo "Frontend not present yet; skipping."
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validate OpenAPI document
+        run: ruby -e 'require "yaml"; YAML.load_file("docs/api/openapi.yaml")'
 
   secret-scan:
     name: Secret scan

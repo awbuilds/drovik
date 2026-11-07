@@ -41,7 +41,8 @@ Every HTTP request passes through:
 - Argon2id with per-password salt, reviewed memory/time/parallelism parameters, and a versioned
   hash encoding so parameters can be upgraded.
 - Password verification uses the hash library's constant-time comparison.
-- Login responses are generic; failures are rate-limited by IP and username.
+- Login responses are generic; failures are rate-limited by IP.
+- First-run setup is allowed only while no user exists and is rate-limited per IP.
 - Successful login creates an opaque 256-bit session token. Only its SHA-256 hash is stored.
 - Cookies: `HttpOnly`, `SameSite=Lax`, `Secure` when HTTPS, `Path=/`, no domain unless required.
 - Idle and absolute expiry are enforced server-side. Logout revokes the session.
