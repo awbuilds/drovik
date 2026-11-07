@@ -335,6 +335,7 @@ any session that made progress.
 - `docs/development/setup.md` — local development.
 - `docs/development/workflow.md` — branch, PR and review workflow.
 - `docs/handoffs/` — session continuity.
+- `docs/api/openapi.yaml` — versioned HTTP contract (OpenAPI 3.1).
 - `CHANGELOG.md` — user-visible changes.
 - `ROADMAP.md` — product roadmap summary.
 
