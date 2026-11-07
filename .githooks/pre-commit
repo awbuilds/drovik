@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Local pre-commit guard. Installed with: make hooks
+set -euo pipefail
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+bash scripts/check-branch.sh
+
+# Secret scanning on staged changes when gitleaks is available.
+if command -v gitleaks >/dev/null 2>&1; then
+    if ! gitleaks protect --staged --redact --no-banner; then
+        echo "Secret scan failed. Remove the staged secret before committing." >&2
+        exit 1
+    fi
+fi
+
+# Format staged Go files.
+staged_go=$(git diff --cached --name-only --diff-filter=ACM -- '*.go' || true)
+if [[ -n "$staged_go" ]]; then
+    if ! command -v gofmt >/dev/null 2>&1; then
+        echo "gofmt not found; cannot verify staged Go files." >&2
+        exit 1
+    fi
+    unformatted=$(gofmt -l $staged_go)
+    if [[ -n "$unformatted" ]]; then
+        echo "Go files need formatting:" >&2
+        echo "$unformatted" >&2
+        echo "Run: gofmt -w <file>" >&2
+        exit 1
+    fi
+fi
+
+# Reject accidentally staged private material. Example env files are allowed.
+staged_secret_like=$(git diff --cached --name-only \
+    | grep -Ev '(^|/)\.env\.(example|sample|template)$' \
+    | grep -E '(^|/)(\.env($|\.)|secrets?/|.*\.(pem|key|p12|pfx)|id_(rsa|ed25519|ecdsa))' || true)
+if [[ -n "$staged_secret_like" ]]; then
+    echo "Refusing to commit a secret-like file. Unstage it and use .env.example:" >&2
+    echo "$staged_secret_like" >&2
+    exit 1
+fi

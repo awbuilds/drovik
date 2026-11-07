@@ -1,0 +1,20 @@
+# Default owner. Security-sensitive paths require explicit review.
+* @abhijithwrrr
+
+# Security and trust boundaries
+/backend/internal/auth/ @abhijithwrrr
+/backend/internal/secrets/ @abhijithwrrr
+/backend/internal/hostkeys/ @abhijithwrrr
+/backend/internal/sshclient/ @abhijithwrrr
+/backend/internal/sftp/ @abhijithwrrr
+/backend/internal/security/ @abhijithwrrr
+/backend/internal/terminal/ @abhijithwrrr
+
+# Supply chain and deployment
+/.github/workflows/ @abhijithwrrr
+/deploy/ @abhijithwrrr
+
+# Governance
+/AGENTS.md @abhijithwrrr
+/SECURITY.md @abhijithwrrr
+/docs/security/ @abhijithwrrr

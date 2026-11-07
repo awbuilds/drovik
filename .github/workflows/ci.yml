@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        if: hashFiles('backend/go.mod') != ''
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Check formatting
+        if: hashFiles('backend/go.mod') != ''
+        run: |
+          cd backend
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Unformatted files:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        if: hashFiles('backend/go.mod') != ''
+        run: cd backend && go vet ./...
+
+      - name: Test
+        if: hashFiles('backend/go.mod') != ''
+        run: cd backend && go test -race ./...
+
+      - name: Lint
+        if: hashFiles('backend/go.mod') != '' && hashFiles('backend/.golangci.yml') != ''
+        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6
+        with:
+          working-directory: backend
+
+      - name: Skip notice
+        if: hashFiles('backend/go.mod') == ''
+        run: echo "Backend not present yet; skipping."
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        if: hashFiles('frontend/package.json') != ''
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.4.1
+
+      - name: Set up Node
+        if: hashFiles('frontend/package.json') != ''
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install
+        if: hashFiles('frontend/package.json') != ''
+        run: cd frontend && pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: hashFiles('frontend/package.json') != ''
+        run: cd frontend && pnpm lint
+
+      - name: Typecheck
+        if: hashFiles('frontend/package.json') != ''
+        run: cd frontend && pnpm typecheck
+
+      - name: Test
+        if: hashFiles('frontend/package.json') != ''
+        run: cd frontend && pnpm test
+
+      - name: Build
+        if: hashFiles('frontend/package.json') != ''
+        run: cd frontend && pnpm build
+
+      - name: Skip notice
+        if: hashFiles('frontend/package.json') == ''
+        run: echo "Frontend not present yet; skipping."
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.27"
+
+      - name: Install gitleaks
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Scan repository
+        run: gitleaks detect --source . --redact --no-banner --verbose
