@@ -349,9 +349,10 @@ covered.
 
 - Phase 0: complete. The repository foundation, governance, ADRs, threat model, AGENTS.md,
   handoffs and CI/security gates are merged.
-- Phase 1: implemented on `feat/phase-1-app` and under review. It adds the Go service foundation,
-  SQLite migrations, first-run setup, Argon2id authentication, server-side sessions, CSRF,
-  rate limiting, the React design system/workspace shell, deployment assets and tests.
+- Phase 1: complete and merged. It adds the Go service foundation, SQLite migrations,
+  first-run setup, Argon2id authentication, server-side sessions, session-bound CSRF, rate
+  limiting, the React design system/workspace shell, deployment assets and tests.
+- Phase 2: next. Encrypted SSH credentials, host-key trust, server CRUD and capability detection.
 - No SSH, SFTP, terminal, monitoring, process, service or log features are implemented yet.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
