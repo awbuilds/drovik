@@ -347,11 +347,15 @@ covered.
 
 ## Current status
 
-- Phase 0: foundation in progress.
-- Phase 1: application skeleton and authentication next.
-- No SSH, SFTP, terminal, monitoring or file features are implemented yet.
+- Phase 0: complete. The repository foundation, governance, ADRs, threat model, AGENTS.md,
+  handoffs and CI/security gates are merged.
+- Phase 1: implemented on `feat/phase-1-app` and under review. It adds the Go service foundation,
+  SQLite migrations, first-run setup, Argon2id authentication, server-side sessions, CSRF,
+  rate limiting, the React design system/workspace shell, deployment assets and tests.
+- No SSH, SFTP, terminal, monitoring, process, service or log features are implemented yet.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
+- Read the latest handoff in `docs/handoffs/` before starting Phase 2.
 
 ## Decision inheritance
 

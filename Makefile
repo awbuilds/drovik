@@ -32,7 +32,7 @@ frontend-typecheck: ## Typecheck the frontend
 	cd frontend && pnpm typecheck
 
 frontend-test: ## Run frontend tests
-	cd frontend && pnpm test -- --run
+	cd frontend && pnpm test
 
 frontend-build: ## Build the frontend
 	cd frontend && pnpm build

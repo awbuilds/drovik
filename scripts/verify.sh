@@ -67,7 +67,7 @@ if [[ -f frontend/package.json ]]; then
     ran+=("frontend typecheck")
 
     step "frontend: test"
-    (cd frontend && pnpm test -- --run)
+    (cd frontend && pnpm test)
     ran+=("frontend test")
 
     step "frontend: build"

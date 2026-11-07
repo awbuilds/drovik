@@ -70,7 +70,7 @@ security model.
 | Session fixation | New random token on login; server-side sessions |
 | CSRF on mutations | Double-submit token + Origin/Sec-Fetch-Site checks + SameSite |
 | Session replay after logout | Server-side revocation; expiry checks on HTTP and WebSocket |
-| Setup takeover | Setup only when no administrator exists; rate limited; setup disabled after completion |
+| Setup takeover | Setup only when no administrator exists; rate limited per IP (5 attempts / 10 minutes); setup disabled after completion; complete first-run before exposure |
 
 ### 5.2 SSH and credential threats
 

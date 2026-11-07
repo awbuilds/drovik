@@ -1,0 +1,373 @@
+openapi: 3.1.0
+info:
+  title: Drovik API
+  version: 0.1.0
+  description: |
+    Versioned HTTP API for the Drovik self-hosted server workspace.
+
+    Phase 1 covers setup, local authentication, sessions and build metadata.
+    SSH, SFTP, terminal, monitoring, process, service and log endpoints are added
+    in later phases.
+
+    All responses use a stable machine-readable error envelope. Secrets are never
+    returned after submission and never appear in errors or audit metadata.
+  license:
+    name: AGPL-3.0-only
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+servers:
+  - url: /
+    description: Same-origin deployment
+
+tags:
+  - name: Setup
+  - name: Authentication
+  - name: System
+
+paths:
+  /api/v1/setup/status:
+    get:
+      tags: [Setup]
+      operationId: getSetupStatus
+      summary: Whether first-run setup is still required
+      security: []
+      responses:
+        "200":
+          description: Setup state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/setup:
+    post:
+      tags: [Setup]
+      operationId: completeSetup
+      summary: Create the initial administrator
+      description: |
+        Allowed only while no user exists. The public route is disabled after the
+        first administrator is created. Complete setup before exposing a new
+        installation to the internet.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetupRequest"
+      responses:
+        "201":
+          description: Administrator created and signed in
+          headers:
+            Set-Cookie:
+              description: Session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      operationId: login
+      summary: Authenticate with a local username and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated session
+          headers:
+            Set-Cookie:
+              description: Session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      operationId: getCurrentUser
+      summary: Return the authenticated user and CSRF token
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current session identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logout
+      summary: Revoke the current session
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "204":
+          description: Session revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/version:
+    get:
+      tags: [System]
+      operationId: getVersion
+      summary: Build and schema identity
+      security: []
+      responses:
+        "200":
+          description: Version metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionInfo"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /healthz:
+    get:
+      tags: [System]
+      operationId: getLiveness
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /readyz:
+    get:
+      tags: [System]
+      operationId: getReadiness
+      summary: Readiness probe (configuration and database)
+      security: []
+      responses:
+        "200":
+          description: Ready to serve
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: drovik_session
+      description: Opaque server-side session cookie (HttpOnly).
+
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: Session-bound synchronizer token returned by login, setup or `/auth/me`.
+      schema:
+        type: string
+        minLength: 32
+
+  responses:
+    Unauthorized:
+      description: Authentication is required or the session is invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Forbidden:
+      description: The request is not permitted
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    ValidationError:
+      description: The request is malformed or does not meet policy
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    RateLimited:
+      description: Too many attempts
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InternalError:
+      description: An unexpected server error occurred
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    SetupStatus:
+      type: object
+      required: [required]
+      properties:
+        required:
+          type: boolean
+          description: True until the first administrator exists.
+
+    SetupRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        password:
+          type: string
+          minLength: 12
+          maxLength: 256
+          format: password
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+          format: password
+
+    AuthResponse:
+      type: object
+      required: [user, csrf_token]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        csrf_token:
+          type: string
+          minLength: 32
+          description: Token to send in `X-CSRF-Token` for mutations.
+
+    User:
+      type: object
+      required: [id, username, role, created_at]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [admin, operator, read_only]
+        created_at:
+          type: string
+          format: date-time
+        last_login_at:
+          type: [string, "null"]
+          format: date-time
+
+    VersionInfo:
+      type: object
+      required: [version, commit, build_date, go_version, schema_version]
+      properties:
+        version:
+          type: string
+        commit:
+          type: string
+        build_date:
+          type: string
+        go_version:
+          type: string
+        schema_version:
+          type: integer
+          minimum: 0
+
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, ready, unavailable]
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable error code.
+              examples:
+                - AUTH_REQUIRED
+                - AUTH_INVALID_CREDENTIALS
+                - CSRF_INVALID
+                - RATE_LIMITED
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: Safe human-readable message; never contains secrets.
+            correlation_id:
+              type: string
+            details:
+              description: Optional safe structured details.

@@ -41,7 +41,8 @@ Every HTTP request passes through:
 - Argon2id with per-password salt, reviewed memory/time/parallelism parameters, and a versioned
   hash encoding so parameters can be upgraded.
 - Password verification uses the hash library's constant-time comparison.
-- Login responses are generic; failures are rate-limited by IP and username.
+- Login responses are generic; failures are rate-limited by IP.
+- First-run setup is allowed only while no user exists and is rate-limited per IP.
 - Successful login creates an opaque 256-bit session token. Only its SHA-256 hash is stored.
 - Cookies: `HttpOnly`, `SameSite=Lax`, `Secure` when HTTPS, `Path=/`, no domain unless required.
 - Idle and absolute expiry are enforced server-side. Logout revokes the session.
@@ -51,7 +52,9 @@ Every HTTP request passes through:
 
 Cookie-authenticated state-changing requests require:
 
-- A CSRF token in a non-HttpOnly cookie, matched against an `X-CSRF-Token` header.
+- A session-bound synchronizer token sent in the response body and echoed in an
+  `X-CSRF-Token` header for mutations. The token is derived with HMAC-SHA-256 from the opaque
+  session token and the server key, so it is not stored in a readable cookie or in the database.
 - `Origin`/`Sec-Fetch-Site` validation against trusted origins.
 - `SameSite=Lax` as an additional layer.
 

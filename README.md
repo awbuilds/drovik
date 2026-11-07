@@ -66,17 +66,25 @@ See [the architecture overview](docs/architecture/overview.md) and the
 git clone https://github.com/awbuilds/drovik.git
 cd drovik
 
+# Configuration and development encryption key
+cp .env.example backend/.env
+mkdir -p backend/secrets
+openssl rand -base64 32 > backend/secrets/encryption.key
+chmod 600 backend/secrets/encryption.key
+
 # Backend
 cd backend
 go run ./cmd/drovik
 
 # Frontend (in another terminal)
 cd frontend
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Docker Compose and production deployment instructions will be added with Phase 1. Start with
+The frontend dev server proxies `/api` to `http://127.0.0.1:8080` by default. Set
+`DROVIK_API_PROXY` if the backend runs elsewhere. For production deployment, see
+[deploy/README.md](deploy/README.md) and
 [docs/development/setup.md](docs/development/setup.md).
 
 ## Security

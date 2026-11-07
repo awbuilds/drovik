@@ -1,0 +1,33 @@
+[Unit]
+Description=Drovik self-hosted server workspace
+Documentation=https://github.com/awbuilds/drovik
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=drovik
+Group=drovik
+WorkingDirectory=/var/lib/drovik
+EnvironmentFile=/etc/drovik/drovik.env
+ExecStart=/usr/local/bin/drovik
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+
+# Hardening. Drovik only needs its data directory and network egress.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/drovik
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
