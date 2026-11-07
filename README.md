@@ -8,8 +8,9 @@ systemd services, logs and audit history. It uses the SSH access you already hav
 nothing on the servers you manage.
 
 > **Status:** early development. Phase 0 (project foundation) and Phase 1 (application skeleton and
-> authentication) are in progress. The remote-server features are not implemented yet. Drovik is a
-> working name pending trademark clearance.
+> authentication) are complete. Phase 2 (SSH connections and host-key trust) is next. The
+> remote-server features are not implemented yet. Drovik is a working name pending trademark
+> clearance.
 
 ## Why Drovik
 

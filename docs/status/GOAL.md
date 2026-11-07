@@ -1,8 +1,8 @@
 # Drovik — Current Goal
 
 **Milestone:** Phase 0 foundation + Phase 1 application skeleton and authentication
-**Status:** implemented on `feat/phase-1-app`, awaiting review and deployment verification
-**Updated:** 2026-11-07
+**Status:** complete and merged; Phase 2 is next
+**Updated:** 2026-11-08
 
 ## Goal
 
@@ -14,7 +14,8 @@ and authentication, and a deliberate React frontend with setup/login flows.
 ## Evidence of completion
 
 - `main` has an active ruleset: PR required, conversation resolution, linear history, no force-push,
-  no deletion, enforced for administrators. Required checks are added once CI names are registered.
+  no deletion, enforced for administrators. Required checks: Backend, Frontend, Secret scan,
+  CodeQL, Go vulnerability check, Dependency review and Docs.
 - The foundation and feature PRs are merged only through pull requests.
 - `make verify` passes: Go format, vet, race tests, golangci-lint; frontend install, lint,
   typecheck, tests and production build.
