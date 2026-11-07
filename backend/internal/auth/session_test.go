@@ -45,6 +45,7 @@ func newTestManager(t *testing.T) (*SessionManager, *storage.UserRepository, *fa
 
 	manager := NewSessionManager(
 		sessions, users, time.Hour, 24*time.Hour, false,
+		[]byte("0123456789abcdef0123456789abcdef"),
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 	manager.now = clock.Now
@@ -107,31 +108,42 @@ func TestSessionRevoke(t *testing.T) {
 	}
 }
 
-func TestSessionCookies(t *testing.T) {
+func TestSessionCookie(t *testing.T) {
 	manager, _, _, _ := newTestManager(t)
 	recorder := httptest.NewRecorder()
-	manager.SetCookies(recorder, "session-token", "csrf-token")
+	manager.SetSessionCookie(recorder, "session-token")
 
 	cookies := recorder.Result().Cookies()
-	if len(cookies) != 2 {
-		t.Fatalf("expected 2 cookies, got %d", len(cookies))
+	if len(cookies) != 1 {
+		t.Fatalf("expected 1 cookie, got %d", len(cookies))
 	}
-	for _, cookie := range cookies {
-		switch cookie.Name {
-		case DefaultSessionCookieName:
-			if !cookie.HttpOnly {
-				t.Fatal("session cookie must be HttpOnly")
-			}
-		case DefaultCSRFCookieName:
-			if cookie.HttpOnly {
-				t.Fatal("CSRF cookie must be readable by the frontend")
-			}
-		}
+	if cookies[0].Name != DefaultSessionCookieName || !cookies[0].HttpOnly {
+		t.Fatalf("unexpected session cookie: %+v", cookies[0])
 	}
+	if cookies[0].SameSite != http.SameSiteLaxMode {
+		t.Fatalf("unexpected SameSite policy: %v", cookies[0].SameSite)
+	}
+}
 
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	request.AddCookie(&http.Cookie{Name: DefaultCSRFCookieName, Value: "csrf-token"})
-	if got := manager.CSRFToken(request); got != "csrf-token" {
-		t.Fatalf("unexpected CSRF token: %q", got)
+func TestCSRFToken(t *testing.T) {
+	manager, _, _, user := newTestManager(t)
+	_, token, csrf, err := manager.Create(context.Background(), user.ID, "test-agent")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if csrf == "" {
+		t.Fatal("expected a CSRF token")
+	}
+	if !manager.ValidateCSRF(token, csrf) {
+		t.Fatal("expected CSRF token to validate")
+	}
+	if manager.ValidateCSRF(token, "wrong") {
+		t.Fatal("wrong CSRF token validated")
+	}
+	if manager.ValidateCSRF(token+"x", csrf) {
+		t.Fatal("CSRF token validated for a different session")
+	}
+	if manager.ValidateCSRF("", csrf) {
+		t.Fatal("empty session validated")
 	}
 }

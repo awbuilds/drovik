@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -48,6 +49,17 @@ func newTestApp(t *testing.T) *testApp {
 		t.Fatalf("storage.Migrate: %v", err)
 	}
 
+	staticDir := filepath.Join(dir, "static")
+	if err := os.MkdirAll(filepath.Join(staticDir, "assets"), 0o700); err != nil {
+		t.Fatalf("create static dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<!doctype html><title>Drovik test</title>"), 0o600); err != nil {
+		t.Fatalf("write index.html: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staticDir, "assets", "app.js"), []byte("console.log('drovik')"), 0o600); err != nil {
+		t.Fatalf("write asset: %v", err)
+	}
+
 	publicURL, _ := url.Parse("http://example.com")
 	cfg := &config.Config{
 		Env:                config.EnvTest,
@@ -58,7 +70,7 @@ func newTestApp(t *testing.T) *testApp {
 		LogFormat:          "text",
 		DataDir:            dir,
 		DBPath:             filepath.Join(dir, "test.db"),
-		StaticDir:          filepath.Join(dir, "static"),
+		StaticDir:          staticDir,
 		EncryptionKey:      []byte("0123456789abcdef0123456789abcdef"),
 		SessionIdleTTL:     time.Hour,
 		SessionAbsoluteTTL: 24 * time.Hour,
@@ -374,5 +386,66 @@ func TestVersionAndSecurityHeaders(t *testing.T) {
 	}
 	if got := result.header.Get("Content-Security-Policy"); !strings.Contains(got, "frame-ancestors 'none'") {
 		t.Fatalf("unexpected CSP: %q", got)
+	}
+}
+
+func TestStaticSPA(t *testing.T) {
+	app := newTestApp(t)
+
+	result := app.request(t, http.MethodGet, "/", nil, "")
+	if result.status != http.StatusOK {
+		t.Fatalf("index: %d %s", result.status, result.body)
+	}
+	if !strings.Contains(string(result.body), "Drovik test") {
+		t.Fatalf("unexpected index body: %s", result.body)
+	}
+	if got := result.header.Get("Content-Type"); !strings.Contains(got, "text/html") {
+		t.Fatalf("unexpected index content type: %q", got)
+	}
+
+	result = app.request(t, http.MethodGet, "/settings", nil, "")
+	if result.status != http.StatusOK || !strings.Contains(string(result.body), "Drovik test") {
+		t.Fatalf("SPA route: %d %s", result.status, result.body)
+	}
+
+	result = app.request(t, http.MethodGet, "/assets/app.js", nil, "")
+	if result.status != http.StatusOK {
+		t.Fatalf("asset: %d %s", result.status, result.body)
+	}
+	if got := result.header.Get("Cache-Control"); !strings.Contains(got, "immutable") {
+		t.Fatalf("unexpected asset cache policy: %q", got)
+	}
+
+	result = app.request(t, http.MethodGet, "/api/v1/does-not-exist", nil, "")
+	if result.status != http.StatusNotFound {
+		t.Fatalf("api 404: %d %s", result.status, result.body)
+	}
+	if decodeError(t, result.body).Error.Code != CodeNotFound {
+		t.Fatalf("unexpected api 404 body: %s", result.body)
+	}
+}
+
+func TestSetupRateLimit(t *testing.T) {
+	app := newTestApp(t)
+	app.request(t, http.MethodPost, "/api/v1/setup", setupRequest{
+		Username: "admin",
+		Password: "correct horse battery staple",
+	}, "")
+
+	for i := 0; i < 4; i++ {
+		result := app.request(t, http.MethodPost, "/api/v1/setup", setupRequest{
+			Username: "second",
+			Password: "correct horse battery staple",
+		}, "")
+		if result.status != http.StatusForbidden {
+			t.Fatalf("setup attempt %d: %d %s", i, result.status, result.body)
+		}
+	}
+	result := app.request(t, http.MethodPost, "/api/v1/setup", setupRequest{
+		Username: "second",
+		Password: "correct horse battery staple",
+	}, "")
+	if result.status != http.StatusTooManyRequests {
+		t.Fatalf("expected setup rate limit, got %d %s", result.status, result.body)
 	}
 }

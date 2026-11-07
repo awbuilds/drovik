@@ -5,9 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -157,7 +155,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
 		return
 	}
-	s.auth.SetCookies(w, token, csrf)
+	s.auth.SetSessionCookie(w, token)
 	s.record(r, user.ID, "setup.completed", user.Username, "success", "")
 	writeJSON(w, http.StatusCreated, authResponse{
 		User:      toUserResponse(user, &now),
@@ -221,7 +219,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err := s.users.UpdateLastLogin(r.Context(), user.ID, now); err != nil {
 		s.logger.Warn("last-login update failed", "error", err, "user_id", user.ID, "request_id", RequestID(r.Context()))
 	}
-	s.auth.SetCookies(w, token, csrf)
+	s.auth.SetSessionCookie(w, token)
 	s.record(r, user.ID, "auth.login", user.Username, "success", "")
 	writeJSON(w, http.StatusOK, authResponse{
 		User:      toUserResponse(*user, &now),
@@ -237,7 +235,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
 		return
 	}
-	s.auth.ClearCookies(w)
+	s.auth.ClearSessionCookie(w)
 	if user != nil {
 		s.record(r, user.ID, "auth.logout", user.Username, "success", "")
 	}
@@ -250,16 +248,11 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthRequired, "Authentication required."))
 		return
 	}
-	csrf := s.auth.CSRFToken(r)
+	csrf := s.auth.CSRFToken(s.auth.SessionToken(r))
 	if csrf == "" {
-		var err error
-		csrf, err = s.auth.NewCSRFToken()
-		if err != nil {
-			s.logger.Error("csrf token generation failed", "error", err, "request_id", RequestID(r.Context()))
-			writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
-			return
-		}
-		s.auth.SetCSRFCookie(w, csrf)
+		s.logger.Error("csrf token derivation failed", "request_id", RequestID(r.Context()))
+		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
+		return
 	}
 	writeJSON(w, http.StatusOK, authResponse{
 		User:      toUserResponse(*user, user.LastLoginAt),
@@ -276,49 +269,23 @@ func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveSPA(w http.ResponseWriter, r *http.Request) {
-	root := s.cfg.StaticDir
-	if root == "" || root == "." {
-		writeError(w, r, NewAPIError(http.StatusNotFound, CodeNotFound, "Not found."))
-		return
-	}
-	indexPath := filepath.Join(root, "index.html")
-	if _, err := os.Stat(indexPath); err != nil {
+	if s.staticHandler == nil || len(s.indexHTML) == 0 {
 		writeError(w, r, NewAPIError(http.StatusNotFound, CodeNotFound, "Not found."))
 		return
 	}
 
 	clean := path.Clean("/" + r.URL.Path)
-	requested := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(clean, "/")))
-	if !withinRoot(root, requested) {
-		writeError(w, r, NewAPIError(http.StatusNotFound, CodeNotFound, "Not found."))
-		return
-	}
-	//nolint:gosec // requested is resolved beneath the configured static root by withinRoot above
-	if info, err := os.Stat(requested); err == nil && !info.IsDir() {
+	if path.Ext(clean) != "" {
 		setStaticCache(w, clean)
-		//nolint:gosec // requested is resolved beneath the configured static root by withinRoot above
-		http.ServeFile(w, r, requested)
+		s.staticHandler.ServeHTTP(w, r)
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, indexPath)
-}
-
-func withinRoot(root, candidate string) bool {
-	absoluteRoot, err := filepath.Abs(root)
-	if err != nil {
-		return false
+	if _, err := w.Write(s.indexHTML); err != nil {
+		s.logger.Warn("serve index failed", "error", err, "request_id", RequestID(r.Context()))
 	}
-	absoluteCandidate, err := filepath.Abs(candidate)
-	if err != nil {
-		return false
-	}
-	relative, err := filepath.Rel(absoluteRoot, absoluteCandidate)
-	if err != nil {
-		return false
-	}
-	return relative == "." || (!strings.HasPrefix(relative, ".."+string(filepath.Separator)) && relative != "..")
 }
 
 func setStaticCache(w http.ResponseWriter, cleanPath string) {

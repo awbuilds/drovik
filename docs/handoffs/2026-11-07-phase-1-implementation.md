@@ -14,7 +14,7 @@ Docker/Compose deployment assets and CI.
   - SQLite via `modernc.org/sqlite`, WAL, foreign keys, embedded goose migrations;
   - Argon2id passwords, opaque sessions with SHA-256 token hashes, idle/absolute expiry;
   - first-run setup, login, logout, `/auth/me`, `/version`, `/healthz`, `/readyz`;
-  - CSRF double-submit + Origin checks, audit events, session janitor.
+  - session-bound CSRF synchronizer token + Origin checks, audit events, session janitor.
 - Frontend implemented under `frontend/`:
   - React 19 + TypeScript 7 strict + Vite 8 + Tailwind CSS 4;
   - deliberate dark/light “control room” design tokens, self-hosted fonts, Radix primitives;
@@ -31,7 +31,8 @@ Docker/Compose deployment assets and CI.
 - Rune/OpenCode design language in React; Rune framework not used (ADR 0001/0009).
 - `modernc.org/sqlite` pure Go driver; goose migrations.
 - Argon2id with 64 MiB / 3 iterations / 2 lanes; opaque sessions; hashed token storage.
-- CSRF double-submit cookie plus Origin/Sec-Fetch-Site checks.
+- CSRF uses an HMAC-derived session-bound token (no readable CSRF cookie) plus
+  Origin/Sec-Fetch-Site checks.
 - Egress defaults and SSH trust are documented but not implemented until Phase 2.
 
 ## Files Touched

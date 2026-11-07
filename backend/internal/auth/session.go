@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -15,10 +17,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/storage"
 )
 
-const (
-	DefaultSessionCookieName = "drovik_session"
-	DefaultCSRFCookieName    = "drovik_csrf"
-)
+const DefaultSessionCookieName = "drovik_session"
 
 var (
 	ErrInvalidSession = errors.New("invalid session")
@@ -35,7 +34,7 @@ type SessionManager struct {
 	cookieSecure bool
 
 	sessionCookieName string
-	csrfCookieName    string
+	csrfKey           []byte
 
 	now func() time.Time
 }
@@ -45,6 +44,7 @@ func NewSessionManager(
 	users *storage.UserRepository,
 	idleTTL, absoluteTTL time.Duration,
 	cookieSecure bool,
+	csrfKey []byte,
 	logger *slog.Logger,
 ) *SessionManager {
 	return &SessionManager{
@@ -55,17 +55,13 @@ func NewSessionManager(
 		absoluteTTL:       absoluteTTL,
 		cookieSecure:      cookieSecure,
 		sessionCookieName: DefaultSessionCookieName,
-		csrfCookieName:    DefaultCSRFCookieName,
+		csrfKey:           append([]byte(nil), csrfKey...),
 		now:               time.Now,
 	}
 }
 
 func (m *SessionManager) Create(ctx context.Context, userID, userAgent string) (*storage.Session, string, string, error) {
 	token, err := randomToken()
-	if err != nil {
-		return nil, "", "", err
-	}
-	csrf, err := randomToken()
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -84,7 +80,7 @@ func (m *SessionManager) Create(ctx context.Context, userID, userAgent string) (
 	if err := m.sessions.Create(ctx, session); err != nil {
 		return nil, "", "", err
 	}
-	return &session, token, csrf, nil
+	return &session, token, m.CSRFToken(token), nil
 }
 
 // Validate resolves a raw token to its session and user, enforcing revocation,
@@ -160,31 +156,20 @@ func (m *SessionManager) RevokeAllForUser(ctx context.Context, userID string) er
 	return m.sessions.RevokeAllForUser(ctx, userID, m.now().UTC())
 }
 
-func (m *SessionManager) SetCookies(w http.ResponseWriter, token, csrf string) {
-	maxAge := int(m.absoluteTTL.Seconds())
+func (m *SessionManager) SetSessionCookie(w http.ResponseWriter, token string) {
 	//nolint:gosec // Secure is configuration-driven; HttpOnly and SameSite are set
 	http.SetCookie(w, &http.Cookie{
 		Name:     m.sessionCookieName,
 		Value:    token,
 		Path:     "/",
-		MaxAge:   maxAge,
+		MaxAge:   int(m.absoluteTTL.Seconds()),
 		HttpOnly: true,
-		Secure:   m.cookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
-	//nolint:gosec // CSRF cookie is intentionally readable by the client; Secure and SameSite are set
-	http.SetCookie(w, &http.Cookie{
-		Name:     m.csrfCookieName,
-		Value:    csrf,
-		Path:     "/",
-		MaxAge:   maxAge,
-		HttpOnly: false,
 		Secure:   m.cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
-func (m *SessionManager) ClearCookies(w http.ResponseWriter) {
+func (m *SessionManager) ClearSessionCookie(w http.ResponseWriter) {
 	//nolint:gosec // Secure is configuration-driven; HttpOnly and SameSite are set
 	http.SetCookie(w, &http.Cookie{
 		Name:     m.sessionCookieName,
@@ -192,29 +177,6 @@ func (m *SessionManager) ClearCookies(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   m.cookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
-	//nolint:gosec // CSRF cookie is intentionally readable by the client; Secure and SameSite are set
-	http.SetCookie(w, &http.Cookie{
-		Name:     m.csrfCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: false,
-		Secure:   m.cookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func (m *SessionManager) SetCSRFCookie(w http.ResponseWriter, csrf string) {
-	//nolint:gosec // CSRF cookie is intentionally readable by the client; Secure and SameSite are set
-	http.SetCookie(w, &http.Cookie{
-		Name:     m.csrfCookieName,
-		Value:    csrf,
-		Path:     "/",
-		MaxAge:   int(m.absoluteTTL.Seconds()),
-		HttpOnly: false,
 		Secure:   m.cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -228,20 +190,25 @@ func (m *SessionManager) SessionToken(r *http.Request) string {
 	return cookie.Value
 }
 
-func (m *SessionManager) CSRFToken(r *http.Request) string {
-	cookie, err := r.Cookie(m.csrfCookieName)
-	if err != nil {
-		return ""
-	}
-	return cookie.Value
+// CSRFToken derives a session-bound synchronizer token. It is sent to the
+// authenticated client in the response body and must be echoed in the
+// X-CSRF-Token header for mutations. It is not stored in a readable cookie.
+func (m *SessionManager) CSRFToken(sessionToken string) string {
+	mac := hmac.New(sha256.New, m.csrfKey)
+	mac.Write([]byte("drovik-csrf-v1:"))
+	mac.Write([]byte(sessionToken))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
-func (m *SessionManager) NewCSRFToken() (string, error) {
-	return randomToken()
+func (m *SessionManager) ValidateCSRF(sessionToken, csrfToken string) bool {
+	if sessionToken == "" || csrfToken == "" {
+		return false
+	}
+	expected := m.CSRFToken(sessionToken)
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(csrfToken)) == 1
 }
 
 func (m *SessionManager) SessionCookieName() string { return m.sessionCookieName }
-func (m *SessionManager) CSRFCookieName() string    { return m.csrfCookieName }
 
 func TokenHash(token string) string {
 	sum := sha256.Sum256([]byte(token))

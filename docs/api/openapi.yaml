@@ -61,7 +61,7 @@ paths:
           description: Administrator created and signed in
           headers:
             Set-Cookie:
-              description: Session and CSRF cookies
+              description: Session cookie
               schema:
                 type: string
           content:
@@ -94,7 +94,7 @@ paths:
           description: Authenticated session
           headers:
             Set-Cookie:
-              description: Session and CSRF cookies
+              description: Session cookie
               schema:
                 type: string
           content:
@@ -211,7 +211,7 @@ components:
       name: X-CSRF-Token
       in: header
       required: true
-      description: Double-submit token matching the readable `drovik_csrf` cookie.
+      description: Session-bound synchronizer token returned by login, setup or `/auth/me`.
       schema:
         type: string
         minLength: 32

@@ -199,7 +199,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		session, user, err := s.auth.Validate(r.Context(), token)
 		if err != nil {
 			if errors.Is(err, auth.ErrInvalidSession) {
-				s.auth.ClearCookies(w)
+				s.auth.ClearSessionCookie(w)
 				writeError(w, r, NewAPIError(
 					http.StatusUnauthorized,
 					CodeAuthSessionExpired,
@@ -225,9 +225,9 @@ func (s *Server) requireCSRF(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		cookieToken := s.auth.CSRFToken(r)
+		sessionToken := s.auth.SessionToken(r)
 		headerToken := r.Header.Get("X-CSRF-Token")
-		if !security.SecureEqual(cookieToken, headerToken) {
+		if !s.auth.ValidateCSRF(sessionToken, headerToken) {
 			writeError(w, r, NewAPIError(http.StatusForbidden, CodeCSRFInvalid, "CSRF validation failed."))
 			return
 		}

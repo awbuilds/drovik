@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -28,11 +30,27 @@ type Server struct {
 	limiter      *security.LoginLimiter
 	setupLimiter *security.LoginLimiter
 	version      version.Info
+
+	staticHandler http.Handler
+	indexHTML     []byte
 }
 
 func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audit.Service) *Server {
 	users := storage.NewUserRepository(db)
 	sessions := storage.NewSessionRepository(db)
+
+	var staticHandler http.Handler
+	var indexHTML []byte
+	if cfg.StaticDir != "" {
+		index, err := os.ReadFile(filepath.Join(cfg.StaticDir, "index.html"))
+		if err == nil {
+			indexHTML = index
+			staticHandler = http.FileServer(http.Dir(cfg.StaticDir))
+		} else {
+			logger.Debug("static frontend not available", "dir", cfg.StaticDir, "error", err)
+		}
+	}
+
 	return &Server{
 		cfg:      cfg,
 		logger:   logger,
@@ -46,11 +64,14 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 			cfg.SessionIdleTTL,
 			cfg.SessionAbsoluteTTL,
 			cfg.CookieSecure,
+			cfg.EncryptionKey,
 			logger,
 		),
-		limiter:      security.NewLoginLimiter(cfg.LoginRateLimit, cfg.LoginRateWindow),
-		setupLimiter: security.NewLoginLimiter(5, 10*time.Minute),
-		version:      version.Get(),
+		limiter:       security.NewLoginLimiter(cfg.LoginRateLimit, cfg.LoginRateWindow),
+		setupLimiter:  security.NewLoginLimiter(5, 10*time.Minute),
+		version:       version.Get(),
+		staticHandler: staticHandler,
+		indexHTML:     indexHTML,
 	}
 }
 

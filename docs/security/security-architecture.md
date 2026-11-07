@@ -52,7 +52,9 @@ Every HTTP request passes through:
 
 Cookie-authenticated state-changing requests require:
 
-- A CSRF token in a non-HttpOnly cookie, matched against an `X-CSRF-Token` header.
+- A session-bound synchronizer token sent in the response body and echoed in an
+  `X-CSRF-Token` header for mutations. The token is derived with HMAC-SHA-256 from the opaque
+  session token and the server key, so it is not stored in a readable cookie or in the database.
 - `Origin`/`Sec-Fetch-Site` validation against trusted origins.
 - `SameSite=Lax` as an additional layer.
 

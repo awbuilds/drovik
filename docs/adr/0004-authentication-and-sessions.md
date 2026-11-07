@@ -16,8 +16,9 @@ security and CSRF protection are critical.
 - Opaque, random session tokens (at least 256 bits). Store only a SHA-256 hash in the database.
 - Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure` when served over HTTPS, scoped path.
 - Configurable idle and absolute lifetimes. Logout revokes the session server-side.
-- CSRF: double-submit token plus `Origin` validation for state-changing cookie-authenticated
-  requests.
+- CSRF: a session-bound synchronizer token (HMAC-SHA-256 over the opaque session token and
+  server key) sent in the response body and required in `X-CSRF-Token`, plus `Origin` and
+  `Sec-Fetch-Site` validation for state-changing cookie-authenticated requests.
 - Login rate limiting per IP and username; constant-time password verification; generic error
   messages to avoid user enumeration.
 - WebSocket upgrades authenticate the session and validate `Origin`.

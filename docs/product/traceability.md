@@ -27,8 +27,8 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
 | AUTH-001 | Unauthenticated users cannot access protected data | Tested | `requireAuth` middleware | `TestSetupLoginLogoutFlow` |
 | AUTH-002 | Login rate limiting | Tested | `internal/security.LoginLimiter` | `TestLoginAndRateLimit` |
 | AUTH-003 | Constant-time password verification | Tested | Argon2id + `subtle.ConstantTimeCompare` | `TestPasswordHashAndVerify` |
-| AUTH-004 | HttpOnly/SameSite/Secure cookies | Tested | `SessionManager.SetCookies` | `TestSessionCookies` |
-| AUTH-005 | CSRF protection | Tested | Double-submit token + Origin checks | `TestSetupLoginLogoutFlow`, `TestOriginAndContentTypeValidation` |
+| AUTH-004 | HttpOnly/SameSite/Secure cookies | Tested | `SessionManager.SetSessionCookie` | `TestSessionCookie` |
+| AUTH-005 | CSRF protection | Tested | Session-bound synchronizer token + Origin checks | `TestSetupLoginLogoutFlow`, `TestCSRFToken`, `TestOriginAndContentTypeValidation` |
 | AUTH-006 | Logout invalidates server session | Tested | `RevokeByToken` + cookie clearing | `TestSetupLoginLogoutFlow` |
 | AUTH-007 | Expired/revoked sessions rejected | Tested (HTTP) | Session validation | `TestSessionIdleExpiry`, `TestSessionRevoke` |
 | AUTH-008 | WebSocket session + Origin validation | Deferred | Phase 3 WebSocket work | — |

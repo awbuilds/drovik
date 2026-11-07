@@ -15,8 +15,9 @@ Phase 1 endpoints:
 | `GET` | `/healthz` | Liveness |
 | `GET` | `/readyz` | Readiness |
 
-Cookie-authenticated mutations require the `X-CSRF-Token` header matching the readable
-`drovik_csrf` cookie. Errors use the stable envelope described in the specification.
+Cookie-authenticated mutations require the session-bound `X-CSRF-Token` returned by login, setup
+or `/auth/me`. It is not stored in a readable cookie. Errors use the stable envelope described in
+the specification.
 
 The document is the intended source of truth for generated Go and TypeScript types. Generation
 and contract tests land with the Phase 2 API expansion.
