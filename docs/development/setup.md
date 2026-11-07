@@ -36,17 +36,18 @@ Never work on `main`.
 ## Configuration
 
 ```bash
-cp .env.example .env
+cp .env.example backend/.env
 # Generate a development encryption key:
-mkdir -p secrets
-openssl rand -base64 32 > secrets/encryption.key
-chmod 600 secrets/encryption.key
+mkdir -p backend/secrets
+openssl rand -base64 32 > backend/secrets/encryption.key
+chmod 600 backend/secrets/encryption.key
 ```
 
-`.env` and `secrets/` are gitignored. Never commit them.
+`.env` and `secrets/` are gitignored. Never commit them. The backend loads `.env` from its
+working directory, so run it from `backend/` for local development. The relative paths in the
+example file assume that working directory.
 
-The backend reads configuration from environment variables. For local development it also loads
-`.env` if present. Secrets are never printed in logs.
+The backend reads configuration from environment variables. Secrets are never printed in logs.
 
 ## Backend
 
@@ -72,8 +73,31 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Vite serves on `http://localhost:5173` and proxies `/api` to the backend. Set
-`DROVIK_TRUSTED_ORIGINS` to include the Vite origin.
+Vite serves on `http://localhost:5173` and proxies `/api` to `http://127.0.0.1:8080` by
+default. If the backend uses another port, start Vite with `DROVIK_API_PROXY`:
+
+```bash
+DROVIK_API_PROXY=http://127.0.0.1:8090 pnpm dev
+```
+
+Set `DROVIK_TRUSTED_ORIGINS` to include the Vite origin.
+
+## Docker Compose
+
+The production-oriented container path is documented in [deploy/README.md](../../deploy/README.md).
+For local container testing:
+
+```bash
+cd deploy/compose
+cp .env.example .env
+mkdir -p secrets
+openssl rand -base64 32 > secrets/encryption.key
+chmod 600 secrets/encryption.key
+docker compose up --build
+```
+
+The service binds to `127.0.0.1:8080` and expects a TLS reverse proxy in front of it. The health
+check uses `drovik healthcheck`, which makes one bounded request to `/healthz`.
 
 ## Tests and checks
 

@@ -1,0 +1,29 @@
+# Caddy reverse proxy for Drovik.
+# Replace drovik.example.com and the TLS settings with your own domain.
+#
+# Caddy obtains and renews TLS certificates automatically. Keep the Drovik
+# container bound to 127.0.0.1:8080 so it is not exposed directly.
+
+drovik.example.com {
+	encode zstd gzip
+
+	# File transfers and future SFTP upload streams can be large. Keep a bounded
+	# limit that matches your deployment policy rather than an unlimited body.
+	request_body {
+		max_size 2GB
+	}
+
+	reverse_proxy 127.0.0.1:8080 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		-Server
+	}
+}

@@ -1,0 +1,47 @@
+name: drovik
+
+services:
+  drovik:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        VERSION: ${DROVIK_VERSION:-dev}
+        COMMIT: ${DROVIK_COMMIT:-unknown}
+        BUILD_DATE: ${DROVIK_BUILD_DATE:-unknown}
+    image: ${DROVIK_IMAGE:-ghcr.io/awbuilds/drovik:dev}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DROVIK_ENV: production
+      DROVIK_PUBLIC_URL: ${DROVIK_PUBLIC_URL:?Set DROVIK_PUBLIC_URL in deploy/compose/.env}
+      DROVIK_TRUSTED_ORIGINS: ${DROVIK_TRUSTED_ORIGINS:?Set DROVIK_TRUSTED_ORIGINS in deploy/compose/.env}
+      DROVIK_ENCRYPTION_KEY_FILE: /run/secrets/encryption_key
+      DROVIK_COOKIE_SECURE: "true"
+      DROVIK_LOG_FORMAT: json
+      DROVIK_LOG_LEVEL: ${DROVIK_LOG_LEVEL:-info}
+    volumes:
+      - drovik-data:/data
+    secrets:
+      - encryption_key
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "/drovik", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+secrets:
+  encryption_key:
+    file: ${DROVIK_ENCRYPTION_KEY_FILE:-./secrets/encryption.key}
+
+volumes:
+  drovik-data:

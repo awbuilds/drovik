@@ -12,32 +12,32 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
 
 ## Phase 1 — Setup and authentication
 
-| ID | Requirement | Status | Implementation | Tests |
+| ID | Requirement | Status | Implementation | Evidence |
 |---|---|---|---|---|
-| SET-001 | First-run detection | In progress | `backend/internal/auth`, `/api/v1/setup/status` | pending |
-| SET-002 | Initial administrator creation | In progress | `POST /api/v1/setup` | pending |
-| SET-003 | One-time setup disabled after initialization | In progress | setup guard | pending |
-| SET-004 | Secure password storage (Argon2id) | In progress | `backend/internal/auth/password.go` | pending |
-| SET-005 | Configurable session expiry and logout | In progress | `backend/internal/auth/session.go` | pending |
-| SET-006 | Version/build/schema identity in settings | In progress | `/api/v1/version`, settings page | pending |
-| SET-007 | Configuration validation; no secret logging | In progress | `backend/internal/config`, logging redaction | pending |
-| SET-008 | UTC storage, local display | In progress | store UTC; frontend formatting | pending |
-| SET-009 | Backup configuration documented | Planned | deployment docs | pending |
-| SET-010 | Safe defaults, no servers configured | In progress | first-run state | pending |
-| AUTH-001 | Unauthenticated users cannot access server data | In progress | auth middleware | pending |
-| AUTH-002 | Login rate limiting | In progress | rate limiter | pending |
-| AUTH-003 | Constant-time password verification | In progress | Argon2id library | pending |
-| AUTH-004 | HttpOnly/SameSite/Secure cookies | In progress | session cookie | pending |
-| AUTH-005 | CSRF protection | In progress | CSRF middleware | pending |
-| AUTH-006 | Logout invalidates server session | In progress | session revocation | pending |
-| AUTH-007 | Expired/revoked sessions rejected (HTTP + WS) | In progress | session middleware | pending |
-| AUTH-008 | WebSocket session + Origin validation | Planned | Phase 3 | pending |
-| AUTH-009 | Backend authorization | In progress | middleware/handlers | pending |
-| AUTH-010 | Per-user server access (multi-user) | Planned | data model ready | pending |
-| AUTH-011 | Read-only role blocked from mutations | Planned | Phase 9 | pending |
-| AUTH-012 | Recent auth for sensitive changes | Planned | Phase 1+ | pending |
-| AUTH-013 | Password change revokes other sessions | Planned | Phase 1+ | pending |
-| AUTH-014 | No user enumeration | In progress | generic login errors | pending |
+| SET-001 | First-run detection | Tested | `/api/v1/setup/status` | `TestSetupLoginLogoutFlow` |
+| SET-002 | Initial administrator creation | Tested | `POST /api/v1/setup` | `TestSetupLoginLogoutFlow` |
+| SET-003 | One-time setup disabled after initialization | Tested | `CreateFirstAdmin` transaction + setup guard | `TestSetupLoginLogoutFlow` |
+| SET-004 | Secure password storage (Argon2id) | Tested | `internal/auth/password.go` | `TestPasswordHashAndVerify`, `TestPasswordHashesAreSalted` |
+| SET-005 | Configurable session expiry and logout | Tested | `internal/auth/session.go` | `TestSessionIdleExpiry`, `TestSessionRevoke` |
+| SET-006 | Version/build/schema identity | Tested | `/api/v1/version`, Settings page | `TestVersionAndSecurityHeaders` |
+| SET-007 | Configuration validation; no secret logging | Tested | `internal/config`, redacting logger | `config_test.go`, `TestRedaction` |
+| SET-008 | UTC storage, local display | Implemented | UTC timestamps; frontend formatters | `formatDateTime`/`formatRelativeTime` |
+| SET-009 | Backup configuration documented | Implemented | `deploy/README.md` | Manual review |
+| SET-010 | Safe defaults, no servers configured | Implemented | Empty server catalog; first-run workspace | Workspace empty state |
+| AUTH-001 | Unauthenticated users cannot access protected data | Tested | `requireAuth` middleware | `TestSetupLoginLogoutFlow` |
+| AUTH-002 | Login rate limiting | Tested | `internal/security.LoginLimiter` | `TestLoginAndRateLimit` |
+| AUTH-003 | Constant-time password verification | Tested | Argon2id + `subtle.ConstantTimeCompare` | `TestPasswordHashAndVerify` |
+| AUTH-004 | HttpOnly/SameSite/Secure cookies | Tested | `SessionManager.SetCookies` | `TestSessionCookies` |
+| AUTH-005 | CSRF protection | Tested | Double-submit token + Origin checks | `TestSetupLoginLogoutFlow`, `TestOriginAndContentTypeValidation` |
+| AUTH-006 | Logout invalidates server session | Tested | `RevokeByToken` + cookie clearing | `TestSetupLoginLogoutFlow` |
+| AUTH-007 | Expired/revoked sessions rejected | Tested (HTTP) | Session validation | `TestSessionIdleExpiry`, `TestSessionRevoke` |
+| AUTH-008 | WebSocket session + Origin validation | Deferred | Phase 3 WebSocket work | — |
+| AUTH-009 | Backend authorization | Implemented | Auth middleware; server routes arrive in Phase 2 | `TestSetupLoginLogoutFlow` |
+| AUTH-010 | Per-user server access | Deferred | Phase 2+ multi-user data model | — |
+| AUTH-011 | Read-only role blocked from mutations | Deferred | Phase 9 | — |
+| AUTH-012 | Recent auth for sensitive changes | Deferred | Phase 1+ follow-up | — |
+| AUTH-013 | Password change revokes other sessions | Deferred | Phase 1+ follow-up | — |
+| AUTH-014 | No user enumeration | Tested | Generic errors + dummy verification | `TestLoginAndRateLimit` (generic 401) |
 
 ## Later phases
 
@@ -54,7 +54,7 @@ starts. Summary:
 | Processes | PROC-001–013 | Not started |
 | Services | SVC-001–014 | Not started |
 | Logs | LOG-001–012 | Not started |
-| Audit | AUD-001–009 | Not started |
+| Audit | AUD-001–009 | Partially: login/setup/logout events |
 | Notifications | MSG-001–007 | Not started |
 | Performance | NFR-PERF-001–007 | Not started |
 | Reliability | NFR-REL-001–007 | Not started |
