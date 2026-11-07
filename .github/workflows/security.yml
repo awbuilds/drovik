@@ -28,13 +28,28 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check for analyzed source
+        id: source
+        run: |
+          if [ -f backend/go.mod ] || [ -f frontend/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Initialize CodeQL
+        if: steps.source.outputs.present == 'true'
         uses: github/codeql-action/init@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
         with:
           languages: go, javascript-typescript
 
       - name: Analyze
+        if: steps.source.outputs.present == 'true'
         uses: github/codeql-action/analyze@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
+
+      - name: Skip notice
+        if: steps.source.outputs.present == 'false'
+        run: echo "No analyzed source yet; skipping CodeQL."
 
   govulncheck:
     name: Go vulnerability check

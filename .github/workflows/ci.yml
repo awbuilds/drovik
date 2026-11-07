@@ -16,9 +16,6 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -35,6 +32,7 @@ jobs:
       - name: Check formatting
         if: hashFiles('backend/go.mod') != ''
         run: |
+          cd backend
           unformatted=$(gofmt -l .)
           if [ -n "$unformatted" ]; then
             echo "Unformatted files:"
@@ -44,11 +42,11 @@ jobs:
 
       - name: Vet
         if: hashFiles('backend/go.mod') != ''
-        run: go vet ./...
+        run: cd backend && go vet ./...
 
       - name: Test
         if: hashFiles('backend/go.mod') != ''
-        run: go test -race ./...
+        run: cd backend && go test -race ./...
 
       - name: Lint
         if: hashFiles('backend/go.mod') != '' && hashFiles('backend/.golangci.yml') != ''
@@ -63,9 +61,6 @@ jobs:
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -88,23 +83,23 @@ jobs:
 
       - name: Install
         if: hashFiles('frontend/package.json') != ''
-        run: pnpm install --frozen-lockfile
+        run: cd frontend && pnpm install --frozen-lockfile
 
       - name: Lint
         if: hashFiles('frontend/package.json') != ''
-        run: pnpm lint
+        run: cd frontend && pnpm lint
 
       - name: Typecheck
         if: hashFiles('frontend/package.json') != ''
-        run: pnpm typecheck
+        run: cd frontend && pnpm typecheck
 
       - name: Test
         if: hashFiles('frontend/package.json') != ''
-        run: pnpm test -- --run
+        run: cd frontend && pnpm test
 
       - name: Build
         if: hashFiles('frontend/package.json') != ''
-        run: pnpm build
+        run: cd frontend && pnpm build
 
       - name: Skip notice
         if: hashFiles('frontend/package.json') == ''
@@ -120,9 +115,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: "false"
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.27"
+
+      - name: Install gitleaks
+        run: |
+          go install github.com/gitleaks/gitleaks/v8@v8.30.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Scan repository
+        run: gitleaks detect --source . --redact --no-banner --verbose
