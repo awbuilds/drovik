@@ -1,0 +1,58 @@
+name: Feature request
+description: Propose a feature or improvement.
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Drovik follows the phased scope in `docs/product/PRD.md`. Please check whether the
+        request is already in scope, deferred, or explicitly out of scope before filing.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the smallest useful version.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: input
+    id: requirement
+    attributes:
+      label: Related requirement ID
+      description: If this maps to the PRD, name it (for example FILE-022).
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Suggested phase
+      options:
+        - Phase 0 — foundation
+        - Phase 1 — skeleton and auth
+        - Phase 2 — SSH connections
+        - Phase 3 — workspace and terminal
+        - Phase 4 — SFTP files
+        - Phase 5 — monitoring
+        - Phase 6 — processes, services, logs
+        - Phase 7 — beta hardening
+        - Phase 8 — stable release
+        - Post-MVP (Phase 9)
+        - Unsure
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I checked the PRD and existing issues.
+          required: true
