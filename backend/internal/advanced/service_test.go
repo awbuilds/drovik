@@ -906,3 +906,21 @@ func TestManagedTaskEmptyAndSilentCrontab(t *testing.T) {
 		t.Fatalf("expected truncated crontab rejection, got %v", err)
 	}
 }
+
+func TestDockerRemoveForcesRunningContainer(t *testing.T) {
+	var acted string
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		if strings.HasPrefix(command, "docker rm ") {
+			acted = command
+			return "", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	containerID := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	if err := service.DockerAction(context.Background(), env.User.ID, env.Server.ID, containerID, "remove"); err != nil {
+		t.Fatalf("DockerAction: %v", err)
+	}
+	if acted != "docker rm -f "+containerID {
+		t.Fatalf("unexpected remove command: %q", acted)
+	}
+}
