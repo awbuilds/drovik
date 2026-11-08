@@ -29,6 +29,9 @@ type Server struct {
 	// MetricsUnavailable omits the /proc/stat section to simulate a host
 	// without usable /proc metrics.
 	MetricsUnavailable bool
+	// CommandHook runs before the built-in responses. Return handled=true to
+	// send stdout/stderr and exit with the given status.
+	CommandHook func(command string) (stdout, stderr string, exitCode int, handled bool)
 
 	listener net.Listener
 	server   *gssh.Server
@@ -109,6 +112,18 @@ func newSigner() (ssh.Signer, ed25519.PrivateKey, error) {
 }
 
 func respond(session gssh.Session, command string, server *Server) {
+	if server.CommandHook != nil {
+		if stdout, stderr, exitCode, handled := server.CommandHook(command); handled {
+			_, _ = io.WriteString(session, stdout)
+			if stderr != "" {
+				_, _ = io.WriteString(session.Stderr(), stderr)
+			}
+			if exitCode != 0 {
+				_ = session.Exit(exitCode)
+			}
+			return
+		}
+	}
 	switch {
 	case strings.Contains(command, "@@stat@@"):
 		if server.MetricsUnavailable {

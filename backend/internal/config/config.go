@@ -69,6 +69,12 @@ type Config struct {
 	MonitorMaxOutputBytes  int
 	MonitorMaxFilesystems  int
 	MonitorMaxInterfaces   int
+
+	OpsCommandTimeout time.Duration
+	ProcessMaxEntries int
+	ServiceMaxUnits   int
+	LogMaxLines       int
+	LogMaxOutputBytes int
 }
 
 func Load() (*Config, error) {
@@ -278,6 +284,30 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		return nil, errors.New("monitoring limits must be positive and the stale window must not be shorter than the refresh interval")
 	}
 
+	opsTimeout, err := parseDuration(lookup, "DROVIK_OPS_COMMAND_TIMEOUT", 20*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	processMaxEntries, err := parseInt(lookup, "DROVIK_PROCESS_MAX_ENTRIES", 2000)
+	if err != nil {
+		return nil, err
+	}
+	serviceMaxUnits, err := parseInt(lookup, "DROVIK_SERVICE_MAX_UNITS", 1000)
+	if err != nil {
+		return nil, err
+	}
+	logMaxLines, err := parseInt(lookup, "DROVIK_LOG_MAX_LINES", 1000)
+	if err != nil {
+		return nil, err
+	}
+	logMaxOutput, err := parseInt(lookup, "DROVIK_LOG_MAX_OUTPUT_BYTES", 1<<20)
+	if err != nil {
+		return nil, err
+	}
+	if opsTimeout <= 0 || processMaxEntries <= 0 || serviceMaxUnits <= 0 || logMaxLines <= 0 || logMaxOutput <= 0 {
+		return nil, errors.New("operations limits must be greater than zero")
+	}
+
 	maxSessionsPerUser, err := parseInt(lookup, "DROVIK_SSH_MAX_SESSIONS_PER_USER", 2)
 	if err != nil {
 		return nil, err
@@ -348,6 +378,11 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		MonitorMaxOutputBytes:   monitorMaxOutput,
 		MonitorMaxFilesystems:   monitorMaxFilesystems,
 		MonitorMaxInterfaces:    monitorMaxInterfaces,
+		OpsCommandTimeout:       opsTimeout,
+		ProcessMaxEntries:       processMaxEntries,
+		ServiceMaxUnits:         serviceMaxUnits,
+		LogMaxLines:             logMaxLines,
+		LogMaxOutputBytes:       logMaxOutput,
 	}, nil
 }
 

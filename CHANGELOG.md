@@ -20,6 +20,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Phase 5 host monitoring: agentless CPU, load, memory, filesystem, network and uptime snapshots
   with two-sample rate calculation, per-host caching/coalescing, stale fallback and a live
   monitoring page.
+- Phase 6 operations: bounded process list with SIGTERM/SIGKILL and PID identity checks, systemd
+  service discovery/actions with post-action state, and a bounded systemd journal viewer.
 - Project foundation: AGENTS.md contract, Hydra-style handoff notes, AGPL-3.0 licensing,
   contribution, security and governance documentation.
 - Architecture decision records and threat model.

@@ -196,6 +196,63 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
   `stale` with a warning; older failures surface as an error.
 - Metrics are not persisted as historical time series.
 
+
+## Phase 6 — Processes, services and logs
+
+| ID | Requirement | Status | Implementation / evidence |
+|---|---|---|---|
+| PROC-001 | Process list | Tested | `processes.Service.List`; service/HTTP tests |
+| PROC-002 | Identity fields | Tested | PID/PPID/user/state/CPU/memory/RSS/uptime/command; parser test |
+| PROC-003 | Sorting and refresh | Implemented | Client sorting; 10s auto + manual refresh |
+| PROC-004 | Filter/search | Implemented | Client filter over the bounded list |
+| PROC-005 | Remote account context | Implemented | Account badge and page description |
+| PROC-006 | SIGTERM | Tested | Enumerated signal; service/HTTP tests |
+| PROC-007 | SIGKILL confirmation | Implemented | Separate signal + explicit checkbox |
+| PROC-008 | Honest permissions | Tested | Permission mapping; denied-signal test |
+| PROC-009 | Structured parameters | Tested | Validated PID and fixed kill command; no shell concatenation |
+| PROC-010 | PID identity recheck | Tested | Start-time recheck; reused-PID test |
+| PROC-011 | Data-loss warning | Implemented | Signal dialog warning |
+| PROC-012 | Post-action check | Implemented | Running/state returned and list invalidated |
+| PROC-013 | Failed/denied display | Implemented | Stable error codes and dialog errors |
+| SVC-001 | systemd detection | Tested | `systemctl` list failure maps to unavailable; test |
+| SVC-002 | Unit discovery/state | Tested | list-units + list-unit-files merge; parser test |
+| SVC-003 | Distinct states | Implemented | Active/sub/file-state badges |
+| SVC-004 | Service details | Implemented | Unit name, description, states |
+| SVC-005 | Start/stop/restart | Tested | Enumerated actions; HTTP test |
+| SVC-006 | Reload | Implemented | Enumerated action |
+| SVC-007 | Enable/disable | Implemented | Enumerated actions with confirmation |
+| SVC-008 | Confirmation | Implemented | Action dialog with impact copy |
+| SVC-009 | Re-read after action | Tested | `systemctl show`; action test |
+| SVC-010 | No escalation | Implemented | `--no-ask-password`, no sudo |
+| SVC-011 | Unit validation | Tested | Regex validation before use; test |
+| SVC-012 | Unsupported states | Implemented | Unavailable alert and no retry as another user |
+| SVC-013 | Safe action errors | Implemented | Stable codes; generic client messages |
+| SVC-014 | Unit editing | Deferred | Explicitly out of MVP |
+| LOG-001 | Journal viewer | Tested | `logs.Service`; service/HTTP tests |
+| LOG-002 | System/unit logs | Tested | Unit query parameter; tests |
+| LOG-003 | Bounded lines/time | Implemented | `lines` limit and fixed time-range enum |
+| LOG-004 | Timestamp/severity | Tested | Journal JSON parsing; parser test |
+| LOG-005 | Text filtering | Implemented | Client filter over returned window |
+| LOG-006 | Refresh | Implemented | Manual refresh |
+| LOG-007 | Output/time limits | Implemented | Line/byte caps and command timeout |
+| LOG-008 | Permission errors | Tested | `JOURNAL_PERMISSION_DENIED`; test |
+| LOG-009 | No log retention | Implemented | Response-only; no persistence |
+| LOG-010 | XSS-safe rendering | Tested | React text rendering; script payload test |
+| LOG-011 | Unavailable state | Implemented | Unavailable alert with permission context |
+| LOG-012 | File-based logs | Deferred | Post-MVP; must use bounded SFTP |
+
+### Phase 6 notes
+
+- Process discovery uses the fixed `ps -eo ...` format; invalid lines are skipped.
+- Signals are limited to SIGTERM and SIGKILL. PID 1 is rejected by the backend and disabled in the UI.
+- The identity check compares the start time derived from `etimes` against the value captured by
+  the list within a 3-second tolerance. A mismatch returns `409 PROCESS_PID_REUSED` without
+  signaling.
+- Service actions accept only validated `.service` identifiers and enumerated verbs. Drovik never
+  uses sudo or silently retries with elevated privileges.
+- Journal output is parsed from JSON, bounded, and never stored. Log text is untrusted and rendered
+  as text.
+
 ## Later phases
 
 The remaining requirement groups are tracked in the PRD and will be added here when their phase

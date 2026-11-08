@@ -21,6 +21,11 @@ Current endpoints:
 | `POST` | `/api/v1/servers/{id}/trust-host-key` | Approve/replace a host key |
 | `GET` | `/api/v1/servers/{id}/capabilities` | Last detected capabilities |
 | `GET` | `/api/v1/servers/{id}/overview` | Cached host metrics snapshot |
+| `GET` | `/api/v1/servers/{id}/processes` | Bounded process list |
+| `POST` | `/api/v1/servers/{id}/processes/{pid}/signal` | SIGTERM/SIGKILL with identity check |
+| `GET` | `/api/v1/servers/{id}/services` | systemd service units |
+| `POST` | `/api/v1/servers/{id}/services/{unit}/action` | Enumerated service action |
+| `GET` | `/api/v1/servers/{id}/logs` | Bounded journal window |
 | `GET` | `/api/v1/servers/{id}/files` | List a remote directory over SFTP |
 | `POST` | `/api/v1/servers/{id}/files/upload` | Upload a file over SFTP |
 | `GET` | `/api/v1/servers/{id}/files/download` | Stream a remote file |

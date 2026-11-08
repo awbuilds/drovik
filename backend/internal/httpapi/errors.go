@@ -37,6 +37,16 @@ const (
 	CodeIsDirectory            = "IS_DIRECTORY"
 	CodeSFTPPermissionDenied   = "SFTP_PERMISSION_DENIED"
 	CodeCapabilityUnavailable  = "CAPABILITY_UNAVAILABLE"
+	CodeProcessUnavailable     = "PROCESS_UNAVAILABLE"
+	CodeProcessNotFound        = "PROCESS_NOT_FOUND"
+	CodeProcessPermission      = "PROCESS_PERMISSION_DENIED"
+	CodeProcessPIDReused       = "PROCESS_PID_REUSED"
+	CodeProcessActionFailed    = "PROCESS_ACTION_FAILED"
+	CodeSystemdUnavailable     = "SERVICE_MANAGER_UNAVAILABLE"
+	CodeServiceNotFound        = "SERVICE_NOT_FOUND"
+	CodeServicePermission      = "SERVICE_PERMISSION_DENIED"
+	CodeServiceActionFailed    = "SERVICE_ACTION_FAILED"
+	CodeJournalPermission      = "JOURNAL_PERMISSION_DENIED"
 )
 
 type APIError struct {

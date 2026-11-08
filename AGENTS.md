@@ -362,11 +362,13 @@ covered.
 - Phase 5: complete. Bounded agentless host metrics (CPU, load, memory, filesystems, network,
   uptime), per-host caching/coalescing, stale fallback and the monitoring UI are implemented and
   tested.
-- Phase 6: next. Process manager, systemd services and bounded logs.
-- Process, service and log features are not implemented yet.
+- Phase 6: complete. Bounded process discovery and enumerated signals with PID identity checks,
+  systemd unit discovery/actions with state re-reads, and bounded journal retrieval are implemented
+  and tested.
+- Phase 7: next. MVP integration, audit history, security hardening and public beta.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
-- Read the latest handoff in `docs/handoffs/` before starting Phase 6.
+- Read the latest handoff in `docs/handoffs/` before starting Phase 7.
 
 ## Decision inheritance
 
