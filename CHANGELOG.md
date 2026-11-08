@@ -14,6 +14,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   egress policy, password/private-key authentication and capability detection.
 - Phase 3 interactive terminal: authenticated WebSocket PTY, resize, bounded per-user/global
   sessions, rate limits, session cleanup and the xterm.js terminal panel.
+- Phase 4 SFTP file manager: safe directory listing, streamed uploads/downloads, create/rename/
+  delete, recursive-delete guards, symlink handling, stale-file detection and a bounded text
+  editor.
 - Project foundation: AGENTS.md contract, Hydra-style handoff notes, AGPL-3.0 licensing,
   contribution, security and governance documentation.
 - Architecture decision records and threat model.

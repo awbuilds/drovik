@@ -30,17 +30,23 @@ short, human-readable summary.
 - Bounded session pool and cleanup.
 - Terminal UI with server context and reconnect states.
 
-## Now — Phase 4: SFTP file manager and editor
+## Complete — Phase 4: SFTP file manager and editor
 
 - Safe directory listing, uploads, downloads and transfers.
 - Create/rename/delete with traversal and symlink protections.
 - Bounded text editor with unsaved-change and stale-file handling.
 
+## Now — Phase 5: system overview and metrics
+
+- Bounded `/proc` and standard-command collectors.
+- CPU deltas, memory, disk, uptime, load and network rates.
+- Honest unavailable/stale states and per-host coalescing.
+
 ## Then
 
 | Phase | Focus |
 |---|---|
-| 5 | System overview and metrics |
+| 6 | Processes, systemd services and logs |
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

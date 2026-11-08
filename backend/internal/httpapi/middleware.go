@@ -177,10 +177,16 @@ func (s *Server) cors(next http.Handler) http.Handler {
 }
 
 func (s *Server) bodyLimit(next http.Handler) http.Handler {
-	const maxBody = 1 << 20 // 1 MiB for JSON endpoints in Phase 1.
+	const maxJSONBody = 4 << 20 // 4 MiB for JSON endpoints, including editor payloads.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentType := strings.ToLower(r.Header.Get("Content-Type"))
+		if strings.HasPrefix(contentType, "multipart/form-data") {
+			// Upload handlers apply their own file-size limit.
+			next.ServeHTTP(w, r)
+			return
+		}
 		if r.Body != nil {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBody)
+			r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 		}
 		next.ServeHTTP(w, r)
 	})

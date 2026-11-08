@@ -300,6 +300,7 @@ export function ServersPage() {
               testing={testingId === server.id}
               onTest={() => void runTest(server)}
               onTerminal={() => navigate(`/terminal/${server.id}`)}
+              onFiles={() => navigate(`/files/${server.id}`)}
               onEdit={() => {
                 setEditing(server)
                 setDialogOpen(true)

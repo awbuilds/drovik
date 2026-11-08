@@ -17,6 +17,10 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
 import { WorkspacePage } from '@/pages/WorkspacePage'
 
+const FilesPage = lazy(() =>
+  import('@/pages/FilesPage').then((module) => ({ default: module.FilesPage })),
+)
+
 const TerminalPage = lazy(() =>
   import('@/pages/TerminalPage').then((module) => ({ default: module.TerminalPage })),
 )
@@ -104,6 +108,26 @@ function AppRoutes() {
         element={
           <AppShell>
             <ServersPage />
+          </AppShell>
+        }
+      />
+      <Route
+        path="/files"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading files" />}>
+              <FilesPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/files/:serverId"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading files" />}>
+              <FilesPage />
+            </Suspense>
           </AppShell>
         }
       />

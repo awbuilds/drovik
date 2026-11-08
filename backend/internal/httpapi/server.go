@@ -13,6 +13,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/audit"
 	"github.com/awbuilds/drovik/backend/internal/auth"
 	"github.com/awbuilds/drovik/backend/internal/config"
+	"github.com/awbuilds/drovik/backend/internal/files"
 	"github.com/awbuilds/drovik/backend/internal/secrets"
 	"github.com/awbuilds/drovik/backend/internal/security"
 	"github.com/awbuilds/drovik/backend/internal/servers"
@@ -32,6 +33,7 @@ type Server struct {
 	audit        *audit.Service
 	auth         *auth.SessionManager
 	servers      *servers.Service
+	files        *files.Service
 	terminal     *terminal.Manager
 	limiter      *security.LoginLimiter
 	setupLimiter *security.LoginLimiter
@@ -63,6 +65,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		auditService,
 		logger,
 	)
+	filesService := files.NewService(cfg, serverService, auditService, logger)
 	terminalManager := terminal.NewManager(cfg, serverService, logger)
 
 	var staticHandler http.Handler
@@ -85,6 +88,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		sessions: sessions,
 		audit:    auditService,
 		servers:  serverService,
+		files:    filesService,
 		terminal: terminalManager,
 		auth: auth.NewSessionManager(
 			sessions,
@@ -139,6 +143,17 @@ func (s *Server) Handler() http.Handler {
 			r.With(s.requireCSRF).Post("/servers/{id}/trust-host-key", s.handleTrustHostKey)
 			r.Get("/servers/{id}/capabilities", s.handleCapabilities)
 			r.Get("/servers/{id}/terminal", s.handleTerminal)
+
+			r.Get("/servers/{id}/files", s.handleListFiles)
+			r.Get("/servers/{id}/files/stat", s.handleStatFile)
+			r.Get("/servers/{id}/files/download", s.handleDownloadFile)
+			r.Get("/servers/{id}/files/content", s.handleReadFile)
+			r.With(s.requireCSRF).Post("/servers/{id}/files/upload", s.handleUploadFile)
+			r.With(s.requireCSRF).Post("/servers/{id}/files/mkdir", s.handleMkdir)
+			r.With(s.requireCSRF).Post("/servers/{id}/files/touch", s.handleTouch)
+			r.With(s.requireCSRF).Patch("/servers/{id}/files/rename", s.handleRename)
+			r.With(s.requireCSRF).Delete("/servers/{id}/files", s.handleDeleteFile)
+			r.With(s.requireCSRF).Put("/servers/{id}/files/content", s.handleWriteFile)
 		})
 	})
 

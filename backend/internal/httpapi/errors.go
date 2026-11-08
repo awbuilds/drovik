@@ -28,6 +28,14 @@ const (
 	CodeSSHHostKeyChanged      = "SSH_HOST_KEY_CHANGED"
 	CodeSSHAuthFailed          = "SSH_AUTH_FAILED"
 	CodeSSHTimeout             = "SSH_OPERATION_TIMEOUT"
+	CodeFileTooLarge           = "FILE_TOO_LARGE"
+	CodeFileBinary             = "FILE_BINARY"
+	CodeFileStale              = "FILE_STALE"
+	CodeFileConflict           = "FILE_CONFLICT"
+	CodeSFTPUnavailable        = "SFTP_UNAVAILABLE"
+	CodeSymlinkNotAllowed      = "SYMLINK_NOT_ALLOWED"
+	CodeIsDirectory            = "IS_DIRECTORY"
+	CodeSFTPPermissionDenied   = "SFTP_PERMISSION_DENIED"
 )
 
 type APIError struct {

@@ -56,6 +56,12 @@ type Config struct {
 
 	SSHMaxSessionsPerUser int
 	SSHMaxSessionsGlobal  int
+
+	SFTPMaxUploadBytes      int64
+	SFTPMaxEditorBytes      int64
+	SFTPMaxListEntries      int
+	SFTPMaxRecursiveEntries int
+	SFTPOperationTimeout    time.Duration
 }
 
 func Load() (*Config, error) {
@@ -210,6 +216,30 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		return nil, err
 	}
 
+	sftpMaxUpload, err := parseInt64(lookup, "DROVIK_SFTP_MAX_UPLOAD_BYTES", 2*1024*1024*1024)
+	if err != nil {
+		return nil, err
+	}
+	sftpMaxEditor, err := parseInt64(lookup, "DROVIK_SFTP_MAX_EDITOR_BYTES", 1*1024*1024)
+	if err != nil {
+		return nil, err
+	}
+	sftpMaxList, err := parseInt(lookup, "DROVIK_SFTP_MAX_LIST_ENTRIES", 5000)
+	if err != nil {
+		return nil, err
+	}
+	sftpMaxRecursive, err := parseInt(lookup, "DROVIK_SFTP_MAX_RECURSIVE_ENTRIES", 10000)
+	if err != nil {
+		return nil, err
+	}
+	sftpTimeout, err := parseDuration(lookup, "DROVIK_SFTP_OPERATION_TIMEOUT", 2*time.Minute)
+	if err != nil {
+		return nil, err
+	}
+	if sftpMaxUpload <= 0 || sftpMaxEditor <= 0 || sftpMaxList <= 0 || sftpMaxRecursive <= 0 || sftpTimeout <= 0 {
+		return nil, errors.New("SFTP limits must be greater than zero")
+	}
+
 	maxSessionsPerUser, err := parseInt(lookup, "DROVIK_SSH_MAX_SESSIONS_PER_USER", 2)
 	if err != nil {
 		return nil, err
@@ -244,31 +274,36 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 
 	return &Config{
-		Env:                   env,
-		HTTPAddr:              httpAddr,
-		PublicURL:             publicURL,
-		TrustedOrigins:        origins,
-		LogLevel:              logLevel,
-		LogFormat:             logFormat,
-		DataDir:               filepath.Clean(dataDir),
-		DBPath:                filepath.Clean(dbPath),
-		StaticDir:             filepath.Clean(staticDir),
-		EncryptionKey:         key,
-		SessionIdleTTL:        idleTTL,
-		SessionAbsoluteTTL:    absoluteTTL,
-		CookieSecure:          cookieSecure,
-		LoginRateLimit:        loginLimit,
-		LoginRateWindow:       loginWindow,
-		ShutdownTimeout:       shutdownTimeout,
-		ReadinessTimeout:      readinessTimeout,
-		SSHDialTimeout:        sshDialTimeout,
-		SSHHandshakeTimeout:   sshHandshakeTimeout,
-		SSHOperationTimeout:   sshOperationTimeout,
-		EgressAllowPrivate:    egressAllowPrivate,
-		EgressAllowedPrefixes: egressAllowed,
-		EgressDeniedPrefixes:  egressDenied,
-		SSHMaxSessionsPerUser: maxSessionsPerUser,
-		SSHMaxSessionsGlobal:  maxSessionsGlobal,
+		Env:                     env,
+		HTTPAddr:                httpAddr,
+		PublicURL:               publicURL,
+		TrustedOrigins:          origins,
+		LogLevel:                logLevel,
+		LogFormat:               logFormat,
+		DataDir:                 filepath.Clean(dataDir),
+		DBPath:                  filepath.Clean(dbPath),
+		StaticDir:               filepath.Clean(staticDir),
+		EncryptionKey:           key,
+		SessionIdleTTL:          idleTTL,
+		SessionAbsoluteTTL:      absoluteTTL,
+		CookieSecure:            cookieSecure,
+		LoginRateLimit:          loginLimit,
+		LoginRateWindow:         loginWindow,
+		ShutdownTimeout:         shutdownTimeout,
+		ReadinessTimeout:        readinessTimeout,
+		SSHDialTimeout:          sshDialTimeout,
+		SSHHandshakeTimeout:     sshHandshakeTimeout,
+		SSHOperationTimeout:     sshOperationTimeout,
+		EgressAllowPrivate:      egressAllowPrivate,
+		EgressAllowedPrefixes:   egressAllowed,
+		EgressDeniedPrefixes:    egressDenied,
+		SSHMaxSessionsPerUser:   maxSessionsPerUser,
+		SSHMaxSessionsGlobal:    maxSessionsGlobal,
+		SFTPMaxUploadBytes:      sftpMaxUpload,
+		SFTPMaxEditorBytes:      sftpMaxEditor,
+		SFTPMaxListEntries:      sftpMaxList,
+		SFTPMaxRecursiveEntries: sftpMaxRecursive,
+		SFTPOperationTimeout:    sftpTimeout,
 	}, nil
 }
 
@@ -415,6 +450,18 @@ func parsePrefixes(lookup func(string) (string, bool), key string) ([]netip.Pref
 		prefixes = append(prefixes, prefix.Masked())
 	}
 	return prefixes, nil
+}
+
+func parseInt64(lookup func(string) (string, bool), key string, fallback int64) (int64, error) {
+	value, ok := lookup(key)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer", key)
+	}
+	return parsed, nil
 }
 
 func parseDuration(lookup func(string) (string, bool), key string, fallback time.Duration) (time.Duration, error) {

@@ -22,6 +22,7 @@ tags:
   - name: Setup
   - name: Authentication
   - name: Servers
+  - name: Files
   - name: Terminal
   - name: System
 
@@ -457,6 +458,312 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /api/v1/servers/{id}/files:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Files]
+      operationId: listFiles
+      summary: List a remote directory over SFTP
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: path
+          in: query
+          required: false
+          description: Absolute remote path; empty uses the SFTP home directory.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Directory listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileListing"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Files]
+      operationId: deleteFile
+      summary: Delete a remote file or directory
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: recursive
+          in: query
+          required: false
+          description: Required to delete a non-empty directory. Symlinks are removed, not followed.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/files/stat:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Files]
+      operationId: statFile
+      summary: Stat a remote path
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileEntry"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/servers/{id}/files/download:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Files]
+      operationId: downloadFile
+      summary: Stream a remote file
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File stream
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/servers/{id}/files/upload:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    post:
+      tags: [Files]
+      operationId: uploadFile
+      summary: Upload a file over SFTP
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: overwrite
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Uploaded
+        "409":
+          description: Target exists and overwrite was false
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "413":
+          description: File exceeds the configured limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/files/mkdir:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    post:
+      tags: [Files]
+      operationId: createDirectory
+      summary: Create a remote directory
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PathRequest"
+      responses:
+        "201":
+          description: Directory created
+        "409":
+          description: Path exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/files/touch:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    post:
+      tags: [Files]
+      operationId: createFile
+      summary: Create an empty remote file
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PathRequest"
+      responses:
+        "201":
+          description: File created
+        "409":
+          description: Path exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/files/rename:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    patch:
+      tags: [Files]
+      operationId: renameFile
+      summary: Rename or move a remote item
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameRequest"
+      responses:
+        "204":
+          description: Renamed
+        "409":
+          description: Target exists and overwrite was false
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/files/content:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Files]
+      operationId: readFile
+      summary: Read a bounded text file for editing
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Text content and version metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileContent"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    put:
+      tags: [Files]
+      operationId: writeFile
+      summary: Save a text file if it has not changed remotely
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WriteFileRequest"
+      responses:
+        "204":
+          description: Saved
+        "409":
+          description: Remote file changed since it was opened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "413":
+          description: Content exceeds the editor limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   securitySchemes:
     cookieAuth:
@@ -829,3 +1136,96 @@ components:
           type: boolean
           default: false
           description: Replace an existing approved key after deliberate re-verification.
+
+    FileEntry:
+      type: object
+      required: [name, path, type, size, mode, modified_at]
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        type:
+          type: string
+          enum: [file, directory, symlink, other]
+        size:
+          type: integer
+          format: int64
+        mode:
+          type: string
+        modified_at:
+          type: string
+          format: date-time
+        uid:
+          type: integer
+          format: int64
+        gid:
+          type: integer
+          format: int64
+
+    FileListing:
+      type: object
+      required: [path, entries, truncated]
+      properties:
+        path:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileEntry"
+        truncated:
+          type: boolean
+
+    FileContent:
+      type: object
+      required: [path, content, size, mode, modified_at]
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+        size:
+          type: integer
+          format: int64
+        mode:
+          type: string
+        modified_at:
+          type: string
+          format: date-time
+
+    PathRequest:
+      type: object
+      additionalProperties: false
+      required: [path]
+      properties:
+        path:
+          type: string
+
+    RenameRequest:
+      type: object
+      additionalProperties: false
+      required: [from, to]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        overwrite:
+          type: boolean
+          default: false
+
+    WriteFileRequest:
+      type: object
+      additionalProperties: false
+      required: [path, content]
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+        expected_modified_at:
+          type: string
+          format: date-time
+        expected_size:
+          type: integer
+          format: int64

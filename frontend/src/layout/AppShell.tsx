@@ -14,6 +14,7 @@ import {
   SquareTerminal,
   Sun,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/auth/useAuth'
 import { listServers } from '@/api/servers'
@@ -25,14 +26,22 @@ import { Tooltip } from '@/components/ui/Tooltip'
 import { cn } from '@/lib/cn'
 import { useThemeStore } from '@/lib/theme'
 
-const navigation = [
+interface NavItem {
+  to: string
+  label: string
+  icon: LucideIcon
+  enabled: boolean
+  phase?: string
+}
+
+const navigation: Array<{ label: string; items: NavItem[] }> = [
   {
     label: 'Workspace',
     items: [
       { to: '/', label: 'Overview', icon: LayoutDashboard, enabled: true },
       { to: '/servers', label: 'Servers', icon: Server, enabled: true },
       { to: '/terminal', label: 'Terminal', icon: SquareTerminal, enabled: true },
-      { to: '/files', label: 'Files', icon: FolderTree, enabled: false, phase: 'Phase 4' },
+      { to: '/files', label: 'Files', icon: FolderTree, enabled: true },
     ],
   },
   {
@@ -265,7 +274,7 @@ function SidebarContent({
           </Tooltip>
         </div>
         <p className="text-ink-600 mt-2 px-1 font-mono text-[9px] tracking-wider uppercase">
-          Phase 3 · Interactive terminal
+          Phase 4 · SFTP files
         </p>
       </div>
     </>
