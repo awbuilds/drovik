@@ -1476,6 +1476,62 @@ paths:
         "204": {description: Deleted}
         "422": {$ref: "#/components/responses/ValidationError"}
 
+  /api/v1/auth/mfa:
+    get:
+      tags: [Authentication]
+      operationId: getMFAStatus
+      summary: Report whether local MFA is enabled
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: MFA status}
+  /api/v1/auth/mfa/setup:
+    post:
+      tags: [Authentication]
+      operationId: setupMFA
+      summary: Generate a pending TOTP secret and otpauth URI
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Pending secret and URI}
+  /api/v1/auth/mfa/enable:
+    post:
+      tags: [Authentication]
+      operationId: enableMFA
+      summary: Confirm a TOTP code, enable MFA and return recovery codes
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: {type: string}
+      responses:
+        "200": {description: Recovery codes (shown once)}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /api/v1/auth/mfa/disable:
+    post:
+      tags: [Authentication]
+      operationId: disableMFA
+      summary: Disable MFA after password confirmation
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: {type: string, format: password}
+      responses:
+        "204": {description: Disabled}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+
 components:
   securitySchemes:
     cookieAuth:
@@ -1603,6 +1659,9 @@ components:
           minLength: 1
           maxLength: 256
           format: password
+        totp:
+          type: string
+          description: Six-digit authenticator code or a single-use recovery code when MFA is enabled.
 
     AuthResponse:
       type: object

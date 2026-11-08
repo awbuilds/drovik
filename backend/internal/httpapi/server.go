@@ -37,6 +37,8 @@ type Server struct {
 
 	users        *storage.UserRepository
 	sessions     *storage.SessionRepository
+	mfa          *storage.MFARepository
+	cipher       *secrets.Cipher
 	audit        *audit.Service
 	auth         *auth.SessionManager
 	servers      *servers.Service
@@ -59,6 +61,7 @@ type Server struct {
 func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audit.Service) (*Server, error) {
 	users := storage.NewUserRepository(db)
 	sessions := storage.NewSessionRepository(db)
+	mfa := storage.NewMFARepository(db)
 
 	cipher, err := secrets.New(cfg.EncryptionKey)
 	if err != nil {
@@ -119,6 +122,8 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		db:         db,
 		users:      users,
 		sessions:   sessions,
+		mfa:        mfa,
+		cipher:     cipher,
 		audit:      auditService,
 		servers:    serverService,
 		files:      filesService,
@@ -171,6 +176,10 @@ func (s *Server) Handler() http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireAuth)
 			r.Get("/auth/me", s.handleMe)
+			r.Get("/auth/mfa", s.handleMFAStatus)
+			r.With(s.requireCSRF).Post("/auth/mfa/setup", s.handleMFASetup)
+			r.With(s.requireCSRF).Post("/auth/mfa/enable", s.handleMFAEnable)
+			r.With(s.requireCSRF).Post("/auth/mfa/disable", s.handleMFADisable)
 			r.Get("/activity", s.handleActivity)
 			r.With(s.requireCSRF).Post("/auth/logout", s.handleLogout)
 

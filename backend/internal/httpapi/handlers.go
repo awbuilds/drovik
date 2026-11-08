@@ -40,6 +40,7 @@ type setupRequest struct {
 type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	TOTP     string `json:"totp,omitempty"`
 }
 
 type versionResponse struct {
@@ -206,6 +207,25 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.record(r, user.ID, "auth.login_failed", user.Username, "denied", CodeAuthInvalidCredentials)
 		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthInvalidCredentials, "Invalid username or password."))
 		return
+	}
+
+	mfaSecret, mfaEnabled, err := s.mfa.Get(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("login MFA lookup failed", "error", err, "user_id", user.ID, "request_id", RequestID(r.Context()))
+		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
+		return
+	}
+	if mfaEnabled {
+		if strings.TrimSpace(request.TOTP) == "" {
+			s.record(r, user.ID, "auth.login_failed", user.Username, "denied", CodeAuthMFARequired)
+			writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthMFARequired, "Enter your authenticator code."))
+			return
+		}
+		if !s.verifyMFACode(r.Context(), mfaSecret, user.ID, request.TOTP) {
+			s.record(r, user.ID, "auth.login_failed", user.Username, "denied", CodeAuthMFAInvalid)
+			writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthMFAInvalid, "The authenticator code is invalid."))
+			return
+		}
 	}
 
 	_, token, csrf, err := s.auth.Create(r.Context(), user.ID, r.UserAgent())

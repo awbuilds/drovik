@@ -496,3 +496,39 @@ func TestTaskValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestDockerActionCancellationKeepsAudit(t *testing.T) {
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		if strings.Contains(command, "docker rm ") {
+			time.Sleep(300 * time.Millisecond)
+			return "", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	containerID := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+	err := service.DockerAction(ctx, env.User.ID, env.Server.ID, containerID, "remove")
+	if err == nil {
+		t.Fatal("expected cancellation error")
+	}
+	events, err := storage.NewAuditRepository(env.DB).ListRecent(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("ListRecent: %v", err)
+	}
+	found := false
+	for _, event := range events {
+		if event.EventType == "docker.action" {
+			found = true
+			if event.Outcome != "unknown" || event.SafeErrorCode == nil || *event.SafeErrorCode != "OUTCOME_UNKNOWN" {
+				t.Fatalf("unexpected docker audit event: %+v", event)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected a docker.action audit row for the delivered command")
+	}
+}

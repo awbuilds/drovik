@@ -1936,9 +1936,9 @@ The team can produce a release from a tagged commit, verify its artifacts, migra
 
 > **Implementation status:** Docker inspection/enumerated actions, read-only storage/network
 > diagnostics, package lifecycle, managed scheduled tasks, snippets, local users/server assignments,
-> bounded metric history and in-app alerts are implemented. OIDC/MFA, notifications and destructive
-> storage/network changes are being delivered as separate increments; non-Linux targets remain out
-> of scope pending a new support matrix.
+> bounded metric history and in-app alerts are implemented. Local TOTP MFA is implemented; OIDC,
+> external notifications and destructive storage/network changes are being delivered as separate
+> increments; non-Linux targets remain out of scope pending a new support matrix.
 
 Features in this phase should be individually designed and threat-modeled.
 

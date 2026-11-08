@@ -86,11 +86,16 @@ func classify(stderr string, err error) error {
 }
 
 func (s *Service) record(ctx context.Context, actorID, serverID, eventType, target, outcome, code string) {
+	// Accountability writes must survive the client request that triggered the
+	// action. The caller context is deliberately ignored.
+	auditCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = ctx
 	var safeCode *string
 	if code != "" {
 		safeCode = &code
 	}
-	s.audit.Record(ctx, storage.AuditEvent{
+	s.audit.Record(auditCtx, storage.AuditEvent{
 		ActorUserID: &actorID, ServerID: audit.StrPtr(serverID), EventType: eventType,
 		TargetSummary: target, Outcome: outcome, SafeErrorCode: safeCode,
 		CreatedAt: time.Now().UTC(),

@@ -91,10 +91,41 @@ export function setup(username: string, password: string): Promise<AuthResponse>
   })
 }
 
-export function login(username: string, password: string): Promise<AuthResponse> {
+export function login(username: string, password: string, totp?: string): Promise<AuthResponse> {
   return apiRequest<AuthResponse>('/api/v1/auth/login', {
     method: 'POST',
-    body: { username, password },
+    body: { username, password, ...(totp ? { totp } : {}) },
+  })
+}
+
+export interface MFAStatus {
+  enabled: boolean
+}
+
+export function getMFAStatus(signal?: AbortSignal): Promise<MFAStatus> {
+  return apiRequest<MFAStatus>('/api/v1/auth/mfa', { signal })
+}
+
+export function setupMFA(csrf: string): Promise<{ secret: string; uri: string }> {
+  return apiRequest<{ secret: string; uri: string }>('/api/v1/auth/mfa/setup', {
+    method: 'POST',
+    csrf,
+  })
+}
+
+export function enableMFA(code: string, csrf: string): Promise<{ recovery_codes: string[] }> {
+  return apiRequest<{ recovery_codes: string[] }>('/api/v1/auth/mfa/enable', {
+    method: 'POST',
+    csrf,
+    body: { code },
+  })
+}
+
+export function disableMFA(password: string, csrf: string): Promise<void> {
+  return apiRequest<void>('/api/v1/auth/mfa/disable', {
+    method: 'POST',
+    csrf,
+    body: { password },
   })
 }
 

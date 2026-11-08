@@ -24,6 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/auth/useAuth'
+import { reportClientError } from '@/lib/errors'
 import { listServers } from '@/api/servers'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -101,8 +102,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [])
 
   const handleLogout = async () => {
-    await logout()
-    navigate('/login', { replace: true })
+    try {
+      await logout()
+      navigate('/login', { replace: true })
+    } catch (caught) {
+      // Keep the authenticated shell; the server-side session was not revoked.
+      reportClientError(caught, { operation: 'auth.logout' })
+    }
   }
 
   return (

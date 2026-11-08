@@ -337,7 +337,8 @@ separate design and threat model before implementation.
 | 9.6 Task editing | Tested | Drovik-marked user-crontab blocks, validation, SFTP staging, audit; lifecycle tests |
 | 9.7 Local users/roles | Tested | User service, last-admin guard, HTTP read-only test |
 | 9.7 Server assignment/read-only | Tested | `server_assignments`, effective access checks, route guard |
-| 9.7 OIDC/MFA/external secrets | In progress | Local MFA and OIDC remain the next increment; federated identity needs its own threat model |
+| 9.7 Local MFA | Tested | TOTP enrollment, encrypted secrets, recovery codes, login challenge; HTTP tests |
+| 9.7 OIDC/SSO/external secrets | Out of scope | Federated identity needs a separate threat model |
 | 9.8 Metric retention/history | Implemented | SQLite samples, retention/cap, history API and chart |
 | 9.8 Threshold alerts | Implemented | In-app threshold rules; no external notifications |
 | 9.8 Notifications | In progress | Alert webhook delivery is the next increment |
@@ -353,9 +354,9 @@ separate design and threat model before implementation.
   intentionally absent.
 - Read-only accounts and read-only server assignments are enforced by backend middleware, not only
   UI controls.
-- Package lifecycle and managed task editing extend the original read-first surface with enumerated,
-  confirmed and audited mutations. Destructive storage/network changes and non-Linux targets remain
-  out of scope until separately designed.
+- Package lifecycle, managed task editing and local TOTP MFA extend the original read-first surface
+  with enumerated, confirmed and audited mutations. Destructive storage/network changes, OIDC and
+  non-Linux targets remain out of scope until separately designed.
 - History is local, bounded and explicitly not a substitute for enterprise monitoring. External
   notifications and OIDC/MFA remain post-Phase-9 hardening items.
 
