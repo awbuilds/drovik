@@ -431,3 +431,34 @@ func TestAuditListScopesToUser(t *testing.T) {
 		t.Fatalf("expected the second user's events, got %+v", secondEvents)
 	}
 }
+
+func TestUserRepositoryGuardBlocksLastAdminDeactivation(t *testing.T) {
+	db := newTestDatabase(t)
+	users := NewUserRepository(db)
+	first := createTestUser(t, db)
+	now := time.Now().UTC()
+	second := User{
+		ID: NewID(), Username: "second-admin", PasswordHash: "hash", Role: "admin",
+		IsActive: true, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := users.Create(context.Background(), second); err != nil {
+		t.Fatalf("Create second admin: %v", err)
+	}
+
+	// Deactivating one of two active admins is allowed.
+	if err := users.UpdateRoleAndStatus(context.Background(), first.ID, "admin", false, now); err != nil {
+		t.Fatalf("deactivate first admin: %v", err)
+	}
+	// The statement-level guard must reject deactivating the last active admin
+	// even when the service-level pre-check is bypassed (concurrent writers).
+	if err := users.UpdateRoleAndStatus(context.Background(), second.ID, "admin", false, now); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected last-admin guard rejection, got %v", err)
+	}
+	count, err := users.CountAdmins(context.Background())
+	if err != nil {
+		t.Fatalf("CountAdmins: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one active admin, got %d", count)
+	}
+}

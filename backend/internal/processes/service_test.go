@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/awbuilds/drovik/backend/internal/storage"
 	"github.com/awbuilds/drovik/backend/internal/testenv"
 	"github.com/awbuilds/drovik/backend/internal/testssh"
 )
@@ -178,5 +179,74 @@ func BenchmarkParseProcessLine(b *testing.B) {
 		if _, ok := parseProcessLine(line, now); !ok {
 			b.Fatal("expected a parsable process")
 		}
+	}
+}
+
+func TestSignalReportsUnknownWhenStateCannotBeRead(t *testing.T) {
+	env, service := newProcessEnv(t, func(command string) (string, string, int, bool) {
+		switch command {
+		case listCommand:
+			return processFixture, "", 0, true
+		case "LC_ALL=C ps -p 4242 -o etimes=":
+			return "5000\n", "", 0, true
+		case "kill -s TERM 4242":
+			return "", "", 0, true
+		case "ps -p 4242 -o stat=":
+			return "", "sh: 1: ps: not found\n", 127, true
+		}
+		return "", "", 0, false
+	})
+	list, err := service.List(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	result, err := service.Signal(
+		context.Background(), env.User.ID, env.Server.ID,
+		4242, SignalTerm, list.Processes[0].StartedAt,
+	)
+	if err != nil {
+		t.Fatalf("Signal: %v", err)
+	}
+	if !result.Delivered || !result.OutcomeUnknown {
+		t.Fatalf("expected delivered unknown outcome: %+v", result)
+	}
+	events, err := storage.NewAuditRepository(env.DB).ListRecent(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("ListRecent: %v", err)
+	}
+	found := false
+	for _, event := range events {
+		if event.EventType == "process.signal" {
+			found = true
+			if event.Outcome != "unknown" || event.SafeErrorCode == nil || *event.SafeErrorCode != "OUTCOME_UNKNOWN" {
+				t.Fatalf("unexpected audit outcome: %+v", event)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected a process.signal audit event")
+	}
+}
+
+func TestSignalUnobservableIdentityIsNotReportedAsMissing(t *testing.T) {
+	env, service := newProcessEnv(t, func(command string) (string, string, int, bool) {
+		switch command {
+		case listCommand:
+			return processFixture, "", 0, true
+		case "LC_ALL=C ps -p 4242 -o etimes=":
+			return "", "sh: 1: ps: not found\n", 127, true
+		}
+		return "", "", 0, false
+	})
+	list, err := service.List(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	_, err = service.Signal(
+		context.Background(), env.User.ID, env.Server.ID,
+		4242, SignalTerm, list.Processes[0].StartedAt,
+	)
+	if errors.Is(err, ErrNotFound) {
+		t.Fatalf("an unobservable identity must not be reported as a missing process: %v", err)
 	}
 }

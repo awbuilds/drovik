@@ -192,7 +192,7 @@ func (s *Service) Action(
 	_, stderr, err := sshclient.RunCommand(commandCtx, client, command, 64*1024)
 	if err != nil {
 		classified := classifyError(stderr)
-		s.record(ctx, ownerID, serverID, "service.action", "failure", safeCode(classified), action+" "+unitName)
+		s.recordAudit(ownerID, serverID, "service.action", "failure", safeCode(classified), action+" "+unitName)
 		return nil, classified
 	}
 
@@ -224,9 +224,11 @@ func (s *Service) Action(
 	if !result.StateKnown {
 		result.Message = "The action completed, but the resulting unit state could not be read."
 		_ = stateStderr
+		s.recordAudit(ownerID, serverID, "service.action", "unknown", "OUTCOME_UNKNOWN", action+" "+unitName)
+		return result, nil
 	}
 
-	s.record(ctx, ownerID, serverID, "service.action", "success", "", action+" "+unitName)
+	s.recordAudit(ownerID, serverID, "service.action", "success", "", action+" "+unitName)
 	return result, nil
 }
 
@@ -278,6 +280,14 @@ func safeCode(err error) string {
 	default:
 		return "SERVICE_ACTION_FAILED"
 	}
+}
+
+// recordAudit detaches the accountability record from request cancellation so a
+// delivered action is never lost when the client disconnects.
+func (s *Service) recordAudit(actorID, serverID, eventType, outcome, code, target string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	s.record(ctx, actorID, serverID, eventType, outcome, code, target)
 }
 
 func (s *Service) record(ctx context.Context, actorID, serverID, eventType, outcome, code, target string) {

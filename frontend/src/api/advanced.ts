@@ -282,6 +282,7 @@ export interface HistoryResult {
   samples: HistoryPoint[]
   alerts: AlertState[]
   retention: string
+  data_available: boolean
 }
 
 export function getHistory(

@@ -75,8 +75,14 @@ func (s *Service) Storage(ctx context.Context, ownerID, serverID string) (*Stora
 	return overview, nil
 }
 
+const maxSectionLines = 4096
+
+// splitSections assembles each marker-delimited section in linear time and
+// bounds the number of retained lines so hostile remote output cannot turn a
+// byte-capped response into unbounded parsing work.
 func splitSections(output string) map[string]string {
-	sections := make(map[string]string, 4)
+	builders := make(map[string]*strings.Builder, 4)
+	counts := make(map[string]int, 4)
 	current := ""
 	for _, line := range strings.Split(output, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -84,9 +90,21 @@ func splitSections(output string) map[string]string {
 			current = strings.Trim(trimmed, "@")
 			continue
 		}
-		if current != "" {
-			sections[current] += line + "\n"
+		if current == "" || counts[current] >= maxSectionLines {
+			continue
 		}
+		builder := builders[current]
+		if builder == nil {
+			builder = &strings.Builder{}
+			builders[current] = builder
+		}
+		builder.WriteString(line)
+		builder.WriteByte('\n')
+		counts[current]++
+	}
+	sections := make(map[string]string, len(builders))
+	for name, builder := range builders {
+		sections[name] = builder.String()
 	}
 	return sections
 }

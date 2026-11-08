@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
@@ -96,6 +97,9 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		auditService,
 		logger,
 	)
+	pruneCtx, pruneCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	advancedService.PruneHistory(pruneCtx)
+	pruneCancel()
 
 	var staticHandler http.Handler
 	var indexHTML []byte

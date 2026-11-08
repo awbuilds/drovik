@@ -98,6 +98,10 @@ func (s *Service) Docker(ctx context.Context, ownerID, serverID string) (*Docker
 			if err := json.Unmarshal([]byte(line), &raw); err != nil {
 				continue
 			}
+			if len(result.Images) >= s.cfg.DockerMaxContainers {
+				result.Truncated = true
+				break
+			}
 			result.Images = append(result.Images, DockerImage{
 				ID: jsonString(raw, "ID"), Repository: jsonString(raw, "Repository"),
 				Tag: jsonString(raw, "Tag"), Size: jsonString(raw, "Size"), Created: jsonString(raw, "CreatedSince"),
@@ -189,7 +193,6 @@ func (s *Service) DockerInspect(ctx context.Context, ownerID, serverID, containe
 	// Docker inspect includes Config.Env and Cmd, which commonly contain
 	// secrets. Return only identity, state, mounts, ports and labels.
 	item := raw[0]
-	config, _ := item["Config"].(map[string]any)
 	network, _ := item["NetworkSettings"].(map[string]any)
 	return map[string]any{
 		"id": item["Id"], "name": strings.TrimPrefix(anyString(item["Name"]), "/"),
@@ -198,7 +201,8 @@ func (s *Service) DockerInspect(ctx context.Context, ownerID, serverID, containe
 		"network_settings": map[string]any{
 			"ports": network["Ports"], "ip_address": network["IPAddress"],
 		},
-		"labels": config["Labels"],
+		// Labels are container-controlled and can contain secrets; they are
+		// deliberately omitted from the response.
 	}, nil
 }
 

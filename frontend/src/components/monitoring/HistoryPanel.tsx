@@ -49,7 +49,7 @@ function linePath(samples: HistoryPoint[], key: 'cpu_percent' | 'memory_percent'
   return points.length > 1 ? `M${points.join(' L')}` : ''
 }
 
-export function HistoryPanel({ serverId }: { serverId: string }) {
+export function HistoryPanel({ serverId, canWrite }: { serverId: string; canWrite: boolean }) {
   const { csrfToken } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -168,13 +168,16 @@ export function HistoryPanel({ serverId }: { serverId: string }) {
                 <Badge variant="outline">{rule.metric}</Badge>
                 <span className="text-ink-300 font-mono text-[10px]">{rule.comparator === 'gt' ? '>' : '≥'} {rule.threshold}</span>
                 <span className="text-ink-500 ml-auto font-mono text-[9px]">{rule.enabled ? 'enabled' : 'disabled'}</span>
-                <Button size="icon" variant="ghost" className="hover:text-rose-400 h-6 w-6" aria-label="Delete alert rule" onClick={() => void removeRule(ruleID(rule))}>
-                  <Trash2 className="h-3 w-3" aria-hidden="true" />
-                </Button>
+                {canWrite ? (
+                  <Button size="icon" variant="ghost" className="hover:text-rose-400 h-6 w-6" aria-label="Delete alert rule" onClick={() => void removeRule(ruleID(rule))}>
+                    <Trash2 className="h-3 w-3" aria-hidden="true" />
+                  </Button>
+                ) : null}
               </div>
             ))}
             {alertsQuery.isError ? <p className="text-ink-500 text-xs">Alert rules could not be loaded.</p> : null}
           </div>
+          {canWrite ? (
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <Select value={metric} onChange={(event) => setMetric(event.target.value)} className="h-8 w-36 text-xs" aria-label="Alert metric">
               <option value="cpu_percent">CPU %</option>
@@ -192,6 +195,14 @@ export function HistoryPanel({ serverId }: { serverId: string }) {
               Add rule
             </Button>
           </div>
+          ) : (
+            <p className="text-ink-500 mt-3 text-[11px]">You have read-only access; threshold rules cannot be changed.</p>
+          )}
+          {historyQuery.data && !historyQuery.data.data_available && (alertsQuery.data?.rules.length ?? 0) > 0 ? (
+            <Alert variant="warning" title="Alert state unavailable">
+              No recent sample exists for this window, so threshold state cannot be evaluated.
+            </Alert>
+          ) : null}
           {(historyQuery.data?.alerts ?? []).filter((alert) => alert.active).length > 0 ? (
             <Alert variant="warning" title="Active threshold" >
               {historyQuery.data?.alerts.filter((alert) => alert.active).map((alert) => `${alert.metric} = ${alert.value.toFixed(1)} (threshold ${alert.threshold})`).join(' · ')}

@@ -21,6 +21,11 @@ type TimerEntry struct {
 	Activates string `json:"activates"`
 }
 
+const (
+	maxCron   = 256
+	maxTimers = 256
+)
+
 type ScheduleOverview struct {
 	Available   bool         `json:"available"`
 	Cron        []CronEntry  `json:"cron"`
@@ -68,11 +73,17 @@ func (s *Service) Schedules(ctx context.Context, ownerID, serverID string) (*Sch
 			source = strings.TrimPrefix(trimmed, "### ")
 			continue
 		}
+		if len(result.Cron) >= maxCron {
+			break
+		}
 		if parsed, ok := cronLine(source, line); ok {
 			result.Cron = append(result.Cron, parsed)
 		}
 	}
 	for _, line := range strings.Split(sections["timers"], "\n") {
+		if len(result.Timers) >= maxTimers {
+			break
+		}
 		fields := strings.Fields(line)
 		if len(fields) < 6 {
 			continue

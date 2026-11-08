@@ -28,6 +28,7 @@ export interface SignalResult {
   delivered: boolean
   running: boolean
   state?: string
+  outcome_unknown: boolean
 }
 
 export interface ServiceUnit {

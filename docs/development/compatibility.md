@@ -43,8 +43,8 @@ only for features whose tools are present.
 - macOS hosts (the collector reads Linux `/proc`).
 - Editing systemd unit files or creating arbitrary units.
 - File-based log tailing outside the journal.
-- Docker/Podman management.
-- Multi-user RBAC beyond the current single-operator model.
+- Destructive Docker/Podman changes beyond enumerated container start/stop/restart/remove.
+- Storage, network, package and cron mutations (inspection only).
 
 Report compatibility gaps with the managed host distribution, tool versions and the stable Drovik
 error code.

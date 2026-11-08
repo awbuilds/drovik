@@ -2,8 +2,9 @@ package advanced
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"math"
+	"regexp"
 	"time"
 
 	"github.com/awbuilds/drovik/backend/internal/monitoring"
@@ -30,11 +31,12 @@ type AlertState struct {
 }
 
 type HistoryResult struct {
-	ServerID  string         `json:"server_id"`
-	Since     string         `json:"since"`
-	Samples   []HistoryPoint `json:"samples"`
-	Alerts    []AlertState   `json:"alerts"`
-	Retention string         `json:"retention"`
+	ServerID      string         `json:"server_id"`
+	Since         string         `json:"since"`
+	Samples       []HistoryPoint `json:"samples"`
+	Alerts        []AlertState   `json:"alerts"`
+	Retention     string         `json:"retention"`
+	DataAvailable bool           `json:"data_available"`
 }
 
 type AlertRuleInput struct {
@@ -44,8 +46,24 @@ type AlertRuleInput struct {
 	Enabled    bool    `json:"enabled"`
 }
 
+const (
+	maxAlertRules = 100
+	alertRuleIDRE = `^[a-f0-9]{32}$`
+)
+
+var alertRuleIDPattern = regexp.MustCompile(alertRuleIDRE)
+
 var historyRanges = map[string]time.Duration{
 	"1h": time.Hour, "24h": 24 * time.Hour, "7d": 7 * 24 * time.Hour, "30d": 30 * 24 * time.Hour,
+}
+
+// PruneHistory removes samples older than the configured retention. It runs at
+// startup so servers that stopped being polled do not retain stale data.
+func (s *Service) PruneHistory(ctx context.Context) {
+	cutoff := time.Now().UTC().Add(-s.cfg.MetricsRetention)
+	if err := s.metrics.PruneAll(ctx, cutoff); err != nil {
+		s.logger.Warn("metric retention prune failed", "error", err)
+	}
 }
 
 func (s *Service) RecordSnapshot(ctx context.Context, snapshot *monitoring.Snapshot) {
@@ -53,11 +71,10 @@ func (s *Service) RecordSnapshot(ctx context.Context, snapshot *monitoring.Snaps
 		return
 	}
 	sample := storage.MetricSample{ServerID: snapshot.ServerID, CollectedAt: snapshot.CollectedAt}
-	sample.CPUPercent = snapshot.CPU.UsagePercent
-	sample.MemoryPercent = snapshot.Memory.UsedPercent
+	sample.CPUPercent = finitePtr(snapshot.CPU.UsagePercent)
+	sample.MemoryPercent = finitePtr(snapshot.Memory.UsedPercent)
 	if snapshot.Load.Available {
-		value := snapshot.Load.One
-		sample.LoadOne = &value
+		sample.LoadOne = finitePtr(&snapshot.Load.One)
 	}
 	if snapshot.FilesystemsAvailable && len(snapshot.Filesystems) > 0 {
 		maxUsed := 0.0
@@ -66,7 +83,7 @@ func (s *Service) RecordSnapshot(ctx context.Context, snapshot *monitoring.Snaps
 				maxUsed = *filesystem.UsedPercent
 			}
 		}
-		sample.DiskPercent = &maxUsed
+		sample.DiskPercent = finitePtr(&maxUsed)
 	}
 	if snapshot.NetworkAvailable {
 		var rx, tx float64
@@ -78,7 +95,7 @@ func (s *Service) RecordSnapshot(ctx context.Context, snapshot *monitoring.Snaps
 				tx += *iface.TransmitRateBps
 			}
 		}
-		sample.RXBps, sample.TXBps = &rx, &tx
+		sample.RXBps, sample.TXBps = finitePtr(&rx), finitePtr(&tx)
 	}
 	if err := s.metrics.Insert(ctx, sample); err != nil {
 		s.logger.Warn("metric sample insert failed", "error", err, "server_id", snapshot.ServerID)
@@ -122,6 +139,7 @@ func (s *Service) History(ctx context.Context, ownerID, serverID, rangeName stri
 		return nil, err
 	}
 	latest := latestSample(samples)
+	result.DataAvailable = latest != nil
 	result.Alerts = evaluateAlerts(rules, latest)
 	return result, nil
 }
@@ -148,7 +166,16 @@ func (s *Service) SaveAlertRule(ctx context.Context, ownerID, serverID, ruleID s
 	}
 	now := time.Now().UTC()
 	if ruleID == "" {
+		existing, err := s.alerts.List(ctx, serverID)
+		if err != nil {
+			return nil, err
+		}
+		if len(existing) >= maxAlertRules {
+			return nil, fmt.Errorf("%w: at most %d alert rules are supported per server", ErrInvalidTarget, maxAlertRules)
+		}
 		ruleID = storage.NewID()
+	} else if !alertRuleIDPattern.MatchString(ruleID) {
+		return nil, fmt.Errorf("%w: invalid alert rule identifier", ErrInvalidTarget)
 	}
 	rule := storage.AlertRule{
 		ID: ruleID, ServerID: serverID, Metric: input.Metric, Comparator: input.Comparator,
@@ -166,13 +193,18 @@ func (s *Service) DeleteAlertRule(ctx context.Context, ownerID, serverID, ruleID
 		return err
 	}
 	if err := s.alerts.Delete(ctx, serverID, ruleID); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return ErrSnippetNotFound
-		}
 		return err
 	}
 	s.record(ctx, ownerID, serverID, "alert.rule_deleted", ruleID, "success", "")
 	return nil
+}
+
+func finitePtr(value *float64) *float64 {
+	if value == nil || math.IsInf(*value, 0) || math.IsNaN(*value) {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
 
 func latestSample(samples []storage.MetricSample) *storage.MetricSample {

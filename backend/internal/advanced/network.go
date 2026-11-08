@@ -63,7 +63,7 @@ func (s *Service) Network(ctx context.Context, ownerID, serverID string) (*Netwo
 		Available:   strings.TrimSpace(sections["addr"]) != "" || strings.TrimSpace(sections["route"]) != "",
 		Interfaces:  parseInterfaces(sections["addr"]),
 		Routes:      parseRoutes(sections["route"]),
-		Listeners:   parseListeners(sections["listen"], 500),
+		Listeners:   parseListeners(sections["listen"], maxListeners),
 		CollectedAt: time.Now().UTC(),
 	}
 	if !overview.Available {
@@ -72,10 +72,19 @@ func (s *Service) Network(ctx context.Context, ownerID, serverID string) (*Netwo
 	return overview, nil
 }
 
+const (
+	maxNetworkInterfaces = 256
+	maxRoutes            = 1024
+	maxListeners         = 500
+)
+
 func parseInterfaces(raw string) []NetworkInterface {
 	var links []map[string]any
 	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &links); err != nil {
 		return []NetworkInterface{}
+	}
+	if len(links) > maxNetworkInterfaces {
+		links = links[:maxNetworkInterfaces]
 	}
 	result := make([]NetworkInterface, 0, len(links))
 	for _, link := range links {
@@ -110,6 +119,9 @@ func parseRoutes(raw string) []NetworkRoute {
 	var routes []map[string]any
 	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &routes); err != nil {
 		return []NetworkRoute{}
+	}
+	if len(routes) > maxRoutes {
+		routes = routes[:maxRoutes]
 	}
 	result := make([]NetworkRoute, 0, len(routes))
 	for _, route := range routes {

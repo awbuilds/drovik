@@ -3,6 +3,7 @@ package monitoring
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -286,7 +287,10 @@ func parseLoad(raw string) (LoadAverage, bool) {
 	one, errOne := strconv.ParseFloat(fields[0], 64)
 	five, errFive := strconv.ParseFloat(fields[1], 64)
 	fifteen, errFifteen := strconv.ParseFloat(fields[2], 64)
-	if errOne != nil || errFive != nil || errFifteen != nil {
+	if errOne != nil || errFive != nil || errFifteen != nil ||
+		math.IsInf(one, 0) || math.IsNaN(one) ||
+		math.IsInf(five, 0) || math.IsNaN(five) ||
+		math.IsInf(fifteen, 0) || math.IsNaN(fifteen) {
 		return load, false
 	}
 	load.Available = true
@@ -308,7 +312,7 @@ func parseUptime(raw string) (float64, bool) {
 		return 0, false
 	}
 	value, err := strconv.ParseFloat(fields[0], 64)
-	if err != nil || value < 0 {
+	if err != nil || value < 0 || math.IsInf(value, 0) || math.IsNaN(value) {
 		return 0, false
 	}
 	return value, true

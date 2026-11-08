@@ -146,12 +146,17 @@ func (r *UserRepository) List(ctx context.Context) ([]User, error) {
 }
 
 func (r *UserRepository) UpdateRoleAndStatus(ctx context.Context, id, role string, active bool, at time.Time) error {
+	// The guard is evaluated in the same statement as the write, so two admins
+	// demoting or deactivating each other concurrently cannot leave the
+	// installation without an active administrator.
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE users SET role = ?, is_active = ?, updated_at = ?
 		WHERE id = ?
-		  AND (role <> 'admin' OR is_active = 0 OR ? = 'admin'
-		       OR EXISTS (SELECT 1 FROM users WHERE role = 'admin' AND is_active = 1 AND id <> ?))`,
-		role, boolToInt(active), formatTime(at), id, role, id,
+		  AND (
+		       NOT (role = 'admin' AND is_active = 1 AND (? <> 'admin' OR ? = 0))
+		       OR EXISTS (SELECT 1 FROM users WHERE role = 'admin' AND is_active = 1 AND id <> ?)
+		  )`,
+		role, boolToInt(active), formatTime(at), id, role, boolToInt(active), id,
 	)
 	if err != nil {
 		return fmt.Errorf("update user access: %w", err)

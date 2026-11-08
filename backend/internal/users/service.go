@@ -109,6 +109,11 @@ func (s *Service) Update(ctx context.Context, actorID, targetID string, role *st
 	}
 	now := time.Now().UTC()
 	if err := s.users.UpdateRoleAndStatus(ctx, targetID, newRole, newActive, now); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// The statement-level guard rejected the change; the API maps this
+			// to the last-administrator conflict.
+			return nil, ErrLastAdmin
+		}
 		return nil, err
 	}
 	if !newActive {
@@ -170,6 +175,9 @@ func (s *Service) Delete(ctx context.Context, actorID, targetID string) error {
 		}
 	}
 	if err := s.users.Delete(ctx, targetID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) && target.Role == "admin" && target.IsActive {
+			return ErrLastAdmin
+		}
 		return err
 	}
 	s.record(ctx, actorID, "user.deleted", target.Username)

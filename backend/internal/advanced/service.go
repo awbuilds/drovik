@@ -91,7 +91,7 @@ func (s *Service) record(ctx context.Context, actorID, serverID, eventType, targ
 		safeCode = &code
 	}
 	s.audit.Record(ctx, storage.AuditEvent{
-		ActorUserID: &actorID, ServerID: &serverID, EventType: eventType,
+		ActorUserID: &actorID, ServerID: audit.StrPtr(serverID), EventType: eventType,
 		TargetSummary: target, Outcome: outcome, SafeErrorCode: safeCode,
 		CreatedAt: time.Now().UTC(),
 	})
