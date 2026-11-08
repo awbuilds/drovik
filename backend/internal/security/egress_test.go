@@ -76,3 +76,12 @@ func TestEgressDNS(t *testing.T) {
 		t.Fatalf("unexpected address: %s", addr)
 	}
 }
+
+func TestEgressRejectsZonedIPv6Literals(t *testing.T) {
+	policy := NewEgressPolicy(true, nil, nil)
+	for _, host := range []string{"::1%lo", "fe80::1%lo", "::%lo", "ff02::1%lo"} {
+		if _, err := policy.Resolve(context.Background(), host); !errors.Is(err, ErrEgressDenied) {
+			t.Fatalf("expected zoned literal %q to be denied, got %v", host, err)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/coder/websocket"
@@ -33,5 +34,17 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = conn.CloseNow() }()
 
-	s.terminal.Serve(r.Context(), conn, chi.URLParam(r, "id"), user.ID)
+	session := CurrentSession(r.Context())
+	if session == nil {
+		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthRequired, "Authentication required."))
+		return
+	}
+	token := s.auth.SessionToken(r)
+	s.terminal.Serve(
+		r.Context(), conn, chi.URLParam(r, "id"), user.ID, session.ID,
+		func(ctx context.Context) error {
+			_, _, err := s.auth.Validate(ctx, token)
+			return err
+		},
+	)
 }

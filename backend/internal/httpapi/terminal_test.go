@@ -225,3 +225,72 @@ func TestTerminalRequiresAuthentication(t *testing.T) {
 	}
 	_ = response.Body.Close()
 }
+
+func TestTerminalClosesAfterLogout(t *testing.T) {
+	sshServer, err := testssh.Start(t.TempDir())
+	if err != nil {
+		t.Fatalf("testssh.Start: %v", err)
+	}
+	defer sshServer.Close()
+
+	app := newTestApp(t)
+	server, csrf := setupFilesServer(t, app, sshServer)
+	serverURL, _ := url.Parse(app.server.URL)
+	cookies := app.client.Jar.Cookies(serverURL)
+	cookieParts := make([]string, 0, len(cookies))
+	for _, cookie := range cookies {
+		cookieParts = append(cookieParts, cookie.Name+"="+cookie.Value)
+	}
+	wsURL := "ws" + strings.TrimPrefix(app.server.URL, "http") + "/api/v1/servers/" + server.ID + "/terminal"
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	//nolint:bodyclose // the successful response body is owned by the WebSocket connection
+	conn, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{
+			"Origin": []string{"http://example.com"},
+			"Cookie": []string{strings.Join(cookieParts, "; ")},
+		},
+	})
+	if err != nil {
+		t.Fatalf("websocket dial: %v", err)
+	}
+	defer func() { _ = conn.CloseNow() }()
+
+	waitForPrompt := func() {
+		t.Helper()
+		var output strings.Builder
+		for {
+			typ, data, err := conn.Read(ctx)
+			if err != nil {
+				t.Fatalf("read prompt: %v (output %q)", err, output.String())
+			}
+			if typ != websocket.MessageText {
+				continue
+			}
+			var message terminalMessage
+			if err := json.Unmarshal(data, &message); err != nil {
+				t.Fatalf("decode message: %v", err)
+			}
+			if message.Type == "output" {
+				output.WriteString(message.Data)
+			}
+			if strings.Contains(output.String(), "drovik-test$") {
+				return
+			}
+		}
+	}
+	waitForPrompt()
+
+	logout := app.request(t, http.MethodPost, "/api/v1/auth/logout", nil, csrf)
+	if logout.status != http.StatusNoContent {
+		t.Fatalf("logout: %d %s", logout.status, logout.body)
+	}
+
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"input","data":"post_logout_probe\n"}`)); err == nil {
+		readCtx, readCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer readCancel()
+		if _, _, err := conn.Read(readCtx); err == nil {
+			t.Fatal("terminal remained readable after logout")
+		}
+	}
+}

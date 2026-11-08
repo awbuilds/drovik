@@ -38,6 +38,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Security
 
+- Fixed a high-severity credential-exposure bug in `PATCH /api/v1/servers/{id}`: changing
+  `auth_method` without a new credential could reinterpret a stored private key as a password.
+- Fixed terminal sessions surviving logout/expiry, IPv6 zone identifier egress bypass, upload
+  permission widening and journal entry-count exhaustion. See
+  `docs/security/audit-2026-11-08.md`.
 - No telemetry or external error reporting by default.
 - Secret scanning and dependency review in CI.
 

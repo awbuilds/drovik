@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"strings"
 	"time"
 )
 
@@ -49,6 +50,12 @@ func NewEgressPolicy(allowPrivate bool, allowed, denied []netip.Prefix) *EgressP
 func (p *EgressPolicy) Resolve(ctx context.Context, host string) (netip.Addr, error) {
 	if host == "" {
 		return netip.Addr{}, fmt.Errorf("%w: empty host", ErrEgressDenied)
+	}
+	// IPv6 zone identifiers change how the address is scoped and are not part
+	// of an SSH host identity. Reject them instead of allowing a zone to evade
+	// prefix and address-class checks.
+	if strings.ContainsRune(host, '%') {
+		return netip.Addr{}, fmt.Errorf("%w: zone identifiers are not allowed", ErrEgressDenied)
 	}
 
 	if addr, err := netip.ParseAddr(host); err == nil {
@@ -104,6 +111,10 @@ func (p *EgressPolicy) check(addr netip.Addr) error {
 
 	if explicitlyAllowed {
 		return nil
+	}
+
+	if addr.IsLoopback() || addr.IsLinkLocalUnicast() || addr.IsMulticast() || addr.IsUnspecified() {
+		return fmt.Errorf("%w: %s is a blocked address class", ErrEgressDenied, addr)
 	}
 
 	for _, prefix := range defaultDeniedPrefixes {

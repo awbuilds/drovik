@@ -122,6 +122,10 @@ func (s *Service) Read(
 		Entries:     make([]Entry, 0, min(lines, 256)),
 	}
 	for _, line := range strings.Split(output, "\n") {
+		if len(result.Entries) >= lines {
+			result.Truncated = true
+			break
+		}
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -132,7 +136,9 @@ func (s *Service) Read(
 		}
 		result.Entries = append(result.Entries, entry)
 	}
-	result.Truncated = strings.Contains(output, "[output truncated]") || len(result.Entries) >= lines
+	if strings.Contains(output, "[output truncated]") {
+		result.Truncated = true
+	}
 	return result, nil
 }
 
