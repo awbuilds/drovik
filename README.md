@@ -5,17 +5,19 @@
 [![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/website-awbuilds.github.io%2Fdrovik-2ea043)](https://awbuilds.github.io/drovik/)
 
-**A self-hosted, agentless web workspace for your Linux servers.**
+**A self-hosted, agentless web workspace for your Linux servers, with read-only macOS/BSD monitoring.**
 
 Drovik brings the everyday work of managing Linux machines into one deliberate interface:
 saved SSH connections, an interactive terminal, SFTP file management, system health, processes,
 systemd services, logs and audit history. It uses the SSH access you already have. It installs
 nothing on the servers you manage.
 
-> **Status:** stable (`v1.2.0`). Drovik provides authentication, strict SSH host-key trust, terminal,
-> SFTP files, agentless monitoring, process/service/log operations, Docker and host diagnostics,
-> snippets, local users/server assignments, history and audit. Drovik is a working name pending
-> trademark clearance.
+> **Status:** stable (`v1.3.0`). Drovik provides authentication with local MFA and optional OIDC,
+> strict SSH host-key trust, terminal, SFTP files, agentless monitoring, process/service/log
+> operations, Docker and host diagnostics, package lifecycle, managed cron tasks, snippets, local
+> users/server assignments, history, alerts and audit. Vault KV v2 can hold SSH credentials.
+> Destructive storage/network operations are opt-in. Drovik is a working name pending trademark
+> clearance.
 
 [Website](https://awbuilds.github.io/drovik/) · [Documentation](docs/) ·
 [Install](deploy/README.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) ·
@@ -81,7 +83,7 @@ See [the architecture overview](docs/architecture/overview.md) and the
 The supported deployment is a self-hosted container on Linux:
 
 ```bash
-docker pull ghcr.io/awbuilds/drovik:v1.2.0
+docker pull ghcr.io/awbuilds/drovik:v1.3.0
 ```
 
 Use the [Compose example](deploy/compose/docker-compose.yml) with a persistent `/data` volume, a
