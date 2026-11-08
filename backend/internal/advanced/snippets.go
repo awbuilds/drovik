@@ -171,46 +171,74 @@ func (s *Service) RunSnippet(
 	}
 	defer func() { _ = client.Close() }()
 	output, stderr, err := s.run(ctx, client, command)
-	if err != nil && output == "" {
+	if err != nil {
 		classified := classify(stderr, err)
 		s.record(ctx, ownerID, serverID, "snippet.run", snippet.Name, "failure", "SNIPPET_RUN_FAILED")
-		return nil, classified
+		if output == "" {
+			return nil, classified
+		}
 	}
 	if stderr != "" {
 		output += stderr
 	}
-	s.record(ctx, ownerID, serverID, "snippet.run", snippet.Name, "success", "")
+	if err == nil {
+		s.record(ctx, ownerID, serverID, "snippet.run", snippet.Name, "success", "")
+	}
 	return &SnippetRun{
 		SnippetID: snippet.ID, Command: command, Output: output,
 		Truncated: strings.Contains(output, "[output truncated]"),
 	}, nil
 }
 
+const (
+	maxSnippetValueBytes   = 4 << 10
+	maxSnippetCommandBytes = 64 << 10
+)
+
+// renderSnippet substitutes declared placeholders with shell-quoted values and
+// stops as soon as the rendered command would exceed the budget. It never
+// builds an unbounded intermediate string from request-controlled values.
 func renderSnippet(snippet *Snippet, values map[string]string) (string, error) {
 	allowed := make(map[string]SnippetVariable, len(snippet.Variables))
 	for _, variable := range snippet.Variables {
 		allowed[variable.Name] = variable
 	}
-	for name := range values {
+	for name, value := range values {
 		if _, ok := allowed[name]; !ok {
 			return "", fmt.Errorf("%w: unknown variable %q", ErrInvalidTarget, name)
 		}
+		if len(value) > maxSnippetValueBytes {
+			return "", fmt.Errorf("%w: variable %q is too large", ErrInvalidTarget, name)
+		}
 	}
-	command := placeholderPattern.ReplaceAllStringFunc(snippet.Command, func(match string) string {
-		name := placeholderPattern.FindStringSubmatch(match)[1]
+
+	var builder strings.Builder
+	builder.Grow(len(snippet.Command) + 64)
+	last := 0
+	for _, match := range placeholderPattern.FindAllStringSubmatchIndex(snippet.Command, -1) {
+		if match[2] < 0 || match[3] < 0 {
+			return "", fmt.Errorf("%w: malformed placeholder", ErrInvalidTarget)
+		}
+		name := snippet.Command[match[2]:match[3]]
 		value, ok := values[name]
 		if !ok {
 			value = allowed[name].Default
 		}
-		return shellQuote(value)
-	})
-	if placeholderPattern.MatchString(command) {
-		return "", fmt.Errorf("%w: unresolved snippet variable", ErrInvalidTarget)
+		quoted := shellQuote(value)
+		prefix := match[0] - last
+		remaining := len(snippet.Command) - match[1]
+		if builder.Len()+prefix+len(quoted)+remaining > maxSnippetCommandBytes {
+			return "", fmt.Errorf("%w: substituted command is too large", ErrInvalidTarget)
+		}
+		builder.WriteString(snippet.Command[last:match[0]])
+		builder.WriteString(quoted)
+		last = match[1]
 	}
-	if len(command) > 64*1024 {
+	builder.WriteString(snippet.Command[last:])
+	if builder.Len() > maxSnippetCommandBytes {
 		return "", fmt.Errorf("%w: substituted command is too large", ErrInvalidTarget)
 	}
-	return command, nil
+	return builder.String(), nil
 }
 
 func shellQuote(value string) string {
@@ -231,6 +259,15 @@ func (s *Service) validateSnippet(input SnippetInput) (SnippetInput, error) {
 	}
 	if strings.ContainsRune(input.Command, 0) {
 		return input, fmt.Errorf("%w: command contains a NUL byte", ErrInvalidTarget)
+	}
+	declared := make(map[string]struct{}, len(input.Variables))
+	for _, variable := range input.Variables {
+		declared[variable.Name] = struct{}{}
+	}
+	for _, match := range placeholderPattern.FindAllStringSubmatch(input.Command, -1) {
+		if _, ok := declared[match[1]]; !ok {
+			return input, fmt.Errorf("%w: placeholder %q has no variable declaration", ErrInvalidTarget, match[1])
+		}
 	}
 	if len(input.Variables) > 16 {
 		return input, fmt.Errorf("%w: at most 16 variables are supported", ErrInvalidTarget)

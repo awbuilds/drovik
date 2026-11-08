@@ -31,7 +31,8 @@ func (r *MetricRepository) Insert(ctx context.Context, sample MetricSample) erro
 		INSERT INTO metric_samples (
 			server_id, collected_at, cpu_percent, memory_percent, disk_percent,
 			load_one, rx_bps, tx_bps
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(server_id, collected_at) DO NOTHING`,
 		sample.ServerID, formatTime(sample.CollectedAt), sample.CPUPercent,
 		sample.MemoryPercent, sample.DiskPercent, sample.LoadOne, sample.RXBps, sample.TXBps,
 	)

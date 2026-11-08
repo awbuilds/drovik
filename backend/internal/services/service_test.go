@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/awbuilds/drovik/backend/internal/storage"
 	"github.com/awbuilds/drovik/backend/internal/testenv"
 	"github.com/awbuilds/drovik/backend/internal/testssh"
 )
@@ -130,5 +131,42 @@ func BenchmarkParseUnits(b *testing.B) {
 		if units, _ := parseUnits(unitFixture, 100); len(units) != 2 {
 			b.Fatalf("unexpected units: %+v", units)
 		}
+	}
+}
+
+func TestServiceActionReportsUnknownState(t *testing.T) {
+	env, service := newServicesEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case strings.Contains(command, "systemctl list-units"):
+			return unitFixture, "", 0, true
+		case strings.Contains(command, "systemctl --no-ask-password --no-pager restart ssh.service"):
+			return "", "", 0, true
+		case strings.Contains(command, "systemctl show"):
+			return "", "Failed to connect to bus\n", 1, true
+		}
+		return "", "", 0, false
+	})
+	result, err := service.Action(context.Background(), env.User.ID, env.Server.ID, "ssh.service", ActionRestart)
+	if err != nil {
+		t.Fatalf("Action: %v", err)
+	}
+	if result.StateKnown {
+		t.Fatalf("expected an unknown state: %+v", result)
+	}
+	events, err := storage.NewAuditRepository(env.DB).ListRecent(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("ListRecent: %v", err)
+	}
+	found := false
+	for _, event := range events {
+		if event.EventType == "service.action" {
+			found = true
+			if event.Outcome != "unknown" {
+				t.Fatalf("unexpected audit outcome: %+v", event)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected a service.action audit event")
 	}
 }

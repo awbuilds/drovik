@@ -374,8 +374,8 @@ covered.
   retention/history and in-app threshold alerts are implemented and tested. Destructive host
   changes, OIDC/MFA, external notifications and non-Linux support remain deferred with their own
   threat-model requirements.
-- Security audit 2026-11-08 complete: five confirmed findings fixed in `v1.0.1`; twelve leads and
-  their validation plans are recorded outside the repository and summarized in
+- Security audit 2026-11-08 complete in two runs: five confirmed findings fixed in `v1.0.1`; seven
+  Phase 9 findings fixed in `v1.1.1`. Remaining leads and validation plans are summarized in
   `docs/security/audit-2026-11-08.md`.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.

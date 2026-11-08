@@ -94,9 +94,17 @@ func writeError(w http.ResponseWriter, r *http.Request, err *APIError) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	// Marshal before committing a status so an unencodable value (for example a
+	// non-finite float from remote data) is a visible 500 instead of a silent
+	// empty 200.
+	body, err := json.Marshal(value)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":{"code":"INTERNAL_ERROR","message":"An internal error occurred."}}` + "\n"))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	encoder := json.NewEncoder(w)
-	encoder.SetEscapeHTML(true)
-	_ = encoder.Encode(value)
+	_, _ = w.Write(append(body, '\n'))
 }

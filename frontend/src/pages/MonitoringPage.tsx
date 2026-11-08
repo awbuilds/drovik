@@ -16,6 +16,7 @@ import {
   Timer,
 } from 'lucide-react'
 import { getServerOverview } from '@/api/monitoring'
+import { useAuth } from '@/auth/useAuth'
 import { listServers } from '@/api/servers'
 import { PageHeader } from '@/components/PageHeader'
 import { HistoryPanel } from '@/components/monitoring/HistoryPanel'
@@ -92,6 +93,7 @@ function MetricCard({
 export function MonitoringPage() {
   const { serverId } = useParams<{ serverId?: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const serversQuery = useQuery({
     queryKey: ['servers'],
@@ -553,7 +555,10 @@ export function MonitoringPage() {
             </CardContent>
           </Card>
 
-          <HistoryPanel serverId={serverId} />
+          <HistoryPanel
+            serverId={serverId}
+            canWrite={user?.role !== 'read_only' && currentServer?.access_level !== 'read'}
+          />
 
           <div className="border-ink-700 bg-ink-900/60 flex gap-3 rounded-lg border p-4">
             <Database className="text-mint-400 mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

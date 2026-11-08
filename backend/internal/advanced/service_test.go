@@ -2,8 +2,10 @@ package advanced
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -225,5 +227,131 @@ func TestParseListenersRejectsShortLines(t *testing.T) {
 	listeners := parseListeners(short+"\n"+valid+"\n", 10)
 	if len(listeners) != 1 || listeners[0].Local != "0.0.0.0:22" {
 		t.Fatalf("unexpected listeners: %+v", listeners)
+	}
+}
+
+func TestRenderSnippetBoundsExpansion(t *testing.T) {
+	command := strings.Repeat("{{a}} ", 1000)
+	snippet := &Snippet{
+		Command:   command,
+		Variables: []SnippetVariable{{Name: "a"}},
+	}
+	// A per-value cap rejects oversized input before any expansion.
+	if _, err := renderSnippet(snippet, map[string]string{"a": strings.Repeat("A", maxSnippetValueBytes+1)}); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected oversized value rejection, got %v", err)
+	}
+	// Filling the entire body-derived budget must also fail closed rather than
+	// materializing the expanded string first.
+	values := map[string]string{"a": strings.Repeat("A", maxSnippetValueBytes)}
+	if _, err := renderSnippet(snippet, values); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected rendered-command budget rejection, got %v", err)
+	}
+	ok, err := renderSnippet(snippet, map[string]string{"a": "value"})
+	if err != nil || strings.Count(ok, "'value'") != 1000 {
+		t.Fatalf("unexpected rendered command: %v (len=%d)", err, len(ok))
+	}
+}
+
+func TestSplitSectionsBoundsLines(t *testing.T) {
+	var builder strings.Builder
+	builder.WriteString("@@df@@\n")
+	for index := 0; index < maxSectionLines*3; index++ {
+		builder.WriteString("x\n")
+	}
+	sections := splitSections(builder.String())
+	if lines := strings.Count(sections["df"], "\n"); lines != maxSectionLines {
+		t.Fatalf("expected %d retained lines, got %d", maxSectionLines, lines)
+	}
+}
+
+func TestDockerImagesTruncated(t *testing.T) {
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case strings.Contains(command, "docker ps -a"):
+			return "", "", 0, true
+		case strings.Contains(command, "docker images"):
+			var builder strings.Builder
+			for index := 0; index < 10; index++ {
+				builder.WriteString("{\"ID\":\"sha256:x\",\"Repository\":\"repo\",\"Tag\":\"latest\"}\n")
+			}
+			return builder.String(), "", 0, true
+		}
+		return "", "", 0, false
+	})
+	service.cfg.DockerMaxContainers = 3
+	result, err := service.Docker(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("Docker: %v", err)
+	}
+	if len(result.Images) != 3 || !result.Truncated {
+		t.Fatalf("expected image truncation, got %d (truncated=%v)", len(result.Images), result.Truncated)
+	}
+}
+
+func TestNonFiniteSnapshotIsNotPersisted(t *testing.T) {
+	env, service := newAdvancedEnv(t, nil)
+	infinite := math.Inf(1)
+	notNaN := math.NaN()
+	snapshot := &monitoring.Snapshot{
+		ServerID: env.Server.ID, CollectedAt: time.Now().UTC(),
+		CPU:    monitoring.CPUMetrics{Available: true, UsagePercent: &infinite},
+		Load:   monitoring.LoadAverage{Available: true, One: infinite},
+		Memory: monitoring.MemoryMetrics{Available: true, UsedPercent: &notNaN},
+	}
+	service.RecordSnapshot(context.Background(), snapshot)
+	history, err := service.History(context.Background(), env.User.ID, env.Server.ID, "1h")
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	if len(history.Samples) != 1 {
+		t.Fatalf("expected one sample row: %+v", history)
+	}
+	for _, candidate := range []*float64{history.Samples[0].CPUPercent, history.Samples[0].MemoryPercent, history.Samples[0].LoadOne} {
+		if candidate != nil && (math.IsInf(*candidate, 0) || math.IsNaN(*candidate)) {
+			t.Fatalf("non-finite value persisted: %v", *candidate)
+		}
+	}
+}
+
+func TestMetricInsertDeduplicatesSameCollection(t *testing.T) {
+	env, service := newAdvancedEnv(t, nil)
+	collected := time.Now().UTC()
+	sample := storage.MetricSample{ServerID: env.Server.ID, CollectedAt: collected}
+	repository := storage.NewMetricRepository(env.DB)
+	if err := repository.Insert(context.Background(), sample); err != nil {
+		t.Fatalf("Insert first: %v", err)
+	}
+	if err := repository.Insert(context.Background(), sample); err != nil {
+		t.Fatalf("Insert duplicate: %v", err)
+	}
+	count, err := repository.Count(context.Background(), env.Server.ID)
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one deduplicated sample, got %d", count)
+	}
+	_ = service
+}
+
+func TestAlertRuleIDAndCardinalityBounds(t *testing.T) {
+	env, service := newAdvancedEnv(t, nil)
+	ctx := context.Background()
+	if _, err := service.SaveAlertRule(ctx, env.User.ID, env.Server.ID, "not-an-id", AlertRuleInput{
+		Metric: "cpu_percent", Comparator: "gt", Threshold: 80, Enabled: true,
+	}); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected invalid rule ID rejection, got %v", err)
+	}
+	for index := 0; index < maxAlertRules; index++ {
+		if _, err := service.SaveAlertRule(ctx, env.User.ID, env.Server.ID, "", AlertRuleInput{
+			Metric: "cpu_percent", Comparator: "gt", Threshold: 80, Enabled: true,
+		}); err != nil {
+			t.Fatalf("create rule %d: %v", index, err)
+		}
+	}
+	if _, err := service.SaveAlertRule(ctx, env.User.ID, env.Server.ID, "", AlertRuleInput{
+		Metric: "cpu_percent", Comparator: "gt", Threshold: 80, Enabled: true,
+	}); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected rule cap rejection, got %v", err)
 	}
 }

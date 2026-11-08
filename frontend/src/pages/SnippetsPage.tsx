@@ -149,9 +149,11 @@ export function SnippetsPage() {
     }
   }
 
+  const writableServers = servers.filter((server) => server.access_level !== 'read')
+
   const openRun = (snippet: Snippet) => {
     setRunTarget(snippet)
-    setRunServer(servers[0]?.id ?? '')
+    setRunServer(writableServers[0]?.id ?? '')
     setValues(Object.fromEntries(snippet.variables.map((variable) => [variable.name, variable.default ?? ''])))
     setPreview('')
     setRunOutput('')
@@ -282,14 +284,14 @@ export function SnippetsPage() {
         title={`Run ${runTarget?.name ?? 'snippet'}`}
         description="Select a target, fill variables, preview, then confirm execution."
         size="lg"
-        footer={<><Button variant="ghost" onClick={() => setRunTarget(null)} disabled={runBusy}>Close</Button><Button onClick={() => void previewCommand()} variant="outline" loading={runBusy}>Preview</Button><Button onClick={() => void execute()} loading={runBusy} disabled={!confirmed || !runServer}>Run on server</Button></>}
+        footer={<><Button variant="ghost" onClick={() => setRunTarget(null)} disabled={runBusy}>Close</Button><Button onClick={() => void previewCommand()} variant="outline" loading={runBusy}>Preview</Button><Button onClick={() => void execute()} loading={runBusy} disabled={!confirmed || !runServer || writableServers.length === 0}>Run on server</Button></>}
       >
         <div className="space-y-4">
           {runError ? <Alert variant="error">{runError}</Alert> : null}
           <Field label="Target server" htmlFor="snippet-server">
             <Select id="snippet-server" value={runServer} onChange={(event) => setRunServer(event.target.value)}>
               <option value="">Select a server…</option>
-              {servers.map((server) => <option key={server.id} value={server.id}>{server.display_name} · {server.host}</option>)}
+              {writableServers.map((server) => <option key={server.id} value={server.id}>{server.display_name} · {server.host}</option>)}
             </Select>
           </Field>
           {(runTarget?.variables ?? []).map((variable) => (
@@ -301,10 +303,17 @@ export function SnippetsPage() {
             <p className="text-ink-500 font-mono text-[10px] uppercase">Substituted preview</p>
             <pre className="bg-ink-950 text-ink-200 mt-2 min-h-16 overflow-auto rounded-md p-3 font-mono text-[11px] whitespace-pre-wrap">{preview || 'Preview has not been generated yet.'}</pre>
           </div>
-          <label className="text-ink-300 flex items-start gap-2 text-xs">
-            <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="accent-signal-400 mt-0.5 h-4 w-4" />
-            I confirm this command should run on the selected server as the connected SSH account.
-          </label>
+          {writableServers.length === 0 ? (
+            <Alert variant="warning" title="No writable servers">
+              You have read-only access to every server. Ask an administrator for write access before
+              running snippets.
+            </Alert>
+          ) : (
+            <label className="text-ink-300 flex items-start gap-2 text-xs">
+              <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="accent-signal-400 mt-0.5 h-4 w-4" />
+              I confirm this command should run on the selected server as the connected SSH account.
+            </label>
+          )}
           {runOutput ? <pre className="bg-ink-950 text-mint-200 max-h-52 overflow-auto rounded-md p-3 font-mono text-[11px] whitespace-pre-wrap">{runOutput}</pre> : null}
         </div>
       </Dialog>

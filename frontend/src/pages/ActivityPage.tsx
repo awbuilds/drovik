@@ -146,7 +146,17 @@ export function ActivityPage() {
                           {event.target_summary || '—'}
                         </td>
                         <td className="px-4 py-2.5">
-                          <Badge variant={event.outcome === 'success' ? 'mint' : 'rose'}>{event.outcome}</Badge>
+                          <Badge
+                            variant={
+                              event.outcome === 'success'
+                                ? 'mint'
+                                : event.outcome === 'unknown'
+                                  ? 'signal'
+                                  : 'rose'
+                            }
+                          >
+                            {event.outcome}
+                          </Badge>
                           {event.safe_error_code ? (
                             <p className="text-ink-500 mt-1 font-mono text-[9px]">{event.safe_error_code}</p>
                           ) : null}

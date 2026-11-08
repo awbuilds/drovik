@@ -90,11 +90,17 @@ export function ProcessesPage() {
       }
       setTarget(null)
       toast({
-        title: result.running ? 'Signal sent; process still running' : 'Process signaled',
-        description: result.running
-          ? `PID ${target.pid} is still ${result.state ?? 'running'}. Refresh to re-check.`
-          : `PID ${target.pid} is no longer running.`,
-        variant: result.running ? 'info' : 'success',
+        title: result.outcome_unknown
+          ? 'Signal sent; state could not be verified'
+          : result.running
+            ? 'Signal sent; process still running'
+            : 'Process signaled',
+        description: result.outcome_unknown
+          ? `PID ${target.pid} received the signal, but its state could not be read. Refresh to re-check.`
+          : result.running
+            ? `PID ${target.pid} is still ${result.state ?? 'running'}. Refresh to re-check.`
+            : `PID ${target.pid} is no longer running.`,
+        variant: result.outcome_unknown ? 'info' : result.running ? 'info' : 'success',
       })
       await queryClient.invalidateQueries({ queryKey: ['processes', serverId] })
       if (result.running) {

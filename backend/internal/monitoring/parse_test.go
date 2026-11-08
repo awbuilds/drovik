@@ -189,3 +189,18 @@ func BenchmarkParseSample(b *testing.B) {
 		}
 	}
 }
+
+func TestNonFiniteLoadAndUptimeAreUnavailable(t *testing.T) {
+	fixture := strings.NewReplacer("0.42 0.31 0.25 2/128 4242", "inf nan 0.25 2/128 4242", "123456.78 987654.32", "inf 0").Replace(testssh.DefaultMetricsFixture)
+	sample, err := parseSample(fixture, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("parseSample: %v", err)
+	}
+	if sample.loadAvailable || sample.uptimeAvailable {
+		t.Fatalf("non-finite values must be unavailable: load=%v uptime=%v", sample.loadAvailable, sample.uptimeAvailable)
+	}
+	snapshot := computeSnapshot("server", nil, sample)
+	if snapshot.Load.Available || snapshot.Uptime.Available {
+		t.Fatalf("snapshot must not expose non-finite values: %+v", snapshot)
+	}
+}

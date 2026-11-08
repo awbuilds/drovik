@@ -2144,7 +2144,10 @@ components:
           type: boolean
         running:
           type: boolean
-          description: Result of the post-signal status check.
+          description: Result of the post-signal status check. False when unknown.
+        outcome_unknown:
+          type: boolean
+          description: True when the signal was delivered but the resulting state could not be observed.
         state:
           type: string
 

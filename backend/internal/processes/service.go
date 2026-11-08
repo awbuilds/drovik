@@ -61,11 +61,12 @@ type ListResult struct {
 }
 
 type SignalResult struct {
-	PID       int    `json:"pid"`
-	Signal    string `json:"signal"`
-	Delivered bool   `json:"delivered"`
-	Running   bool   `json:"running"`
-	State     string `json:"state,omitempty"`
+	PID            int    `json:"pid"`
+	Signal         string `json:"signal"`
+	Delivered      bool   `json:"delivered"`
+	Running        bool   `json:"running"`
+	State          string `json:"state,omitempty"`
+	OutcomeUnknown bool   `json:"outcome_unknown"`
 }
 
 type Service struct {
@@ -199,7 +200,7 @@ func (s *Service) Signal(
 	_, stderr, err := sshclient.RunCommand(actionCtx, client, command, 8*1024)
 	if err != nil {
 		classified := classifyError(stderr, err)
-		s.record(ctx, ownerID, server.ID, "process.signal", "failure", safeCode(classified), fmt.Sprintf("pid %d", pid))
+		s.recordAudit(ownerID, server.ID, "process.signal", "failure", safeCode(classified), fmt.Sprintf("pid %d", pid))
 		return nil, classified
 	}
 
@@ -208,22 +209,44 @@ func (s *Service) Signal(
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
+		// The signal was already delivered. Persist the accountability record
+		// with a detached context before returning to the canceled request.
+		result.OutcomeUnknown = true
+		s.recordAudit(ownerID, server.ID, "process.signal", "unknown", "OUTCOME_UNKNOWN", fmt.Sprintf("pid %d %s", pid, flag))
 		return result, ctx.Err()
 	case <-timer.C:
 	}
 
 	stateCtx, stateCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer stateCancel()
-	state, _, stateErr := sshclient.RunCommand(stateCtx, client, fmt.Sprintf("ps -p %d -o stat=", pid), 4*1024)
-	if stateErr != nil && state == "" {
-		result.Running = false
-	} else {
-		state = strings.TrimSpace(state)
-		result.Running = state != ""
+	state, stateStderr, stateErr := sshclient.RunCommand(stateCtx, client, fmt.Sprintf("ps -p %d -o stat=", pid), 4*1024)
+	state = strings.TrimSpace(state)
+	switch {
+	case stateErr == nil && state != "":
+		result.Running = true
 		result.State = state
+	case stateErr == nil:
+		// ps succeeded with no state: the process is gone.
+		result.Running = false
+	case state == "" && strings.TrimSpace(stateStderr) == "":
+		// ps commonly exits non-zero with no diagnostic when the PID is gone.
+		result.Running = false
+	case state != "":
+		// The command produced a state but also a diagnostic; report the state.
+		result.Running = true
+		result.State = state
+	default:
+		// An unobservable status is not evidence of absence. Report an unknown
+		// outcome instead of claiming the process stopped.
+		result.OutcomeUnknown = true
+		result.Running = false
 	}
 
-	s.record(ctx, ownerID, server.ID, "process.signal", "success", "", fmt.Sprintf("pid %d %s", pid, flag))
+	if result.OutcomeUnknown {
+		s.recordAudit(ownerID, server.ID, "process.signal", "unknown", "OUTCOME_UNKNOWN", fmt.Sprintf("pid %d %s", pid, flag))
+	} else {
+		s.recordAudit(ownerID, server.ID, "process.signal", "success", "", fmt.Sprintf("pid %d %s", pid, flag))
+	}
 	return result, nil
 }
 
@@ -232,8 +255,13 @@ func (s *Service) verifyIdentity(ctx context.Context, client *ssh.Client, pid in
 	defer cancel()
 	output, stderr, err := sshclient.RunCommand(checkCtx, client, fmt.Sprintf("LC_ALL=C ps -p %d -o etimes=", pid), 4*1024)
 	if err != nil && output == "" {
-		_ = stderr
-		return ErrNotFound
+		// ps exits non-zero without a diagnostic when the PID does not exist.
+		// A diagnostic means the observation itself failed (missing ps,
+		// timeout, transport), which must not be reported as absence.
+		if strings.TrimSpace(stderr) == "" {
+			return ErrNotFound
+		}
+		return fmt.Errorf("%w: %s", ErrActionFailed, safeStderr(stderr))
 	}
 	elapsed, parseErr := strconv.ParseInt(strings.TrimSpace(output), 10, 64)
 	if parseErr != nil || elapsed < 0 {
@@ -286,6 +314,14 @@ func safeCode(err error) string {
 	default:
 		return "PROCESS_ACTION_FAILED"
 	}
+}
+
+// recordAudit writes the accountability record with a detached, bounded context
+// so a client disconnect after a destructive action cannot erase it.
+func (s *Service) recordAudit(actorID, serverID, eventType, outcome, code, target string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	s.record(ctx, actorID, serverID, eventType, outcome, code, target)
 }
 
 func (s *Service) record(ctx context.Context, actorID, serverID, eventType, outcome, code, target string) {

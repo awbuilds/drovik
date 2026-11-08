@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ---- Frontend ---------------------------------------------------------------
-FROM node:22-alpine AS frontend
+FROM node:22-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202 AS frontend
 WORKDIR /app
 RUN npm install -g pnpm@12.4.1
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
@@ -10,7 +10,7 @@ COPY frontend/ ./
 RUN pnpm build
 
 # ---- Backend ----------------------------------------------------------------
-FROM golang:1.27 AS backend
+FROM golang:1.27@sha256:e519d3b0a5b285e5aa53ab9eef02bc6bbb9cb04608389b743a136a9ce75f0d1e AS backend
 WORKDIR /src
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
@@ -27,10 +27,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /out/drovik ./cmd/drovik
 
 # ---- Runtime ----------------------------------------------------------------
-FROM alpine:3.22 AS dirs
+FROM alpine:3.22@sha256:bfe7ceb9f09ec0566c48fb93356e45a47a00be5a1dd14fa5b909e7709c66b034 AS dirs
 RUN mkdir -p /data
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 WORKDIR /app
 
 COPY --from=backend /out/drovik /drovik

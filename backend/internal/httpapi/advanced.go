@@ -41,6 +41,7 @@ func (s *Server) handleDocker(w http.ResponseWriter, r *http.Request) {
 		s.writeAdvancedError(w, r, err)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -103,6 +104,7 @@ func (s *Server) handleStorageTools(w http.ResponseWriter, r *http.Request) {
 		s.writeAdvancedError(w, r, err)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -113,6 +115,7 @@ func (s *Server) handleNetworkTools(w http.ResponseWriter, r *http.Request) {
 		s.writeAdvancedError(w, r, err)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -123,6 +126,7 @@ func (s *Server) handlePackages(w http.ResponseWriter, r *http.Request) {
 		s.writeAdvancedError(w, r, err)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -133,6 +137,7 @@ func (s *Server) handleSchedules(w http.ResponseWriter, r *http.Request) {
 		s.writeAdvancedError(w, r, err)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, result)
 }
 
