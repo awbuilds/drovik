@@ -12,7 +12,7 @@ saved SSH connections, an interactive terminal, SFTP file management, system hea
 systemd services, logs and audit history. It uses the SSH access you already have. It installs
 nothing on the servers you manage.
 
-> **Status:** stable (`v1.1.1`). Drovik provides authentication, strict SSH host-key trust, terminal,
+> **Status:** stable (`v1.2.0`). Drovik provides authentication, strict SSH host-key trust, terminal,
 > SFTP files, agentless monitoring, process/service/log operations, Docker and host diagnostics,
 > snippets, local users/server assignments, history and audit. Drovik is a working name pending
 > trademark clearance.
@@ -47,7 +47,9 @@ what it is doing:
 | Services | Inspect and control systemd units where permitted, with post-action state |
 | Logs | Bounded journal viewing with safe text rendering |
 | Docker | Inspect containers and images; start, stop, restart or remove after confirmation |
-| Advanced | Read-only storage, network, package and scheduled-task diagnostics |
+| Advanced | Read-only storage and network diagnostics; package lifecycle; managed cron tasks |
+| MFA | TOTP authenticator enrollment with single-use recovery codes |
+| Alerts | In-app threshold rules with encrypted external webhooks |
 | Snippets | Reusable command templates with substituted preview and explicit confirmation |
 | Users | Local accounts, roles and per-server `read`/`write` assignments |
 | History | Optional bounded metric retention, charts and in-app threshold alerts |
@@ -77,7 +79,7 @@ See [the architecture overview](docs/architecture/overview.md) and the
 The supported deployment is a self-hosted container on Linux:
 
 ```bash
-docker pull ghcr.io/awbuilds/drovik:v1.1.1
+docker pull ghcr.io/awbuilds/drovik:v1.2.0
 ```
 
 Use the [Compose example](deploy/compose/docker-compose.yml) with a persistent `/data` volume, a

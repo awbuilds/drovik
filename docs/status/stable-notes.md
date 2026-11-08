@@ -1,6 +1,6 @@
 # Stable release notes
 
-**Release line:** `v1.1.1`
+**Release line:** `v1.2.0`
 
 Drovik 1.0 was the first stable MVP for self-hosted, agentless Linux server management. `v1.1.0`
 adds the Phase 9 advanced-management scope. It includes:
@@ -28,7 +28,9 @@ Only the latest stable minor release and the current beta line receive security 
 
 ## Security patches
 
-`v1.1.1` fixes seven issues found by the second source-first audit of the Phase 9 tree and pins
+`v1.2.0` adds package lifecycle, managed cron tasks, local TOTP MFA and encrypted alert webhooks.
+
+`v1.1.1` fixed seven issues found by the second source-first audit of the Phase 9 tree and pins
 container base images by digest. See [`docs/security/audit-2026-11-08.md`](../security/audit-2026-11-08.md).
 
 `v1.0.1` fixed five issues found by the first source-first audit. The high-severity issue could
