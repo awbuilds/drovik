@@ -350,6 +350,8 @@ export interface AlertRule {
   comparator: string
   threshold: number
   enabled: boolean
+  webhook_configured?: boolean
+  last_notified_at?: string
 }
 
 export function listAlertRules(serverId: string, signal?: AbortSignal): Promise<{ rules: AlertRule[] }> {
@@ -359,7 +361,7 @@ export function listAlertRules(serverId: string, signal?: AbortSignal): Promise<
 export function saveAlertRule(
   serverId: string,
   ruleId: string,
-  input: { metric: string; comparator: string; threshold: number; enabled: boolean },
+  input: { metric: string; comparator: string; threshold: number; enabled: boolean; webhook_url?: string },
   csrf: string,
 ): Promise<AlertRule> {
   return apiRequest<AlertRule>(`/api/v1/servers/${serverId}/alerts/${ruleId || 'new'}`, {

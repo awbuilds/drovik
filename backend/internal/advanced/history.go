@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/awbuilds/drovik/backend/internal/monitoring"
+	"github.com/awbuilds/drovik/backend/internal/safe"
 	"github.com/awbuilds/drovik/backend/internal/storage"
 )
 
@@ -44,6 +45,7 @@ type AlertRuleInput struct {
 	Comparator string  `json:"comparator"`
 	Threshold  float64 `json:"threshold"`
 	Enabled    bool    `json:"enabled"`
+	WebhookURL string  `json:"webhook_url"`
 }
 
 const (
@@ -108,6 +110,11 @@ func (s *Service) RecordSnapshot(ctx context.Context, snapshot *monitoring.Snaps
 	if err := s.metrics.PruneExcess(ctx, snapshot.ServerID, s.cfg.MetricsMaxSamples); err != nil {
 		s.logger.Warn("metric sample cap failed", "error", err, "server_id", snapshot.ServerID)
 	}
+	notifyCtx, notifyCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	safe.Go(notifyCtx, s.logger, "alert-notifications", func(ctx context.Context) {
+		defer notifyCancel()
+		s.notifyAlerts(ctx, snapshot.ServerID, sample)
+	})
 }
 
 func (s *Service) History(ctx context.Context, ownerID, serverID, rangeName string) (*HistoryResult, error) {
@@ -155,6 +162,11 @@ func (s *Service) SaveAlertRule(ctx context.Context, ownerID, serverID, ruleID s
 	if _, err := s.servers.Get(ctx, ownerID, serverID); err != nil {
 		return nil, err
 	}
+	if input.WebhookURL != "" {
+		if err := s.validateWebhook(input.WebhookURL); err != nil {
+			return nil, err
+		}
+	}
 	if input.Metric != "cpu_percent" && input.Metric != "memory_percent" && input.Metric != "disk_percent" && input.Metric != "load_one" {
 		return nil, fmt.Errorf("%w: unsupported alert metric", ErrInvalidTarget)
 	}
@@ -180,6 +192,13 @@ func (s *Service) SaveAlertRule(ctx context.Context, ownerID, serverID, ruleID s
 	rule := storage.AlertRule{
 		ID: ruleID, ServerID: serverID, Metric: input.Metric, Comparator: input.Comparator,
 		Threshold: input.Threshold, Enabled: input.Enabled, CreatedAt: now, UpdatedAt: now,
+	}
+	if input.WebhookURL != "" {
+		encrypted, err := s.encryptWebhook(ruleID, input.WebhookURL)
+		if err != nil {
+			return nil, err
+		}
+		rule.WebhookEncrypted = encrypted
 	}
 	if err := s.alerts.Upsert(ctx, rule); err != nil {
 		return nil, err

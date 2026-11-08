@@ -38,6 +38,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- Alert webhooks: encrypted URL storage, egress-checked delivery, bounded timeout and a 15-minute
+  per-rule cooldown, configured from the monitoring history panel.
 - Local TOTP MFA with encrypted secrets, eight single-use recovery codes and a login challenge;
   logout now clears the query cache and reports failure instead of claiming a revoked session.
 - Phase 9 expansion: enumerated package install/upgrade/remove for apt, dnf, apk and pacman with

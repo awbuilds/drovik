@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -44,6 +45,29 @@ type alertRuleRequest struct {
 	Comparator string  `json:"comparator"`
 	Threshold  float64 `json:"threshold"`
 	Enabled    bool    `json:"enabled"`
+	WebhookURL string  `json:"webhook_url"`
+}
+
+type alertRuleResponse struct {
+	ID                string     `json:"id"`
+	Metric            string     `json:"metric"`
+	Comparator        string     `json:"comparator"`
+	Threshold         float64    `json:"threshold"`
+	Enabled           bool       `json:"enabled"`
+	WebhookConfigured bool       `json:"webhook_configured"`
+	LastNotifiedAt    *time.Time `json:"last_notified_at,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+func toAlertRuleResponse(rule storage.AlertRule) alertRuleResponse {
+	return alertRuleResponse{
+		ID: rule.ID, Metric: rule.Metric, Comparator: rule.Comparator,
+		Threshold: rule.Threshold, Enabled: rule.Enabled,
+		WebhookConfigured: rule.WebhookEncrypted != "",
+		LastNotifiedAt:    rule.LastNotifiedAt,
+		CreatedAt:         rule.CreatedAt, UpdatedAt: rule.UpdatedAt,
+	}
 }
 
 func (s *Server) handleDocker(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +253,11 @@ func (s *Server) handleListAlertRules(w http.ResponseWriter, r *http.Request) {
 		s.writeAdvancedError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"rules": rules})
+	response := make([]alertRuleResponse, 0, len(rules))
+	for _, rule := range rules {
+		response = append(response, toAlertRuleResponse(rule))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"rules": response})
 }
 
 func (s *Server) handleSaveAlertRule(w http.ResponseWriter, r *http.Request) {
@@ -248,13 +276,14 @@ func (s *Server) handleSaveAlertRule(w http.ResponseWriter, r *http.Request) {
 		advanced.AlertRuleInput{
 			Metric: request.Metric, Comparator: request.Comparator,
 			Threshold: request.Threshold, Enabled: request.Enabled,
+			WebhookURL: request.WebhookURL,
 		},
 	)
 	if err != nil {
 		s.writeAdvancedError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, rule)
+	writeJSON(w, http.StatusOK, toAlertRuleResponse(*rule))
 }
 
 func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) {

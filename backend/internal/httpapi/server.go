@@ -97,6 +97,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		storage.NewSnippetRepository(db),
 		storage.NewMetricRepository(db),
 		storage.NewAlertRepository(db),
+		cipher,
 		auditService,
 		logger,
 	)
