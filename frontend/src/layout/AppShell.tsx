@@ -53,7 +53,7 @@ const navigation: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { to: '/monitoring', label: 'Monitoring', icon: Gauge, enabled: true },
       { to: '/logs', label: 'Logs', icon: ScrollText, enabled: true },
-      { to: '/activity', label: 'Activity', icon: Activity, enabled: false, phase: 'Later' },
+      { to: '/activity', label: 'Activity', icon: Activity, enabled: true },
     ],
   },
   {
@@ -175,7 +175,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main id="main-content" className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 lg:px-8" tabIndex={-1}>
           {children}
         </main>
       </div>

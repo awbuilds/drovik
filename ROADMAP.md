@@ -48,17 +48,23 @@ short, human-readable summary.
 - systemd unit discovery, actions and status re-reads.
 - Bounded journal retrieval with safe filtering.
 
-## Now — Phase 7: MVP integration, security hardening and public beta
+## Complete — Phase 7: MVP integration, security hardening and public beta
 
 - Cross-module server-context and stale-data review.
 - Audit history, accessibility and responsive polish.
 - Security test pass, dependency/static analysis and beta release assets.
 
+## Now — Phase 8: stable release and operational maturity
+
+- Versioned release pipeline, checksums and container publishing.
+- Migration, backup/restore and compatibility guidance.
+- Production load/performance validation and stable support policy.
+
 ## Then
 
 | Phase | Focus |
 |---|---|
-| 8 | Stable release and operational maturity |
+| 9 | Post-MVP advanced server management |
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

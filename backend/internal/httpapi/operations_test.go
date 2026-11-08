@@ -120,6 +120,30 @@ func TestOperationsHTTPFlow(t *testing.T) {
 		t.Fatalf("unexpected logs: %+v", journal)
 	}
 
+	result = app.request(t, http.MethodGet, "/api/v1/activity?limit=50", nil, "")
+	if result.status != http.StatusOK {
+		t.Fatalf("activity: %d %s", result.status, result.body)
+	}
+	var activity struct {
+		Events []auditEventResponse `json:"events"`
+	}
+	if err := json.Unmarshal(result.body, &activity); err != nil {
+		t.Fatalf("decode activity: %v", err)
+	}
+	foundProcess := false
+	foundService := false
+	for _, event := range activity.Events {
+		if event.EventType == "process.signal" {
+			foundProcess = true
+		}
+		if event.EventType == "service.action" {
+			foundService = true
+		}
+	}
+	if !foundProcess || !foundService {
+		t.Fatalf("expected process and service audit events: %+v", activity.Events)
+	}
+
 	result = app.request(t, http.MethodGet, base+"/logs?lines=9999", nil, "")
 	if result.status != http.StatusUnprocessableEntity {
 		t.Fatalf("expected line limit rejection, got %d %s", result.status, result.body)

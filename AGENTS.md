@@ -365,10 +365,12 @@ covered.
 - Phase 6: complete. Bounded process discovery and enumerated signals with PID identity checks,
   systemd unit discovery/actions with state re-reads, and bounded journal retrieval are implemented
   and tested.
-- Phase 7: next. MVP integration, audit history, security hardening and public beta.
+- Phase 7: complete. Audit history UI/API, scoped audit queries, accessibility skip link,
+  compatibility/troubleshooting/backup/security-testing docs and the release workflow are in place.
+- Phase 8: next. Stable release, migration/compatibility validation and operational maturity.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
-- Read the latest handoff in `docs/handoffs/` before starting Phase 7.
+- Read the latest handoff in `docs/handoffs/` before starting Phase 8.
 
 ## Decision inheritance
 

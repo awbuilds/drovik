@@ -7,10 +7,10 @@ saved SSH connections, an interactive terminal, SFTP file management, system hea
 systemd services, logs and audit history. It uses the SSH access you already have. It installs
 nothing on the servers you manage.
 
-> **Status:** early development. Phases 0–6 are complete: repository foundation, authentication,
-> SSH connections with strict host-key trust, the interactive terminal, the SFTP file manager, the
-> agentless host overview and process/service/log operations. Phase 7 (MVP integration and public
-> beta) is next. Drovik is a working name pending trademark clearance.
+> **Status:** public beta. The MVP is feature-complete: authentication, strict SSH host-key trust,
+> terminal, SFTP files, agentless monitoring, process/service/log operations and audit history.
+> Beta hardening and compatibility validation are ongoing. Drovik is a working name pending
+> trademark clearance.
 
 ## Why Drovik
 

@@ -253,6 +253,39 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
 - Journal output is parsed from JSON, bounded, and never stored. Log text is untrusted and rendered
   as text.
 
+
+## Phase 7 — MVP integration, security hardening and public beta
+
+| ID | Requirement | Status | Implementation / evidence |
+|---|---|---|---|
+| AUD-001 | Record relevant events | Tested | Setup/login, server, host-key, file, process and service events; HTTP test |
+| AUD-002 | Event metadata | Partial | Timestamp, actor, server, action and outcome; correlation ID only on request-scoped events |
+| AUD-003 | No secrets in audit | Implemented | Target summaries contain paths/PIDs/units only |
+| AUD-004 | No file contents | Implemented | Audit records never include content |
+| AUD-005 | Failed operations recorded | Implemented | Safe error codes on process/service/SSH failures |
+| AUD-006 | Audit protected from user modification | Implemented | No mutation API; SQLite file permissions are the boundary |
+| AUD-007 | Filter audit history | Partial | Server-side user/server scoping and limit; client text/outcome filters, no date/actor filter yet |
+| AUD-008 | Retention documented | Implemented | Retention documented in backup/restore and beta notes |
+| AUD-009 | No tamper-proof claim | Implemented | UI and docs describe local audit metadata only |
+| INT-001 | Server-context consistency | Implemented | Route/query keys include server ID; panels reset on server switch |
+| INT-002 | No stale cross-server data | Implemented | React Query keys and server-scoped fetches |
+| INT-003 | Standard error states | Implemented | Stable code catalog in `docs/api/errors.md` |
+| UX-001 | Accessibility | Partial | Labels, focus rings, skip link and reduced-motion CSS; no full screen-reader audit |
+| UX-002 | Responsive behavior | Partial | Sidebar/drawer, responsive tables and grids; real-device pass pending |
+| REL-001 | Beta release assets | Implemented | `.github/workflows/release.yml` builds archives/checksums/image on tags |
+| SEC-001 | Security test pass | Implemented | `make verify`, CodeQL, dependency review, govulncheck, gitleaks; see security-testing |
+| SEC-002 | Threat-model review | Deferred | Scheduled with independent security audit before stable |
+
+### Phase 7 notes
+
+- Audit events are scoped to the actor or servers owned by the current user; the API exposes no
+  mutation path.
+- The audit UI performs text/outcome filtering over the latest 100 events. Date/actor filtering and
+  configurable retention remain future work.
+- Release artifacts are built from a tag, carry version/commit/build-date metadata and include
+  SHA-256 checksums.
+- Beta limitations are listed in `docs/status/beta-notes.md`.
+
 ## Later phases
 
 The remaining requirement groups are tracked in the PRD and will be added here when their phase

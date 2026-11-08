@@ -37,7 +37,7 @@ Current endpoints:
 
 Cookie-authenticated mutations require the session-bound `X-CSRF-Token` returned by login, setup
 or `/auth/me`. It is not stored in a readable cookie. Errors use the stable envelope described in
-the specification.
+the specification. The stable code catalog is in [`errors.md`](errors.md).
 
 The document is the intended source of truth for generated Go and TypeScript types. Generation
 and contract tests land with a later API hardening pass.

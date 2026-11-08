@@ -22,6 +22,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   monitoring page.
 - Phase 6 operations: bounded process list with SIGTERM/SIGKILL and PID identity checks, systemd
   service discovery/actions with post-action state, and a bounded systemd journal viewer.
+- Phase 7 beta: scoped audit history with filters and a UI page, accessible skip navigation,
+  stable error-code catalog, compatibility/troubleshooting/backup/security-testing guides and a
+  tag-driven release workflow with signed checksum generation.
 - Project foundation: AGENTS.md contract, Hydra-style handoff notes, AGPL-3.0 licensing,
   contribution, security and governance documentation.
 - Architecture decision records and threat model.
