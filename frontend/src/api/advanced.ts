@@ -1,4 +1,4 @@
-import { apiRequest } from './client'
+import { apiDownload, apiRequest } from './client'
 
 export interface DockerContainer {
   id: string
@@ -412,5 +412,26 @@ export function networkOp(
     method: 'POST',
     csrf,
     body: input,
+  })
+}
+
+
+export function exportSnippets(signal?: AbortSignal): Promise<Blob> {
+  return apiDownload('/api/v1/snippets/export', signal)
+}
+
+export interface SnippetImportResult {
+  imported: number
+  snippets: Snippet[]
+}
+
+export function importSnippets(
+  snippets: SnippetInput[],
+  csrf: string,
+): Promise<SnippetImportResult> {
+  return apiRequest<SnippetImportResult>('/api/v1/snippets/import', {
+    method: 'POST',
+    csrf,
+    body: { snippets },
   })
 }

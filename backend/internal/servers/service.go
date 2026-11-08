@@ -94,6 +94,7 @@ type Service struct {
 	repo        *storage.ServerRepository
 	users       *storage.UserRepository
 	assignments *storage.AssignmentRepository
+	teams       *storage.TeamRepository
 	known       *storage.KnownHostRepository
 	caps        *storage.CapabilitiesRepository
 	cipher      *secrets.Cipher
@@ -109,6 +110,7 @@ func NewService(
 	repo *storage.ServerRepository,
 	users *storage.UserRepository,
 	assignments *storage.AssignmentRepository,
+	teams *storage.TeamRepository,
 	known *storage.KnownHostRepository,
 	caps *storage.CapabilitiesRepository,
 	cipher *secrets.Cipher,
@@ -121,6 +123,7 @@ func NewService(
 		repo:        repo,
 		users:       users,
 		assignments: assignments,
+		teams:       teams,
 		known:       known,
 		caps:        caps,
 		cipher:      cipher,
@@ -217,7 +220,13 @@ func (s *Service) Get(ctx context.Context, ownerID, id string) (*storage.Server,
 		return nil, err
 	}
 	if !allowed {
-		return nil, ErrUnauthorized
+		teamLevel, teamAllowed, err := s.teams.AccessLevel(ctx, ownerID, id)
+		if err != nil {
+			return nil, err
+		}
+		if !teamAllowed || teamLevel == "" {
+			return nil, ErrUnauthorized
+		}
 	}
 	return server, nil
 }
@@ -242,14 +251,35 @@ func (s *Service) AccessLevel(ctx context.Context, userID, serverID string) (str
 	if user.Role == "admin" {
 		return "write", nil
 	}
+	level := ""
 	assignment, err := s.assignments.Get(ctx, userID, serverID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return "", ErrUnauthorized
-		}
+	if err == nil {
+		level = assignment.AccessLevel
+	} else if !errors.Is(err, storage.ErrNotFound) {
 		return "", err
 	}
-	return assignment.AccessLevel, nil
+	teamLevel, teamAllowed, err := s.teams.AccessLevel(ctx, userID, serverID)
+	if err != nil {
+		return "", err
+	}
+	if teamAllowed && (level != "write") && (teamLevel == "write" || level == "") {
+		level = teamLevel
+	}
+	if level == "" {
+		return "", ErrUnauthorized
+	}
+	return level, nil
+}
+
+// ReadOnlyHost reports whether a saved host was detected as a non-Linux
+// operating system. Such hosts are supported for read-only monitoring only, so
+// write routes are rejected even though the SSH account might permit them.
+func (s *Service) ReadOnlyHost(ctx context.Context, ownerID, id string) bool {
+	capabilities, err := s.Capabilities(ctx, ownerID, id)
+	if err != nil {
+		return false
+	}
+	return capabilities.OS != "" && capabilities.OS != "Linux"
 }
 
 func (s *Service) ListAssignments(ctx context.Context, actorID, serverID string) ([]storage.ServerAssignment, error) {

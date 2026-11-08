@@ -17,10 +17,17 @@ type dockerActionRequest struct {
 }
 
 type snippetRequest struct {
+	ID          string                     `json:"id,omitempty"`
 	Name        string                     `json:"name"`
 	Description string                     `json:"description"`
 	Command     string                     `json:"command"`
 	Variables   []advanced.SnippetVariable `json:"variables"`
+	CreatedAt   *time.Time                 `json:"created_at,omitempty"`
+	UpdatedAt   *time.Time                 `json:"updated_at,omitempty"`
+}
+
+type snippetImportRequest struct {
+	Snippets []snippetRequest `json:"snippets"`
 }
 
 type snippetRunRequest struct {
@@ -455,6 +462,39 @@ func (s *Server) handleListSnippets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"snippets": list})
 }
 
+func (s *Server) handleExportSnippets(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	snippets, err := s.advanced.ExportSnippets(r.Context(), user.ID)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Disposition", "attachment; filename=\"drovik-snippets.json\"")
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"version": 1, "exported_at": time.Now().UTC(), "snippets": snippets,
+	})
+}
+
+func (s *Server) handleImportSnippets(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request snippetImportRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	inputs := make([]advanced.SnippetInput, 0, len(request.Snippets))
+	for _, item := range request.Snippets {
+		inputs = append(inputs, snippetInput(item))
+	}
+	snippets, err := s.advanced.ImportSnippets(r.Context(), user.ID, inputs)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"imported": len(snippets), "snippets": snippets})
+}
+
 func (s *Server) handleGetSnippet(w http.ResponseWriter, r *http.Request) {
 	user := CurrentUser(r.Context())
 	snippet, err := s.advanced.GetSnippet(r.Context(), user.ID, chi.URLParam(r, "id"))
@@ -547,6 +587,8 @@ func snippetInput(request snippetRequest) advanced.SnippetInput {
 
 func (s *Server) writeAdvancedError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case errors.Is(err, advanced.ErrSnippetExists):
+		writeError(w, r, NewAPIError(http.StatusConflict, CodeConflict, "A snippet with that name already exists."))
 	case errors.Is(err, advanced.ErrSnippetNotFound), errors.Is(err, storage.ErrNotFound):
 		writeError(w, r, NewAPIError(http.StatusNotFound, CodeNotFound, "The requested item was not found."))
 	case errors.Is(err, advanced.ErrPermission):

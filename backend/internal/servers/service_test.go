@@ -80,7 +80,7 @@ func newServiceTestEnvWith(t *testing.T, sshServer *testssh.Server, vaultClient 
 	dialer := sshclient.NewDialer(cfg, known, logger)
 	auditService := audit.New(storage.NewAuditRepository(db), logger)
 	assignments := storage.NewAssignmentRepository(db)
-	service := NewService(cfg, serverRepo, users, assignments, known, caps, cipher, vaultClient, dialer, auditService, logger)
+	service := NewService(cfg, serverRepo, users, assignments, storage.NewTeamRepository(db), known, caps, cipher, vaultClient, dialer, auditService, logger)
 	return &serviceTestEnv{
 		service: service, users: user, userRepo: users, servers: serverRepo,
 		assignments: assignments, known: known, cfg: cfg,

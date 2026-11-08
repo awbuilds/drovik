@@ -17,7 +17,7 @@ the managed host. The beta targets servers, not desktops.
 |---|---|---|
 | SSH | OpenSSH 7.4+ or compatible | Password or private-key auth; strict host-key verification |
 | OS | Linux with `/proc` | Full feature set: terminal, SFTP, monitoring, processes, systemd, journal, Docker and advanced actions |
-| OS | macOS (Darwin) or BSD | Read-only monitoring: host, load, memory, filesystems, network counters and uptime. Linux-only panels report `CAPABILITY_UNAVAILABLE` |
+| OS | macOS (Darwin) or BSD | Read-only monitoring: host, load, memory, filesystems, network counters and uptime. Write routes and Linux-only panels report `CAPABILITY_UNAVAILABLE` |
 | Architecture | x86_64, arm64, armv7 | Depends on the remote tools, not the Drovik binary |
 | Process tools | `ps` with `-eo` (procps-ng preferred) | BusyBox `ps` may lack the required format; the UI reports `PROCESS_UNAVAILABLE` |
 | Files | SFTP subsystem | Required for the Files page; terminal and monitoring still work without it |

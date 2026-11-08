@@ -55,9 +55,9 @@ what it is doing:
 | Secrets | Optional HashiCorp Vault KV v2 credentials; only the path is stored |
 | Alerts | In-app threshold rules with encrypted external webhooks |
 | Snippets | Reusable command templates with substituted preview and explicit confirmation |
-| Users | Local accounts, roles and per-server `read`/`write` assignments |
+| Users | Local accounts, roles, teams and per-server `read`/`write` assignments |
 | History | Optional bounded metric retention, charts and in-app threshold alerts |
-| Audit | Local metadata for logins, connections and sensitive actions |
+| Audit | Local metadata for logins, connections and sensitive actions, with search and CSV/JSON export |
 
 See the full [product requirements and roadmap](docs/product/PRD.md) for scope, non-goals and
 acceptance criteria.

@@ -134,8 +134,14 @@ func (r *ServerRepository) ListAccessible(ctx context.Context, userID string) ([
 		       tags, notes, created_at, updated_at, last_connected_at, is_active
 		FROM servers
 		WHERE is_active = 1
-		  AND (owner_user_id = ? OR id IN (SELECT server_id FROM server_assignments WHERE user_id = ?))
-		ORDER BY display_name COLLATE NOCASE`, userID, userID)
+		  AND (owner_user_id = ?
+		       OR id IN (SELECT server_id FROM server_assignments WHERE user_id = ?)
+		       OR id IN (
+		           SELECT ts.server_id FROM team_servers ts
+		           JOIN team_members tm ON tm.team_id = ts.team_id
+		           WHERE tm.user_id = ?
+		       ))
+		ORDER BY display_name COLLATE NOCASE`, userID, userID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list accessible servers: %w", err)
 	}

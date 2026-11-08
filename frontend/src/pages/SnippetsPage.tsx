@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Code2, Play, Plus, Trash2 } from 'lucide-react'
+import { Code2, Download, Play, Plus, Trash2, Upload } from 'lucide-react'
 import {
   createSnippet,
   deleteSnippet,
+  exportSnippets,
+  importSnippets,
   listSnippets,
   previewSnippet,
   runSnippet,
@@ -74,6 +76,8 @@ export function SnippetsPage() {
   const [runError, setRunError] = useState<string | null>(null)
   const [runBusy, setRunBusy] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInput = useRef<HTMLInputElement>(null)
 
   const snippetsQuery = useQuery({
     queryKey: ['snippets'],
@@ -149,6 +153,58 @@ export function SnippetsPage() {
     }
   }
 
+  const downloadSnippets = async () => {
+    try {
+      const blob = await exportSnippets()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'drovik-snippets.json'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (caught) {
+      toast({ title: 'Export failed', description: userFacingError(caught), variant: 'error' })
+    }
+  }
+
+  const importFile = async (file: File) => {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const parsed: unknown = JSON.parse(text)
+      const list = Array.isArray(parsed)
+        ? parsed
+        : typeof parsed === 'object' && parsed !== null && 'snippets' in parsed
+          ? (parsed as { snippets: unknown }).snippets
+          : null
+      if (!Array.isArray(list)) {
+        throw new Error('The file does not contain a snippets array.')
+      }
+      const inputs: SnippetInput[] = list.map((item) => {
+        if (typeof item !== 'object' || item === null) {
+          throw new Error('Every imported snippet must be an object.')
+        }
+        const candidate = item as Partial<SnippetInput>
+        return {
+          name: String(candidate.name ?? ''),
+          description: String(candidate.description ?? ''),
+          command: String(candidate.command ?? ''),
+          variables: Array.isArray(candidate.variables) ? candidate.variables : [],
+        }
+      })
+      const result = await importSnippets(inputs, csrfToken)
+      toast({ title: 'Snippets imported', description: `${result.imported} snippet${result.imported === 1 ? '' : 's'} added.`, variant: 'success' })
+      await queryClient.invalidateQueries({ queryKey: ['snippets'] })
+    } catch (caught) {
+      toast({ title: 'Import failed', description: userFacingError(caught), variant: 'error' })
+    } finally {
+      setImporting(false)
+      if (importInput.current) importInput.current.value = ''
+    }
+  }
+
   const writableServers = servers.filter((server) => server.access_level !== 'read')
 
   const openRun = (snippet: Snippet) => {
@@ -199,12 +255,34 @@ export function SnippetsPage() {
         title="Snippets"
         description="Reusable command templates with an explicit target, fully substituted preview and confirmation. Snippets execute as the connected SSH account."
         actions={
-          canWrite ? (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              New snippet
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void downloadSnippets()}>
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Export
             </Button>
-          ) : null
+            {canWrite ? (
+              <>
+                <input
+                  ref={importInput}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) void importFile(file)
+                  }}
+                />
+                <Button variant="outline" loading={importing} onClick={() => importInput.current?.click()}>
+                  <Upload className="h-4 w-4" aria-hidden="true" />
+                  Import
+                </Button>
+                <Button onClick={openCreate}>
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  New snippet
+                </Button>
+              </>
+            ) : null}
+          </div>
         }
       />
 

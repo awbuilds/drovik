@@ -21,6 +21,10 @@ const UsersPage = lazy(() =>
   import('@/pages/UsersPage').then((module) => ({ default: module.UsersPage })),
 )
 
+const TeamsPage = lazy(() =>
+  import('@/pages/TeamsPage').then((module) => ({ default: module.TeamsPage })),
+)
+
 const AdvancedPage = lazy(() =>
   import('@/pages/AdvancedPage').then((module) => ({ default: module.AdvancedPage })),
 )
@@ -209,6 +213,16 @@ function AppRoutes() {
           <AppShell>
             <Suspense fallback={<PageLoading label="Loading users" />}>
               <UsersPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/teams"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading teams" />}>
+              <TeamsPage />
             </Suspense>
           </AppShell>
         }

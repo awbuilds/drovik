@@ -805,3 +805,44 @@ func TestDestructiveCancellationAuditsUnknown(t *testing.T) {
 	}
 	t.Fatal("expected a storage.format audit row")
 }
+
+func TestSnippetImportExport(t *testing.T) {
+	env, service := newAdvancedEnv(t, nil)
+	ctx := context.Background()
+	created, err := service.CreateSnippet(ctx, env.User.ID, SnippetInput{
+		Name: "Restart nginx", Description: "test", Command: "systemctl restart {{service}}",
+		Variables: []SnippetVariable{{Name: "service", Default: "nginx"}},
+	})
+	if err != nil {
+		t.Fatalf("CreateSnippet: %v", err)
+	}
+	exported, err := service.ExportSnippets(ctx, env.User.ID)
+	if err != nil || len(exported) != 1 || exported[0].Name != created.Name {
+		t.Fatalf("ExportSnippets: %+v %v", exported, err)
+	}
+	if _, err := service.ImportSnippets(ctx, env.User.ID, []SnippetInput{{
+		Name: created.Name, Command: "echo duplicate",
+	}}); !errors.Is(err, ErrSnippetExists) {
+		t.Fatalf("expected duplicate rejection, got %v", err)
+	}
+	if err := service.DeleteSnippet(ctx, env.User.ID, created.ID); err != nil {
+		t.Fatalf("DeleteSnippet: %v", err)
+	}
+	imported, err := service.ImportSnippets(ctx, env.User.ID, []SnippetInput{{
+		Name: "Restart nginx", Description: "imported", Command: "systemctl restart {{service}}",
+		Variables: []SnippetVariable{{Name: "service", Default: "nginx"}},
+	}})
+	if err != nil || len(imported) != 1 {
+		t.Fatalf("ImportSnippets: %+v %v", imported, err)
+	}
+	if _, err := service.ImportSnippets(ctx, env.User.ID, nil); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected empty import rejection, got %v", err)
+	}
+	tooMany := make([]SnippetInput, 101)
+	for index := range tooMany {
+		tooMany[index] = SnippetInput{Name: "Snippet", Command: "echo hi"}
+	}
+	if _, err := service.ImportSnippets(ctx, env.User.ID, tooMany); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected bounded import rejection, got %v", err)
+	}
+}

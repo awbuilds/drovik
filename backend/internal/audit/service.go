@@ -43,6 +43,10 @@ func (s *Service) ListRecentForUser(ctx context.Context, userID string, limit in
 	return s.repo.ListRecentForUser(ctx, userID, limit)
 }
 
+func (s *Service) ListFilteredForUser(ctx context.Context, userID string, admin bool, filter storage.AuditFilter) ([]storage.AuditEvent, error) {
+	return s.repo.ListFilteredForUser(ctx, userID, admin, filter)
+}
+
 func StrPtr(value string) *string {
 	if value == "" {
 		return nil

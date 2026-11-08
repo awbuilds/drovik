@@ -40,6 +40,28 @@ func (r *SnippetRepository) Create(ctx context.Context, snippet Snippet) error {
 	return nil
 }
 
+func (r *SnippetRepository) CreateMany(ctx context.Context, snippets []Snippet) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin snippet import: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, snippet := range snippets {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO snippets (id, owner_user_id, name, description, command, variables, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			snippet.ID, snippet.OwnerUserID, snippet.Name, snippet.Description, snippet.Command,
+			snippet.Variables, formatTime(snippet.CreatedAt), formatTime(snippet.UpdatedAt),
+		); err != nil {
+			return fmt.Errorf("import snippet: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit snippet import: %w", err)
+	}
+	return nil
+}
+
 func (r *SnippetRepository) Update(ctx context.Context, snippet Snippet) error {
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE snippets SET name = ?, description = ?, command = ?, variables = ?, updated_at = ?

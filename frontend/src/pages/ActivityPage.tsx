@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useDeferredValue, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Activity, RefreshCw, Search } from 'lucide-react'
-import { listActivity } from '@/api/activity'
+import { Activity, Download, RefreshCw, Search } from 'lucide-react'
+import { activityExportURL, listActivity } from '@/api/activity'
 import { listServers } from '@/api/servers'
 import { PageHeader } from '@/components/PageHeader'
 import { Alert } from '@/components/ui/Alert'
@@ -20,11 +20,14 @@ function eventLabel(eventType: string): string {
 
 export function ActivityPage() {
   const [filter, setFilter] = useState('')
+  const [eventType, setEventType] = useState('')
   const [outcome, setOutcome] = useState('all')
+  const deferredFilter = useDeferredValue(filter)
 
   const activityQuery = useQuery({
-    queryKey: ['activity'],
-    queryFn: ({ signal }) => listActivity(100, signal),
+    queryKey: ['activity', deferredFilter, eventType, outcome],
+    queryFn: ({ signal }) =>
+      listActivity({ q: deferredFilter, eventType, outcome, limit: 200 }, signal),
     refetchInterval: 15000,
     staleTime: 5000,
   })
@@ -42,19 +45,15 @@ export function ActivityPage() {
     return map
   }, [serversQuery.data])
 
-  const events = useMemo(() => {
-    const needle = filter.trim().toLowerCase()
-    return (activityQuery.data?.events ?? []).filter((event) => {
-      if (outcome !== 'all' && event.outcome !== outcome) return false
-      if (!needle) return true
-      return (
-        event.event_type.toLowerCase().includes(needle) ||
-        event.target_summary.toLowerCase().includes(needle) ||
-        (event.safe_error_code ?? '').toLowerCase().includes(needle) ||
-        (serverNames.get(event.server_id ?? '') ?? '').toLowerCase().includes(needle)
-      )
-    })
-  }, [activityQuery.data, filter, outcome, serverNames])
+  const events = useMemo(() => activityQuery.data?.events ?? [], [activityQuery.data?.events])
+
+  const downloadExport = (format: 'csv' | 'json') => {
+    const url = activityExportURL(
+      { q: deferredFilter, eventType, outcome, limit: 5000 },
+      format,
+    )
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <div className="space-y-5">
@@ -63,15 +62,25 @@ export function ActivityPage() {
         title="Activity"
         description="Audit history for connection, file, process and service actions performed through Drovik. Events never contain credentials, terminal content or log contents."
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void activityQuery.refetch()}
-            loading={activityQuery.isFetching}
-          >
-            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-            Refresh
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadExport('csv')}>
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadExport('json')}>
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              JSON
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void activityQuery.refetch()}
+              loading={activityQuery.isFetching}
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -81,11 +90,18 @@ export function ActivityPage() {
           <Input
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
-            placeholder="Filter event, target or server"
+            placeholder="Search event, target or error"
             className="h-9 w-72 pl-9 text-xs"
-            aria-label="Filter activity"
+            aria-label="Search activity"
           />
         </div>
+        <Input
+          value={eventType}
+          onChange={(event) => setEventType(event.target.value)}
+          placeholder="Event type, e.g. auth."
+          className="h-9 w-48 font-mono text-xs"
+          aria-label="Filter by event type"
+        />
         <Select
           value={outcome}
           onChange={(event) => setOutcome(event.target.value)}
@@ -95,9 +111,11 @@ export function ActivityPage() {
           <option value="all">All outcomes</option>
           <option value="success">Success</option>
           <option value="failure">Failure</option>
+          <option value="denied">Denied</option>
+          <option value="unknown">Unknown</option>
         </Select>
         <span className="text-ink-500 ml-auto font-mono text-[10px] uppercase">
-          {events.length} of {activityQuery.data?.events.length ?? 0} events
+          {events.length} events (latest 200)
         </span>
       </div>
 
@@ -172,8 +190,9 @@ export function ActivityPage() {
       )}
 
       <p className="text-ink-500 text-[11px] leading-5">
-        Audit records are scoped to your account and servers you own. They store event type, safe
-        target summary, outcome and a stable error code; never secrets or file/log contents.
+        Audit records are scoped to your account and the servers you own, are assigned, or receive
+        through a team. They store event type, safe target summary, outcome and a stable error code;
+        never secrets or file/log contents. CSV exports prefix spreadsheet formula characters.
       </p>
     </div>
   )

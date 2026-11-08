@@ -74,6 +74,7 @@ const navigation: Array<{ label: string; items: NavItem[] }> = [
     label: 'System',
     items: [
       { to: '/users', label: 'Users', icon: Users, enabled: true, adminOnly: true },
+      { to: '/teams', label: 'Teams', icon: Users, enabled: true, adminOnly: true },
       { to: '/settings', label: 'Settings', icon: Settings, enabled: true },
     ],
   },

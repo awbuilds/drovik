@@ -7,6 +7,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- Teams: administrator-managed groups with members and shared servers at `read` or `write`;
+  effective access is additive across direct and team assignments.
+- Audit search and export: server-side text, event-type, outcome and time filters plus bounded CSV
+  and JSON exports with formula-safe CSV.
+- Snippet import/export: versioned JSON export and a bounded, transactional import with duplicate
+  rejection.
+- Non-Linux read-only enforcement: detected macOS/BSD hosts reject every write route while keeping
+  monitoring available.
+- A live macOS collector test alongside the macOS/FreeBSD parser fixtures.
+
 ### Security
 
 - OIDC account linking now requires the local password and, when MFA is enabled, a current

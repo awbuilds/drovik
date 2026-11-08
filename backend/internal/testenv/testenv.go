@@ -101,6 +101,7 @@ func New(dir string, sshServer *testssh.Server) (*Env, error) {
 		storage.NewServerRepository(db),
 		users,
 		storage.NewAssignmentRepository(db),
+		storage.NewTeamRepository(db),
 		known,
 		storage.NewCapabilitiesRepository(db),
 		cipher,

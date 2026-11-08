@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrSnippetNotFound = errors.New("snippet not found")
+	ErrSnippetExists   = errors.New("snippet name already exists")
 	placeholderPattern = regexp.MustCompile(`\{\{([A-Za-z0-9_]{1,32})\}\}`)
 	variablePattern    = regexp.MustCompile(`^[A-Za-z0-9_]{1,32}$`)
 )
@@ -95,6 +96,59 @@ func (s *Service) CreateSnippet(ctx context.Context, ownerID string, input Snipp
 	}
 	s.record(ctx, ownerID, "", "snippet.created", normalized.Name, "success", "")
 	return toSnippet(row)
+}
+
+func (s *Service) ExportSnippets(ctx context.Context, ownerID string) ([]Snippet, error) {
+	return s.ListSnippets(ctx, ownerID)
+}
+
+func (s *Service) ImportSnippets(ctx context.Context, ownerID string, inputs []SnippetInput) ([]Snippet, error) {
+	if len(inputs) == 0 || len(inputs) > 100 {
+		return nil, fmt.Errorf("%w: import must contain 1 to 100 snippets", ErrInvalidTarget)
+	}
+	existing, err := s.ListSnippets(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[string]struct{}, len(existing)+len(inputs))
+	for _, snippet := range existing {
+		names[strings.ToLower(snippet.Name)] = struct{}{}
+	}
+	now := time.Now().UTC()
+	rows := make([]storage.Snippet, 0, len(inputs))
+	for _, input := range inputs {
+		normalized, err := s.validateSnippet(input)
+		if err != nil {
+			return nil, err
+		}
+		key := strings.ToLower(normalized.Name)
+		if _, ok := names[key]; ok {
+			return nil, fmt.Errorf("%w: %s", ErrSnippetExists, normalized.Name)
+		}
+		names[key] = struct{}{}
+		variables, err := json.Marshal(normalized.Variables)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, storage.Snippet{
+			ID: storage.NewID(), OwnerUserID: ownerID, Name: normalized.Name,
+			Description: normalized.Description, Command: normalized.Command,
+			Variables: string(variables), CreatedAt: now, UpdatedAt: now,
+		})
+	}
+	if err := s.snippets.CreateMany(ctx, rows); err != nil {
+		return nil, err
+	}
+	s.record(ctx, ownerID, "", "snippet.imported", fmt.Sprintf("%d snippets", len(rows)), "success", "")
+	result := make([]Snippet, 0, len(rows))
+	for _, row := range rows {
+		snippet, err := toSnippet(row)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, *snippet)
+	}
+	return result, nil
 }
 
 func (s *Service) UpdateSnippet(ctx context.Context, ownerID, id string, input SnippetInput) (*Snippet, error) {

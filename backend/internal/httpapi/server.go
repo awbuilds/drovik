@@ -26,6 +26,7 @@ import (
 	systemservices "github.com/awbuilds/drovik/backend/internal/services"
 	"github.com/awbuilds/drovik/backend/internal/sshclient"
 	"github.com/awbuilds/drovik/backend/internal/storage"
+	teamservice "github.com/awbuilds/drovik/backend/internal/teams"
 	"github.com/awbuilds/drovik/backend/internal/terminal"
 	useradmin "github.com/awbuilds/drovik/backend/internal/users"
 	"github.com/awbuilds/drovik/backend/internal/vault"
@@ -52,6 +53,7 @@ type Server struct {
 	terminal     *terminal.Manager
 	userAdmin    *useradmin.Service
 	advanced     *advanced.Service
+	teams        *teamservice.Service
 	oidc         *oidc.Provider
 	limiter      *security.LoginLimiter
 	setupLimiter *security.LoginLimiter
@@ -82,12 +84,14 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 	capabilities := storage.NewCapabilitiesRepository(db)
 	serverRepository := storage.NewServerRepository(db)
 	assignmentRepository := storage.NewAssignmentRepository(db)
+	teamRepository := storage.NewTeamRepository(db)
 	dialer := sshclient.NewDialer(cfg, knownHosts, logger)
 	serverService := servers.NewService(
 		cfg,
 		serverRepository,
 		users,
 		assignmentRepository,
+		teamRepository,
 		knownHosts,
 		capabilities,
 		cipher,
@@ -103,6 +107,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 	logService := logs.NewService(cfg, serverService, logger)
 	terminalManager := terminal.NewManager(cfg, serverService, logger)
 	userService := useradmin.NewService(users, sessions, auditService, logger)
+	teamService := teamservice.NewService(teamRepository, users, serverRepository, auditService, logger)
 	var oidcProvider *oidc.Provider
 	if cfg.OIDCEnabled {
 		oidcProvider, err = oidc.New(cfg, logger)
@@ -154,6 +159,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		terminal:   terminalManager,
 		userAdmin:  userService,
 		advanced:   advancedService,
+		teams:      teamService,
 		oidc:       oidcProvider,
 		auth: auth.NewSessionManager(
 			sessions,
@@ -209,6 +215,7 @@ func (s *Server) Handler() http.Handler {
 			r.With(s.requireCSRF).Post("/auth/oidc/link", s.handleOIDCLinkStart)
 			r.With(s.requireCSRF).Post("/auth/oidc/unlink", s.handleOIDCUnlink)
 			r.Get("/activity", s.handleActivity)
+			r.Get("/activity/export", s.handleActivityExport)
 			r.With(s.requireCSRF).Post("/auth/logout", s.handleLogout)
 
 			r.Get("/servers", s.handleListServers)
@@ -227,6 +234,15 @@ func (s *Server) Handler() http.Handler {
 
 			r.With(s.requireAdmin).Get("/users", s.handleListUsers)
 			r.With(s.requireAdmin, s.requireCSRF).Post("/users", s.handleCreateUser)
+			r.With(s.requireAdmin).Get("/teams", s.handleListTeams)
+			r.With(s.requireAdmin, s.requireCSRF).Post("/teams", s.handleCreateTeam)
+			r.With(s.requireAdmin).Get("/teams/{teamID}", s.handleGetTeam)
+			r.With(s.requireAdmin, s.requireCSRF).Patch("/teams/{teamID}", s.handleUpdateTeam)
+			r.With(s.requireAdmin, s.requireCSRF).Delete("/teams/{teamID}", s.handleDeleteTeam)
+			r.With(s.requireAdmin, s.requireCSRF).Put("/teams/{teamID}/members/{userID}", s.handleAddTeamMember)
+			r.With(s.requireAdmin, s.requireCSRF).Delete("/teams/{teamID}/members/{userID}", s.handleRemoveTeamMember)
+			r.With(s.requireAdmin, s.requireCSRF).Put("/teams/{teamID}/servers/{serverID}", s.handleSetTeamServer)
+			r.With(s.requireAdmin, s.requireCSRF).Delete("/teams/{teamID}/servers/{serverID}", s.handleRemoveTeamServer)
 			r.With(s.requireAdmin, s.requireCSRF).Patch("/users/{id}", s.handleUpdateUser)
 			r.With(s.requireAdmin, s.requireCSRF).Post("/users/{id}/password", s.handleResetUserPassword)
 			r.With(s.requireAdmin, s.requireCSRF).Delete("/users/{id}", s.handleDeleteUser)
@@ -263,6 +279,8 @@ func (s *Server) Handler() http.Handler {
 			r.With(s.requireServerWrite, s.requireCSRF).Delete("/servers/{id}/tasks/{taskID}", s.handleDeleteTask)
 
 			r.Get("/snippets", s.handleListSnippets)
+			r.Get("/snippets/export", s.handleExportSnippets)
+			r.With(s.requireCSRF).Post("/snippets/import", s.handleImportSnippets)
 			r.With(s.requireWriteAccess, s.requireCSRF).Post("/snippets", s.handleCreateSnippet)
 			r.Get("/snippets/{id}", s.handleGetSnippet)
 			r.With(s.requireWriteAccess, s.requireCSRF).Patch("/snippets/{id}", s.handleUpdateSnippet)

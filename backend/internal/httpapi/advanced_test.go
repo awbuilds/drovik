@@ -143,3 +143,51 @@ func TestAdvancedHTTPFlow(t *testing.T) {
 		t.Fatalf("save alert rule: %d %s", rule.status, rule.body)
 	}
 }
+
+func TestSnippetImportExportHTTP(t *testing.T) {
+	app := newTestApp(t)
+	setup := app.request(t, http.MethodPost, "/api/v1/setup", setupRequest{
+		Username: "admin", Password: "correct horse battery staple",
+	}, "")
+	if setup.status != http.StatusCreated {
+		t.Fatalf("setup: %d %s", setup.status, setup.body)
+	}
+	csrf := decodeAuth(t, setup.body).CSRFToken
+
+	created := app.request(t, http.MethodPost, "/api/v1/snippets", snippetRequest{
+		Name: "Restart nginx", Command: "systemctl restart nginx",
+	}, csrf)
+	if created.status != http.StatusCreated {
+		t.Fatalf("create snippet: %d %s", created.status, created.body)
+	}
+	var snippet advanced.Snippet
+	if err := json.Unmarshal(created.body, &snippet); err != nil {
+		t.Fatalf("decode snippet: %v", err)
+	}
+	exported := app.request(t, http.MethodGet, "/api/v1/snippets/export", nil, "")
+	if exported.status != http.StatusOK || !strings.Contains(string(exported.body), `"version":1`) ||
+		!strings.Contains(string(exported.body), "systemctl restart nginx") {
+		t.Fatalf("export: %d %s", exported.status, exported.body)
+	}
+	var exportPayload struct {
+		Snippets []snippetRequest `json:"snippets"`
+	}
+	if err := json.Unmarshal(exported.body, &exportPayload); err != nil || len(exportPayload.Snippets) != 1 {
+		t.Fatalf("decode export: %v %s", err, exported.body)
+	}
+	duplicate := app.request(t, http.MethodPost, "/api/v1/snippets/import", snippetImportRequest{
+		Snippets: []snippetRequest{{Name: "Restart nginx", Command: "echo duplicate"}},
+	}, csrf)
+	if duplicate.status != http.StatusConflict {
+		t.Fatalf("expected duplicate import conflict, got %d %s", duplicate.status, duplicate.body)
+	}
+	if deleted := app.request(t, http.MethodDelete, "/api/v1/snippets/"+snippet.ID, nil, csrf); deleted.status != http.StatusNoContent {
+		t.Fatalf("delete snippet: %d %s", deleted.status, deleted.body)
+	}
+	imported := app.request(t, http.MethodPost, "/api/v1/snippets/import", snippetImportRequest{
+		Snippets: exportPayload.Snippets,
+	}, csrf)
+	if imported.status != http.StatusCreated || !strings.Contains(string(imported.body), `"imported":1`) {
+		t.Fatalf("import: %d %s", imported.status, imported.body)
+	}
+}
