@@ -7,6 +7,9 @@ import {
   FolderTree,
   Gauge,
   LayoutDashboard,
+  ListTree,
+  ScrollText,
+  Settings2,
   LogOut,
   Menu,
   Moon,
@@ -49,7 +52,15 @@ const navigation: Array<{ label: string; items: NavItem[] }> = [
     label: 'Observe',
     items: [
       { to: '/monitoring', label: 'Monitoring', icon: Gauge, enabled: true },
-      { to: '/activity', label: 'Activity', icon: Activity, enabled: false, phase: 'Phase 6' },
+      { to: '/logs', label: 'Logs', icon: ScrollText, enabled: true },
+      { to: '/activity', label: 'Activity', icon: Activity, enabled: false, phase: 'Later' },
+    ],
+  },
+  {
+    label: 'Operate',
+    items: [
+      { to: '/processes', label: 'Processes', icon: ListTree, enabled: true },
+      { to: '/services', label: 'Services', icon: Settings2, enabled: true },
     ],
   },
   {
@@ -276,7 +287,7 @@ function SidebarContent({
           </Tooltip>
         </div>
         <p className="text-ink-600 mt-2 px-1 font-mono text-[9px] tracking-wider uppercase">
-          Phase 5 · Host monitoring
+          Phase 6 · Operations
         </p>
       </div>
     </>

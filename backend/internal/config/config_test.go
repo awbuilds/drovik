@@ -176,3 +176,37 @@ func TestLoadRejectsInvalidMonitoringConfiguration(t *testing.T) {
 		t.Fatal("expected a stale window shorter than the refresh interval to be rejected")
 	}
 }
+
+func TestLoadOperationsConfiguration(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_OPS_COMMAND_TIMEOUT"] = "9s"
+	env["DROVIK_PROCESS_MAX_ENTRIES"] = "750"
+	env["DROVIK_SERVICE_MAX_UNITS"] = "400"
+	env["DROVIK_LOG_MAX_LINES"] = "300"
+	env["DROVIK_LOG_MAX_OUTPUT_BYTES"] = "524288"
+
+	cfg, err := load(lookupFrom(env))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.OpsCommandTimeout != 9*time.Second || cfg.ProcessMaxEntries != 750 || cfg.ServiceMaxUnits != 400 {
+		t.Fatalf("unexpected operations config: %+v", cfg)
+	}
+	if cfg.LogMaxLines != 300 || cfg.LogMaxOutputBytes != 524288 {
+		t.Fatalf("unexpected log config: %d %d", cfg.LogMaxLines, cfg.LogMaxOutputBytes)
+	}
+}
+
+func TestLoadRejectsInvalidOperationsConfiguration(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_PROCESS_MAX_ENTRIES"] = "0"
+	if _, err := load(lookupFrom(env)); err == nil {
+		t.Fatal("expected zero process entries to be rejected")
+	}
+
+	env = validEnv()
+	env["DROVIK_LOG_MAX_LINES"] = "-1"
+	if _, err := load(lookupFrom(env)); err == nil {
+		t.Fatal("expected a negative log line limit to be rejected")
+	}
+}

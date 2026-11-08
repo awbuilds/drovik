@@ -24,6 +24,9 @@ tags:
   - name: Servers
   - name: Files
   - name: Monitoring
+  - name: Processes
+  - name: Services
+  - name: Logs
   - name: Terminal
   - name: System
 
@@ -822,6 +825,200 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /api/v1/servers/{id}/processes:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Processes]
+      operationId: listProcesses
+      summary: List processes visible to the SSH account
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Bounded process list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Process tools are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/processes/{pid}/signal:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+      - $ref: "#/components/parameters/PID"
+    post:
+      tags: [Processes]
+      operationId: signalProcess
+      summary: Send SIGTERM or SIGKILL after an identity check
+      description: |
+        The server re-reads the process start time and rejects the request if the
+        identity changed. SIGKILL is only accepted when the client explicitly
+        sends it. PID 1 is never signaled.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignalProcessRequest"
+      responses:
+        "200":
+          description: Signal delivered and the process re-checked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalProcessResult"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Process no longer exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Process identity changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/servers/{id}/services:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Services]
+      operationId: listServices
+      summary: List systemd service units
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Service units with active, sub and file state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: systemd is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/services/{unit}/action:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+      - $ref: "#/components/parameters/UnitName"
+    post:
+      tags: [Services]
+      operationId: runServiceAction
+      summary: Run an enumerated systemd action and re-read state
+      description: |
+        Actions are limited to start, stop, restart, reload, enable and disable.
+        The unit identifier is validated before use and the request runs as the
+        configured SSH user without sudo or privilege escalation.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceActionRequest"
+      responses:
+        "200":
+          description: Action completed; resulting state is included
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceActionResult"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Unit not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "502":
+          description: The remote systemctl action failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/logs:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Logs]
+      operationId: readJournalLogs
+      summary: Read a bounded systemd journal window
+      description: |
+        Returns structured journal entries for the system or one service unit.
+        Output is bounded by line count, byte limit and command timeout, and is
+        never persisted by Drovik.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: unit
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [15m, 1h, 24h, 7d, all]
+            default: 1h
+        - name: lines
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 200
+      responses:
+        "200":
+          description: Journal window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogResult"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Invalid query or journal unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   securitySchemes:
     cookieAuth:
@@ -838,6 +1035,24 @@ components:
       description: Saved server identifier.
       schema:
         type: string
+
+    PID:
+      name: pid
+      in: path
+      required: true
+      description: Positive process identifier.
+      schema:
+        type: integer
+        minimum: 2
+
+    UnitName:
+      name: unit
+      in: path
+      required: true
+      description: systemd service unit identifier.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9_.@:\-]{0,254}\.service$'
 
     CsrfToken:
       name: X-CSRF-Token
@@ -1472,3 +1687,180 @@ components:
           description: Bytes per second; null until two samples exist.
         transmit_rate_bps:
           type: [number, "null"]
+
+    Process:
+      type: object
+      required: [pid, ppid, user, state, cpu_percent, memory_percent, rss_bytes, elapsed_seconds, started_at, command]
+      properties:
+        pid:
+          type: integer
+        ppid:
+          type: integer
+        user:
+          type: string
+        state:
+          type: string
+        cpu_percent:
+          type: number
+          description: Lifetime average reported by ps.
+        memory_percent:
+          type: number
+        rss_bytes:
+          type: integer
+          format: int64
+        elapsed_seconds:
+          type: integer
+          format: int64
+        started_at:
+          type: string
+          format: date-time
+        command:
+          type: string
+
+    ProcessList:
+      type: object
+      required: [collected_at, account, processes, truncated]
+      properties:
+        collected_at:
+          type: string
+          format: date-time
+        account:
+          type: string
+          description: SSH account used for collection.
+        processes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Process"
+        truncated:
+          type: boolean
+
+    SignalProcessRequest:
+      type: object
+      additionalProperties: false
+      required: [signal, expected_started_at]
+      properties:
+        signal:
+          type: string
+          enum: [SIGTERM, SIGKILL]
+        expected_started_at:
+          type: string
+          format: date-time
+          description: Start time from the current process list; used for the identity check.
+
+    SignalProcessResult:
+      type: object
+      required: [pid, signal, delivered, running]
+      properties:
+        pid:
+          type: integer
+        signal:
+          type: string
+          enum: [SIGTERM, SIGKILL]
+        delivered:
+          type: boolean
+        running:
+          type: boolean
+          description: Result of the post-signal status check.
+        state:
+          type: string
+
+    ServiceUnit:
+      type: object
+      required: [name, load, active, sub, file_state, description]
+      properties:
+        name:
+          type: string
+        load:
+          type: string
+        active:
+          type: string
+        sub:
+          type: string
+        file_state:
+          type: string
+        description:
+          type: string
+
+    ServiceList:
+      type: object
+      required: [collected_at, units, truncated]
+      properties:
+        collected_at:
+          type: string
+          format: date-time
+        units:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceUnit"
+        truncated:
+          type: boolean
+
+    ServiceActionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [start, stop, restart, reload, enable, disable]
+
+    ServiceActionResult:
+      type: object
+      required: [unit, action, active_state, sub_state, unit_file_state, state_known]
+      properties:
+        unit:
+          type: string
+        action:
+          type: string
+        active_state:
+          type: string
+        sub_state:
+          type: string
+        unit_file_state:
+          type: string
+        state_known:
+          type: boolean
+          description: False when the action completed but status could not be re-read.
+        message:
+          type: string
+
+    LogEntry:
+      type: object
+      required: [timestamp, priority, severity, message]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 7
+        severity:
+          type: string
+        message:
+          type: string
+          description: Untrusted journal text; clients must render it as text, never HTML.
+        unit:
+          type: string
+        identifier:
+          type: string
+
+    LogResult:
+      type: object
+      required: [collected_at, since, lines, entries, truncated]
+      properties:
+        collected_at:
+          type: string
+          format: date-time
+        unit:
+          type: string
+        since:
+          type: string
+        lines:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogEntry"
+        truncated:
+          type: boolean

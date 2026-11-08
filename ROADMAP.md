@@ -42,17 +42,23 @@ short, human-readable summary.
 - CPU deltas, memory, disk, uptime, load and network rates.
 - Honest unavailable/stale states and per-host coalescing.
 
-## Now — Phase 6: processes, systemd services and logs
+## Complete — Phase 6: processes, systemd services and logs
 
 - Bounded process discovery and enumerated signal actions.
 - systemd unit discovery, actions and status re-reads.
 - Bounded journal retrieval with safe filtering.
 
+## Now — Phase 7: MVP integration, security hardening and public beta
+
+- Cross-module server-context and stale-data review.
+- Audit history, accessibility and responsive polish.
+- Security test pass, dependency/static analysis and beta release assets.
+
 ## Then
 
 | Phase | Focus |
 |---|---|
-| 7 | MVP integration, security hardening and public beta |
+| 8 | Stable release and operational maturity |
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

@@ -101,6 +101,11 @@ func newTestApp(t *testing.T) *testApp {
 		MonitorMaxOutputBytes:   256 * 1024,
 		MonitorMaxFilesystems:   64,
 		MonitorMaxInterfaces:    64,
+		OpsCommandTimeout:       5 * time.Second,
+		ProcessMaxEntries:       1000,
+		ServiceMaxUnits:         500,
+		LogMaxLines:             500,
+		LogMaxOutputBytes:       1 << 20,
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	auditService := audit.New(storage.NewAuditRepository(db), logger)

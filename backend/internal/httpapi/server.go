@@ -14,10 +14,13 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/auth"
 	"github.com/awbuilds/drovik/backend/internal/config"
 	"github.com/awbuilds/drovik/backend/internal/files"
+	"github.com/awbuilds/drovik/backend/internal/logs"
 	"github.com/awbuilds/drovik/backend/internal/monitoring"
+	"github.com/awbuilds/drovik/backend/internal/processes"
 	"github.com/awbuilds/drovik/backend/internal/secrets"
 	"github.com/awbuilds/drovik/backend/internal/security"
 	"github.com/awbuilds/drovik/backend/internal/servers"
+	systemservices "github.com/awbuilds/drovik/backend/internal/services"
 	"github.com/awbuilds/drovik/backend/internal/sshclient"
 	"github.com/awbuilds/drovik/backend/internal/storage"
 	"github.com/awbuilds/drovik/backend/internal/terminal"
@@ -36,6 +39,9 @@ type Server struct {
 	servers      *servers.Service
 	files        *files.Service
 	monitoring   *monitoring.Service
+	processes    *processes.Service
+	services     *systemservices.Service
+	logs         *logs.Service
 	terminal     *terminal.Manager
 	limiter      *security.LoginLimiter
 	setupLimiter *security.LoginLimiter
@@ -69,6 +75,9 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 	)
 	filesService := files.NewService(cfg, serverService, auditService, logger)
 	monitoringService := monitoring.NewService(cfg, serverService, logger)
+	processService := processes.NewService(cfg, serverService, auditService, logger)
+	serviceService := systemservices.NewService(cfg, serverService, auditService, logger)
+	logService := logs.NewService(cfg, serverService, logger)
 	terminalManager := terminal.NewManager(cfg, serverService, logger)
 
 	var staticHandler http.Handler
@@ -93,6 +102,9 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		servers:    serverService,
 		files:      filesService,
 		monitoring: monitoringService,
+		processes:  processService,
+		services:   serviceService,
+		logs:       logService,
 		terminal:   terminalManager,
 		auth: auth.NewSessionManager(
 			sessions,
@@ -149,6 +161,11 @@ func (s *Server) Handler() http.Handler {
 			r.Get("/servers/{id}/terminal", s.handleTerminal)
 
 			r.Get("/servers/{id}/overview", s.handleServerOverview)
+			r.Get("/servers/{id}/processes", s.handleListProcesses)
+			r.With(s.requireCSRF).Post("/servers/{id}/processes/{pid}/signal", s.handleSignalProcess)
+			r.Get("/servers/{id}/services", s.handleListServices)
+			r.With(s.requireCSRF).Post("/servers/{id}/services/{unit}/action", s.handleServiceAction)
+			r.Get("/servers/{id}/logs", s.handleReadLogs)
 			r.Get("/servers/{id}/files", s.handleListFiles)
 			r.Get("/servers/{id}/files/stat", s.handleStatFile)
 			r.Get("/servers/{id}/files/download", s.handleDownloadFile)

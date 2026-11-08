@@ -21,6 +21,18 @@ const MonitoringPage = lazy(() =>
   import('@/pages/MonitoringPage').then((module) => ({ default: module.MonitoringPage })),
 )
 
+const ProcessesPage = lazy(() =>
+  import('@/pages/ProcessesPage').then((module) => ({ default: module.ProcessesPage })),
+)
+
+const ServicesPage = lazy(() =>
+  import('@/pages/ServicesPage').then((module) => ({ default: module.ServicesPage })),
+)
+
+const LogsPage = lazy(() =>
+  import('@/pages/LogsPage').then((module) => ({ default: module.LogsPage })),
+)
+
 const FilesPage = lazy(() =>
   import('@/pages/FilesPage').then((module) => ({ default: module.FilesPage })),
 )
@@ -131,6 +143,66 @@ function AppRoutes() {
           <AppShell>
             <Suspense fallback={<PageLoading label="Loading overview" />}>
               <MonitoringPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/processes"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading processes" />}>
+              <ProcessesPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/processes/:serverId"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading processes" />}>
+              <ProcessesPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/services"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading services" />}>
+              <ServicesPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/services/:serverId"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading services" />}>
+              <ServicesPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/logs"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading logs" />}>
+              <LogsPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/logs/:serverId"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading logs" />}>
+              <LogsPage />
             </Suspense>
           </AppShell>
         }
