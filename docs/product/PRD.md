@@ -1934,6 +1934,13 @@ The team can produce a release from a tagged commit, verify its artifacts, migra
 
 ## Phase 9 — Advanced server management (post-MVP)
 
+> **Implementation status (final):** the delivered 1.x scope is the read-first surface described in
+> ADR 0013: Docker inspection/enumerated actions, read-only storage/network/package/schedule
+> diagnostics, snippets, local users/server assignments, bounded metric history and in-app alerts.
+> Destructive storage/network/package/cron changes, OIDC/MFA, external notifications and non-Linux
+> targets are out of scope for the 1.x line. They are not completion criteria; revisiting any of
+> them requires a new ADR and threat model.
+
 Features in this phase should be individually designed and threat-modeled.
 
 ### 9.1 Docker/container management

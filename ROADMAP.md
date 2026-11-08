@@ -68,7 +68,8 @@ short, human-readable summary.
 - Local metric retention, history charts and in-app threshold alerts.
 
 Destructive storage/network/package/cron changes, OIDC/MFA, external notifications and non-Linux
-target support remain documented hardening items rather than casual additions.
+target support are permanently out of scope for the 1.x line (ADR 0013). Revisiting them requires a
+new ADR and threat model; they are not pending Phase 9 work.
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

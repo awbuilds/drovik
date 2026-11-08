@@ -369,11 +369,12 @@ covered.
   compatibility/troubleshooting/backup/security-testing docs and the release workflow are in place.
 - Phase 8: complete. Tag-driven release pipeline, stable release notes, versioned support policy,
   release runbook and parser benchmarks are in place.
-- Phase 9: complete for the read-first advanced-management scope. Docker inspection/actions, storage,
-  network, package and scheduled-task inspection, snippets, local users/server assignments, metric
-  retention/history and in-app threshold alerts are implemented and tested. Destructive host
-  changes, OIDC/MFA, external notifications and non-Linux support remain deferred with their own
-  threat-model requirements.
+- Phase 9: complete and final for the read-first advanced-management scope. Docker
+  inspection/actions, storage, network, package and scheduled-task inspection, snippets, local
+  users/server assignments, metric retention/history and in-app threshold alerts are implemented
+  and tested. Destructive host changes, OIDC/MFA, external notifications and non-Linux support are
+  permanently out of scope for the 1.x line (ADR 0013); revisiting them requires a new ADR and
+  threat model.
 - Security audit 2026-11-08 complete in two runs: five confirmed findings fixed in `v1.0.1`; seven
   Phase 9 findings fixed in `v1.1.1`. Remaining leads and validation plans are summarized in
   `docs/security/audit-2026-11-08.md`.

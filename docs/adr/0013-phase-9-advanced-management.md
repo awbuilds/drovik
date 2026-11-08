@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted for the Phase 9 read-first implementation.
+Accepted — final Phase 9 scope (approved 2026-11-08). The read-first scope below is the permanent
+1.x boundary. The excluded items are not pending work; revisiting any of them requires a new ADR
+and its own threat model.
 
 ## Context
 
@@ -35,6 +37,23 @@ web session into unbounded root-equivalent authority by accident.
   enterprise monitoring system.
 - **Additional operating systems:** Linux remains the only supported target. macOS/BSD are detected
   as unsupported for Linux-specific collectors; no unverified shell compatibility is claimed.
+
+## Permanently out of scope for the 1.x line
+
+The following Phase 9 candidates were reviewed and are not planned for the 1.x series:
+
+- Mount, unmount, format, partition or other destructive storage operations.
+- Firewall, interface, route or other network changes.
+- Package install, upgrade, removal or repository configuration changes.
+- Cron, systemd timer or other scheduled-task editing.
+- OIDC/SSO, MFA, external secret managers or other federated identity.
+- External notification channels (email, webhook, chat, paging).
+- macOS, BSD or Windows managed-host support.
+
+Rationale: each changes the product's threat model or support matrix, and several can destroy data
+or lock an operator out of a host. The current read-first surface preserves the project's rule that
+destructive host changes need independent risk review and explicit design. Adding any of them later
+is a new feature programme, not a completion criterion for Phase 9.
 
 ## Consequences
 
