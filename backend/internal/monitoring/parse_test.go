@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -202,5 +203,149 @@ func TestNonFiniteLoadAndUptimeAreUnavailable(t *testing.T) {
 	snapshot := computeSnapshot("server", nil, sample)
 	if snapshot.Load.Available || snapshot.Uptime.Available {
 		t.Fatalf("snapshot must not expose non-finite values: %+v", snapshot)
+	}
+}
+
+func TestParseMacOSFixture(t *testing.T) {
+	const fixture = `@@os-release@@
+@@uname@@
+Darwin 23.5.0 arm64
+@@hostname@@
+studio
+@@loadavg@@
+@@stat@@
+@@meminfo@@
+@@netdev@@
+@@cpuinfo@@
+@@mounts@@
+@@df@@
+Filesystem 1024-blocks Used Available Capacity Mounted on
+/dev/disk3s1s1 971350180 12345678 958000000 2% /
+@@posix-boottime@@
+{ sec = 1700000000, usec = 0 } Fri Nov  3 12:00:00 2023
+@@posix-load@@
+{ 1.50 2.00 2.50 }
+@@posix-ncpu@@
+10
+@@posix-memsize@@
+17179869184
+@@posix-pagesize@@
+16384
+@@posix-brand@@
+Apple M2 Pro
+@@vmstat@@
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free: 100000.
+Pages active: 400000.
+Pages inactive: 200000.
+Pages speculative: 10000.
+Pages wired down: 100000.
+Pages occupied by compressor: 50000.
+@@sw-vers@@
+ProductName: macOS
+ProductVersion: 14.5
+BuildVersion: 23F79
+@@top@@
+CPU usage: 5.26% user, 10.52% sys, 84.21% idle
+@@mount@@
+/dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)
+@@netstat@@
+Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
+lo0 16384 <Link#1> 100 0 10000 100 0 10000 0
+en0 1500 <Link#4> aa:bb:cc:dd:ee:ff 200 0 20000 300 0 30000 0
+@@end@@`
+
+	now := time.Unix(1_700_003_600, 0).UTC()
+	sample, err := parseSample(fixture, now)
+	if err != nil {
+		t.Fatalf("parseSample: %v", err)
+	}
+	if sample.host.OS != "Darwin" || sample.host.Kernel != "23.5.0" || sample.host.Architecture != "arm64" {
+		t.Fatalf("unexpected host: %+v", sample.host)
+	}
+	if sample.host.Distribution != "macOS 14.5" {
+		t.Fatalf("unexpected distribution: %q", sample.host.Distribution)
+	}
+	if !sample.loadAvailable || sample.load.One != 1.5 || sample.load.Fifteen != 2.5 {
+		t.Fatalf("unexpected load: %+v", sample.load)
+	}
+	if !sample.uptimeAvailable || sample.uptime != 3600 {
+		t.Fatalf("unexpected uptime: %f", sample.uptime)
+	}
+	if !sample.memoryAvailable || sample.memory.TotalBytes != 17179869184 {
+		t.Fatalf("unexpected memory: %+v", sample.memory)
+	}
+	if sample.memory.AvailableBytes != 310000*16384 || sample.memory.UsedBytes != 550000*16384 {
+		t.Fatalf("unexpected memory split: %+v", sample.memory)
+	}
+	if sample.cores != 10 || sample.model != "Apple M2 Pro" || !sample.cpuAvailable || sample.cpuUsage == nil || math.Abs(*sample.cpuUsage-15.79) > 0.001 {
+		t.Fatalf("unexpected CPU: %+v usage=%v", sample.cpu, sample.cpuUsage)
+	}
+	if !sample.filesystemsAvailable || len(sample.filesystems) != 1 {
+		t.Fatalf("unexpected filesystems: %+v", sample.filesystems)
+	}
+	root := sample.filesystems[0]
+	if root.Mountpoint != "/" || root.FSType != "apfs" || !root.ReadOnly || root.TotalBytes != 971350180*1024 {
+		t.Fatalf("unexpected root filesystem: %+v", root)
+	}
+	if !sample.networkAvailable || len(sample.network) != 2 {
+		t.Fatalf("unexpected network: %+v", sample.network)
+	}
+	if sample.network[0].name != "en0" || sample.network[0].rx != 20000 || sample.network[0].tx != 30000 {
+		t.Fatalf("unexpected en0 counters: %+v", sample.network[0])
+	}
+	if sample.network[1].name != "lo0" || sample.network[1].rx != 10000 {
+		t.Fatalf("unexpected lo0 counters: %+v", sample.network[1])
+	}
+}
+
+func TestParseFreeBSDFixture(t *testing.T) {
+	const fixture = `@@os-release@@
+NAME="FreeBSD"
+@@uname@@
+FreeBSD 14.1-RELEASE amd64
+@@hostname@@
+jail
+@@df@@
+Filesystem 1024-blocks Used Available Capacity Mounted on
+/dev/ada0p2 1024000 512000 460800 53% /
+@@posix-boottime@@
+{ sec = 1700000000, usec = 0 }
+@@posix-load@@
+{ 0.10 0.20 0.30 }
+@@posix-ncpu@@
+4
+@@posix-physmem@@
+8589934592
+@@posix-pagesize@@
+4096
+@@posix-model@@
+FreeBSD Test Model
+@@vmstat@@
+@@mount@@
+/dev/ada0p2 on / (ufs, local, soft-updates)
+@@netstat@@
+Name Mtu Network Address Ipkts Ierrs Idrop Ibytes Opkts Oerrs Obytes Coll
+em0 1500 <Link#1> 00:11:22:33:44:55 100 0 0 4096 200 0 8192 0
+@@end@@`
+	now := time.Unix(1_700_000_600, 0).UTC()
+	sample, err := parseSample(fixture, now)
+	if err != nil {
+		t.Fatalf("parseSample: %v", err)
+	}
+	if sample.host.OS != "FreeBSD" || sample.host.Distribution != "FreeBSD" {
+		t.Fatalf("unexpected host: %+v", sample.host)
+	}
+	if !sample.loadAvailable || sample.load.One != 0.1 || !sample.uptimeAvailable || sample.uptime != 600 {
+		t.Fatalf("unexpected load/uptime: %+v %f", sample.load, sample.uptime)
+	}
+	if sample.cores != 4 || sample.model != "FreeBSD Test Model" || sample.cpuAvailable {
+		t.Fatalf("unexpected CPU: %+v", sample.cpu)
+	}
+	if len(sample.filesystems) != 1 || sample.filesystems[0].FSType != "ufs" {
+		t.Fatalf("unexpected filesystems: %+v", sample.filesystems)
+	}
+	if !sample.networkAvailable || len(sample.network) != 1 || sample.network[0].rx != 4096 || sample.network[0].tx != 8192 {
+		t.Fatalf("unexpected network: %+v", sample.network)
 	}
 }

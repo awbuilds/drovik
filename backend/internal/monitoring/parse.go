@@ -18,6 +18,7 @@ type rawSample struct {
 	load                 LoadAverage
 	uptime               float64
 	cpu                  rawCPU
+	cpuUsage             *float64
 	memory               MemoryMetrics
 	filesystems          []Filesystem
 	network              []rawInterface
@@ -79,6 +80,11 @@ func parseSample(output string, now time.Time) (rawSample, error) {
 	sections := parseSections(output)
 	if len(sections) == 0 {
 		return rawSample{}, fmt.Errorf("%w: empty collector output", ErrMetricsUnavailable)
+	}
+	host := parseHost(sections["os-release"], sections["uname"], sections["hostname"])
+	if host.OS != "" && host.OS != "Linux" &&
+		(strings.TrimSpace(sections["posix-load"]) != "" || strings.TrimSpace(sections["vmstat"]) != "") {
+		return parsePosixSample(sections, now)
 	}
 	sample := rawSample{collectedAt: now}
 	sample.host = parseHost(sections["os-release"], sections["uname"], sections["hostname"])
@@ -334,7 +340,7 @@ func parseFilesystems(df, mounts string) []Filesystem {
 			fstype string
 			device string
 			ro     bool
-		}{fstype: fields[2], device: fields[0], ro: strings.Contains(","+options+",", ",ro,")}
+		}{fstype: fields[2], device: fields[0], ro: isReadOnlyMount(options)}
 	}
 
 	filesystems := make([]Filesystem, 0, 16)
@@ -383,6 +389,11 @@ func parseFilesystems(df, mounts string) []Filesystem {
 		return filesystems[i].Mountpoint < filesystems[j].Mountpoint
 	})
 	return filesystems
+}
+
+func isReadOnlyMount(options string) bool {
+	padded := "," + options + ","
+	return strings.Contains(padded, ",ro,") || strings.Contains(padded, ",read-only,")
 }
 
 func parseNetwork(raw string) []rawInterface {
@@ -497,8 +508,13 @@ func computeSnapshot(serverID string, previous *rawSample, current rawSample) Sn
 		Network: make([]NetworkInterface, 0, len(current.network)),
 	}
 
+	if current.cpuUsage != nil {
+		snapshot.CPU.UsagePercent = current.cpuUsage
+	}
 	if previous != nil && previous.cpuAvailable && current.cpuAvailable {
-		snapshot.CPU.UsagePercent = usagePercent(previous.cpu, current.cpu)
+		if snapshot.CPU.UsagePercent == nil {
+			snapshot.CPU.UsagePercent = usagePercent(previous.cpu, current.cpu)
+		}
 		previousCores := make(map[int]rawCPU, len(previous.cpu.cores))
 		for _, core := range previous.cpu.cores {
 			previousCores[core.index] = rawCPU{total: core.total, idle: core.idle}

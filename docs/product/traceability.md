@@ -342,7 +342,7 @@ separate design and threat model before implementation.
 | 9.8 Metric retention/history | Implemented | SQLite samples, retention/cap, history API and chart |
 | 9.8 Threshold alerts | Implemented | In-app threshold rules; no external notifications |
 | 9.8 Notifications | Tested | Encrypted alert webhooks, egress-checked delivery, cooldown; delivery test |
-| 9.9 Additional OS | Out of scope | Final Phase 9 scope (ADR 0013); non-Linux targets need a new support matrix |
+| 9.9 Additional OS | Tested | macOS/BSD read-only monitoring (host, load, memory, filesystems, network, uptime); portable collector and macOS/FreeBSD parser tests; Linux-only panels labelled unavailable |
 
 ### Phase 9 notes
 
@@ -350,15 +350,15 @@ separate design and threat model before implementation.
   checks and audit pipeline from prior phases.
 - Docker access is explicitly labelled root-equivalent. The Docker socket is never mounted into the
   Drovik container.
-- Storage, network, package and scheduled-task surfaces are read-only; destructive changes remain
-  intentionally absent.
+- Storage and network inspection is read-only; destructive changes are feature-flagged and
+  administrator-only. Package lifecycle and Drovik-managed cron tasks are enumerated and audited.
 - Read-only accounts and read-only server assignments are enforced by backend middleware, not only
   UI controls.
-- Package lifecycle, managed task editing, local TOTP MFA, destructive host operations and OIDC
-  extend the original read-first surface with enumerated, confirmed and audited mutations. External
-  secret managers and non-Linux targets remain out of scope until separately designed.
-- History is local, bounded and explicitly not a substitute for enterprise monitoring. External
-  notifications and OIDC/MFA remain post-Phase-9 hardening items.
+- Package lifecycle, managed task editing, local TOTP MFA, destructive host operations, OIDC and
+  macOS/BSD read-only monitoring extend the original read-first surface. External secret managers
+  and Windows targets remain out of scope until separately designed.
+- History is local, bounded and explicitly not a substitute for enterprise monitoring. Alert
+  webhooks, OIDC and MFA are implemented; external secret managers remain out of scope.
 
 ## Later phases
 

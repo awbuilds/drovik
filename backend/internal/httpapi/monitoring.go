@@ -35,7 +35,7 @@ func (s *Server) writeMonitoringError(w http.ResponseWriter, r *http.Request, er
 	case errors.Is(err, storage.ErrNotFound):
 		writeError(w, r, NewAPIError(http.StatusNotFound, CodeServerNotFound, "Server not found."))
 	case errors.Is(err, monitoring.ErrMetricsUnavailable):
-		writeError(w, r, NewAPIError(http.StatusUnprocessableEntity, CodeCapabilityUnavailable, "The host does not expose readable /proc metrics."))
+		writeError(w, r, NewAPIError(http.StatusUnprocessableEntity, CodeCapabilityUnavailable, "The host does not expose readable metrics."))
 	case errors.Is(err, security.ErrEgressDenied):
 		writeError(w, r, NewAPIError(http.StatusForbidden, CodeAuthForbidden, "The destination is not allowed by the egress policy."))
 	case errors.Is(err, sshclient.ErrInvalidCredentials), errors.Is(err, sshclient.ErrInvalidPrivateKey):

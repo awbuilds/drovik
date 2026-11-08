@@ -42,7 +42,7 @@ what it is doing:
 | Workspace | One shell with persistent server context and multiple tool panels |
 | Terminal | Full interactive SSH PTY with resize, copy/paste and clean lifecycle |
 | Files | SFTP browsing, streamed transfers, create/rename/delete and a bounded text editor |
-| Overview | CPU, memory, disk, uptime, load and network counters without an agent |
+| Overview | CPU, memory, disk, uptime, load and network counters without an agent; read-only macOS/BSD monitoring |
 | Processes | Inspect and safely signal processes your SSH user owns, with PID identity checks |
 | Services | Inspect and control systemd units where permitted, with post-action state |
 | Logs | Bounded journal viewing with safe text rendering |

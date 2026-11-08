@@ -30,6 +30,12 @@ func DetectCapabilities(ctx context.Context, client *ssh.Client) Capabilities {
 	capabilities.Kernel = commandOutput(ctx, client, "uname -r")
 	capabilities.Architecture = commandOutput(ctx, client, "uname -m")
 	capabilities.Distribution = parseDistribution(commandOutput(ctx, client, "cat /etc/os-release 2>/dev/null"))
+	if capabilities.OS == "Darwin" {
+		version := commandOutput(ctx, client, "sw_vers -productVersion 2>/dev/null")
+		if version != "" {
+			capabilities.Distribution = "macOS " + version
+		}
+	}
 	capabilities.Systemd = commandYes(ctx, client, "command -v systemctl >/dev/null 2>&1 && echo yes || echo no")
 	capabilities.Journalctl = commandYes(ctx, client, "command -v journalctl >/dev/null 2>&1 && echo yes || echo no")
 	capabilities.Proc = commandYes(ctx, client, "test -r /proc/stat && test -r /proc/meminfo && echo yes || echo no")
