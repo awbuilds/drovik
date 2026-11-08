@@ -44,11 +44,12 @@ type loginRequest struct {
 }
 
 type versionResponse struct {
-	Version       string `json:"version"`
-	Commit        string `json:"commit"`
-	BuildDate     string `json:"build_date"`
-	GoVersion     string `json:"go_version"`
-	SchemaVersion int64  `json:"schema_version"`
+	Version            string `json:"version"`
+	Commit             string `json:"commit"`
+	BuildDate          string `json:"build_date"`
+	GoVersion          string `json:"go_version"`
+	SchemaVersion      int64  `json:"schema_version"`
+	DestructiveHostOps bool   `json:"destructive_host_ops"`
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

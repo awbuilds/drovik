@@ -23,6 +23,7 @@ export interface VersionInfo {
   build_date: string
   go_version: string
   schema_version: number
+  destructive_host_ops: boolean
 }
 
 export interface ApiErrorBody {

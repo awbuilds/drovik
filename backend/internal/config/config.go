@@ -84,6 +84,8 @@ type Config struct {
 
 	MetricsRetention  time.Duration
 	MetricsMaxSamples int
+
+	EnableDestructiveHostOps bool
 }
 
 func Load() (*Config, error) {
@@ -349,6 +351,11 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		return nil, errors.New("advanced management limits must be greater than zero")
 	}
 
+	destructiveHostOps, err := parseBool(lookup, "DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS", false)
+	if err != nil {
+		return nil, err
+	}
+
 	maxSessionsPerUser, err := parseInt(lookup, "DROVIK_SSH_MAX_SESSIONS_PER_USER", 2)
 	if err != nil {
 		return nil, err
@@ -383,54 +390,55 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 
 	return &Config{
-		Env:                     env,
-		HTTPAddr:                httpAddr,
-		PublicURL:               publicURL,
-		TrustedOrigins:          origins,
-		LogLevel:                logLevel,
-		LogFormat:               logFormat,
-		DataDir:                 filepath.Clean(dataDir),
-		DBPath:                  filepath.Clean(dbPath),
-		StaticDir:               filepath.Clean(staticDir),
-		EncryptionKey:           key,
-		SessionIdleTTL:          idleTTL,
-		SessionAbsoluteTTL:      absoluteTTL,
-		CookieSecure:            cookieSecure,
-		LoginRateLimit:          loginLimit,
-		LoginRateWindow:         loginWindow,
-		ShutdownTimeout:         shutdownTimeout,
-		ReadinessTimeout:        readinessTimeout,
-		SSHDialTimeout:          sshDialTimeout,
-		SSHHandshakeTimeout:     sshHandshakeTimeout,
-		SSHOperationTimeout:     sshOperationTimeout,
-		EgressAllowPrivate:      egressAllowPrivate,
-		EgressAllowedPrefixes:   egressAllowed,
-		EgressDeniedPrefixes:    egressDenied,
-		SSHMaxSessionsPerUser:   maxSessionsPerUser,
-		SSHMaxSessionsGlobal:    maxSessionsGlobal,
-		SFTPMaxUploadBytes:      sftpMaxUpload,
-		SFTPMaxEditorBytes:      sftpMaxEditor,
-		SFTPMaxListEntries:      sftpMaxList,
-		SFTPMaxRecursiveEntries: sftpMaxRecursive,
-		SFTPOperationTimeout:    sftpTimeout,
-		MonitorRefreshInterval:  monitorRefresh,
-		MonitorStaleAfter:       monitorStaleAfter,
-		MonitorTimeout:          monitorTimeout,
-		MonitorMaxOutputBytes:   monitorMaxOutput,
-		MonitorMaxFilesystems:   monitorMaxFilesystems,
-		MonitorMaxInterfaces:    monitorMaxInterfaces,
-		OpsCommandTimeout:       opsTimeout,
-		ProcessMaxEntries:       processMaxEntries,
-		ServiceMaxUnits:         serviceMaxUnits,
-		LogMaxLines:             logMaxLines,
-		LogMaxOutputBytes:       logMaxOutput,
-		AdvancedTimeout:         advancedTimeout,
-		AdvancedMaxOutputBytes:  advancedMaxOutput,
-		DockerMaxContainers:     dockerMaxContainers,
-		PackageMaxEntries:       packageMaxEntries,
-		SnippetMaxCommandBytes:  snippetMaxCommand,
-		MetricsRetention:        metricsRetention,
-		MetricsMaxSamples:       metricsMaxSamples,
+		Env:                      env,
+		HTTPAddr:                 httpAddr,
+		PublicURL:                publicURL,
+		TrustedOrigins:           origins,
+		LogLevel:                 logLevel,
+		LogFormat:                logFormat,
+		DataDir:                  filepath.Clean(dataDir),
+		DBPath:                   filepath.Clean(dbPath),
+		StaticDir:                filepath.Clean(staticDir),
+		EncryptionKey:            key,
+		SessionIdleTTL:           idleTTL,
+		SessionAbsoluteTTL:       absoluteTTL,
+		CookieSecure:             cookieSecure,
+		LoginRateLimit:           loginLimit,
+		LoginRateWindow:          loginWindow,
+		ShutdownTimeout:          shutdownTimeout,
+		ReadinessTimeout:         readinessTimeout,
+		SSHDialTimeout:           sshDialTimeout,
+		SSHHandshakeTimeout:      sshHandshakeTimeout,
+		SSHOperationTimeout:      sshOperationTimeout,
+		EgressAllowPrivate:       egressAllowPrivate,
+		EgressAllowedPrefixes:    egressAllowed,
+		EgressDeniedPrefixes:     egressDenied,
+		SSHMaxSessionsPerUser:    maxSessionsPerUser,
+		SSHMaxSessionsGlobal:     maxSessionsGlobal,
+		SFTPMaxUploadBytes:       sftpMaxUpload,
+		SFTPMaxEditorBytes:       sftpMaxEditor,
+		SFTPMaxListEntries:       sftpMaxList,
+		SFTPMaxRecursiveEntries:  sftpMaxRecursive,
+		SFTPOperationTimeout:     sftpTimeout,
+		MonitorRefreshInterval:   monitorRefresh,
+		MonitorStaleAfter:        monitorStaleAfter,
+		MonitorTimeout:           monitorTimeout,
+		MonitorMaxOutputBytes:    monitorMaxOutput,
+		MonitorMaxFilesystems:    monitorMaxFilesystems,
+		MonitorMaxInterfaces:     monitorMaxInterfaces,
+		OpsCommandTimeout:        opsTimeout,
+		ProcessMaxEntries:        processMaxEntries,
+		ServiceMaxUnits:          serviceMaxUnits,
+		LogMaxLines:              logMaxLines,
+		LogMaxOutputBytes:        logMaxOutput,
+		AdvancedTimeout:          advancedTimeout,
+		AdvancedMaxOutputBytes:   advancedMaxOutput,
+		DockerMaxContainers:      dockerMaxContainers,
+		PackageMaxEntries:        packageMaxEntries,
+		SnippetMaxCommandBytes:   snippetMaxCommand,
+		MetricsRetention:         metricsRetention,
+		MetricsMaxSamples:        metricsMaxSamples,
+		EnableDestructiveHostOps: destructiveHostOps,
 	}, nil
 }
 

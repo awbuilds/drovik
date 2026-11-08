@@ -34,6 +34,26 @@ type packageActionRequest struct {
 	Confirm bool   `json:"confirm"`
 }
 
+type storageOpRequest struct {
+	Device        string `json:"device"`
+	Mountpoint    string `json:"mountpoint"`
+	Filesystem    string `json:"filesystem"`
+	Confirm       bool   `json:"confirm"`
+	ConfirmDevice string `json:"confirm_device"`
+}
+
+type networkOpRequest struct {
+	Interface   string `json:"interface"`
+	State       string `json:"state"`
+	CIDR        string `json:"cidr"`
+	Destination string `json:"destination"`
+	Gateway     string `json:"gateway"`
+	Action      string `json:"action"`
+	Protocol    string `json:"protocol"`
+	Port        int    `json:"port"`
+	Confirm     bool   `json:"confirm"`
+}
+
 type taskRequest struct {
 	Schedule string `json:"schedule"`
 	Command  string `json:"command"`
@@ -193,6 +213,134 @@ func (s *Server) handleSchedules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleStorageMount(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request storageOpRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.Mount(r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Device, request.Mountpoint, request.Filesystem, request.Confirm)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleStorageUnmount(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request storageOpRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.Unmount(r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Mountpoint, request.Confirm)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleStorageFormat(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request storageOpRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.Format(r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Device, request.Filesystem, request.ConfirmDevice, request.Confirm)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleStoragePartition(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request storageOpRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.Partition(r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Device, request.Filesystem, request.ConfirmDevice, request.Confirm)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleNetworkLink(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request networkOpRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.LinkState(r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Interface, request.State, request.Confirm)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleNetworkAddress(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request networkOpRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.AddressChange(r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Interface, request.CIDR, request.Action, request.Confirm)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleNetworkRoute(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request networkOpRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.RouteChange(r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Interface, request.Destination, request.Gateway, request.Action, request.Confirm)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleNetworkFirewall(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request networkOpRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.FirewallChange(r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Port, request.Protocol, request.Action, request.Confirm)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -405,6 +553,8 @@ func (s *Server) writeAdvancedError(w http.ResponseWriter, r *http.Request, err 
 		writeError(w, r, NewAPIError(http.StatusForbidden, CodeAuthForbidden, "The SSH account does not have permission for this operation."))
 	case errors.Is(err, advanced.ErrInvalidTarget):
 		writeError(w, r, NewAPIError(http.StatusUnprocessableEntity, CodeValidation, "The advanced operation request is invalid."))
+	case errors.Is(err, advanced.ErrFeatureDisabled):
+		writeError(w, r, NewAPIError(http.StatusForbidden, CodeFeatureDisabled, "Destructive host operations are disabled by configuration."))
 	case errors.Is(err, advanced.ErrUnavailable):
 		writeError(w, r, NewAPIError(http.StatusUnprocessableEntity, CodeCapabilityUnavailable, "The required host tool is unavailable."))
 	case errors.Is(err, advanced.ErrActionFailed):

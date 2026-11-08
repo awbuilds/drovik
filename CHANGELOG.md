@@ -38,6 +38,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- Destructive host operations behind `DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS` (default false):
+  mount/unmount, format, partition, link state, address/route changes and ufw/firewalld rules, with
+  admin-only access, typed device confirmation, mount/root guards and audit.
 - Alert webhooks: encrypted URL storage, egress-checked delivery, bounded timeout and a 15-minute
   per-rule cooldown, configured from the monitoring history panel.
 - Local TOTP MFA with encrypted secrets, eight single-use recovery codes and a login challenge;

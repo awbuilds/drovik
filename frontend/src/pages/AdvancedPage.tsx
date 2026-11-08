@@ -30,10 +30,12 @@ import {
   type DockerAction,
   type DockerContainer,
 } from '@/api/advanced'
+import { getVersion } from '@/api/client'
 import { listServers } from '@/api/servers'
 import { useAuth } from '@/auth/useAuth'
 import { PageHeader } from '@/components/PageHeader'
 import { ServerPicker } from '@/components/ServerPicker'
+import { HostOpsPanel } from '@/components/advanced/HostOpsPanel'
 import { ConfirmDialog } from '@/components/servers/ConfirmDialog'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
@@ -87,6 +89,11 @@ export function AdvancedPage() {
   const serversQuery = useQuery({
     queryKey: ['servers'],
     queryFn: ({ signal }) => listServers(signal),
+  })
+  const versionQuery = useQuery({
+    queryKey: ['version'],
+    queryFn: ({ signal }) => getVersion(signal),
+    staleTime: 60_000,
   })
   const servers = serversQuery.data?.servers ?? []
   const currentServer = servers.find((server) => server.id === serverId)
@@ -415,6 +422,7 @@ export function AdvancedPage() {
         storageQuery.isLoading ? <Skeleton className="h-64 w-full" /> :
         storageQuery.data ? (
           <div className="space-y-4">
+            <HostOpsPanel serverId={serverId} kind="storage" enabled={Boolean(versionQuery.data?.destructive_host_ops) && canWrite} />
             <Card>
               <CardHeader><CardTitle>Block devices</CardTitle><CardDescription>Read-only lsblk inspection. No mount, format or partition actions are exposed.</CardDescription></CardHeader>
               <CardContent className="px-0 pt-2">
@@ -485,6 +493,7 @@ export function AdvancedPage() {
                 </Card>
               ))}
             </div>
+            <HostOpsPanel serverId={serverId} kind="network" enabled={Boolean(versionQuery.data?.destructive_host_ops) && canWrite} />
             <Card>
               <CardHeader><CardTitle>Routes</CardTitle><CardDescription>Read-only routing table.</CardDescription></CardHeader>
               <CardContent className="px-0 pt-2">

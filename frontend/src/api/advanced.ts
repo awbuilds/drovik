@@ -377,3 +377,40 @@ export function deleteAlertRule(serverId: string, ruleId: string, csrf: string):
     csrf,
   })
 }
+
+
+export type StorageAction = 'mount' | 'unmount' | 'format' | 'partition'
+export type NetworkAction = 'link' | 'address' | 'route' | 'firewall'
+
+export interface HostOpResult {
+  command: string
+  output: string
+  success: boolean
+  truncated: boolean
+}
+
+export function storageOp(
+  serverId: string,
+  action: StorageAction,
+  input: Record<string, string | boolean>,
+  csrf: string,
+): Promise<HostOpResult> {
+  return apiRequest<HostOpResult>(`/api/v1/servers/${serverId}/storage/${action}`, {
+    method: 'POST',
+    csrf,
+    body: input,
+  })
+}
+
+export function networkOp(
+  serverId: string,
+  action: NetworkAction,
+  input: Record<string, string | number | boolean>,
+  csrf: string,
+): Promise<HostOpResult> {
+  return apiRequest<HostOpResult>(`/api/v1/servers/${serverId}/network/${action}`, {
+    method: 'POST',
+    csrf,
+    body: input,
+  })
+}

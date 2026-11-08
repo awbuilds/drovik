@@ -18,8 +18,13 @@ web session into unbounded root-equivalent authority by accident.
   socket into its own container. Only list/image/log/inspect and start/stop/restart/remove by
   validated container ID are exposed. Every action is confirmed, audited, blocked for read-only
   assignments and labelled as potentially root-equivalent.
-- **Storage and network** remain read-only. Destructive disk, firewall and interface mutations are
-  intentionally absent until separately designed and reviewed.
+- **Destructive storage and network** are implemented behind the disabled-by-default
+  `DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS` flag. Mount/unmount, format, partition, link state,
+  address/route changes and ufw/firewalld rules are administrator-only, require CSRF and explicit
+  confirmation, and format/partition require typing the exact device. Mountpoints `/`, `/boot`,
+  `/proc`, `/sys`, `/dev`, `/etc`, `/usr`, `/var` and `/run` are refused; format/partition refuse a
+  mounted device; all actions are audited. These commands can still destroy data or disconnect the
+  host, so tests are run only against disposable Colima containers/loop devices.
 - **Package lifecycle** exposes install, upgrade and remove for the detected package manager
   (apt/dnf/apk/pacman). Package names are strictly validated, confirmation is required, commands
   are enumerated, no sudo/escalation is attempted and every action is audited. Failures return the
@@ -55,8 +60,7 @@ web session into unbounded root-equivalent authority by accident.
 
 The following Phase 9 candidates were reviewed and are not planned for the 1.x series:
 
-- Mount, unmount, format, partition or other destructive storage operations.
-- Firewall, interface, route or other network changes.
+- Unattended or scheduled destructive operations (the flag remains manual and disabled by default).
 - Repository configuration changes and automatic update scheduling.
 - systemd timer or unit-file editing.
 - OIDC/SSO, external secret managers or other federated identity (local TOTP MFA is implemented).

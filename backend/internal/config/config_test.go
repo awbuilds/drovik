@@ -237,3 +237,23 @@ func TestLoadRejectsInvalidAdvancedConfiguration(t *testing.T) {
 		t.Fatal("expected zero retention to be rejected")
 	}
 }
+
+func TestLoadDestructiveHostOpsFlag(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS"] = "true"
+	cfg, err := load(lookupFrom(env))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.EnableDestructiveHostOps {
+		t.Fatal("expected destructive host ops to be enabled")
+	}
+	env = validEnv()
+	cfg, err = load(lookupFrom(env))
+	if err != nil {
+		t.Fatalf("load default: %v", err)
+	}
+	if cfg.EnableDestructiveHostOps {
+		t.Fatal("destructive host ops must default to disabled")
+	}
+}

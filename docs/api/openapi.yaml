@@ -1548,6 +1548,88 @@ paths:
         "204": {description: Disabled}
         "401": {$ref: "#/components/responses/Unauthorized"}
 
+  /api/v1/servers/{id}/storage/mount:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: mountFilesystem
+      summary: Mount a filesystem (administrator, feature-flagged)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Command result}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /api/v1/servers/{id}/storage/unmount:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: unmountFilesystem
+      summary: Unmount a filesystem (administrator, feature-flagged)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Command result}
+  /api/v1/servers/{id}/storage/format:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: formatDevice
+      summary: Format a block device (administrator, feature-flagged, typed confirmation)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Command result}
+  /api/v1/servers/{id}/storage/partition:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: partitionDevice
+      summary: Create a GPT partition table (administrator, feature-flagged, typed confirmation)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Command result}
+  /api/v1/servers/{id}/network/link:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: setLinkState
+      summary: Bring a network link up or down (administrator, feature-flagged)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Command result}
+  /api/v1/servers/{id}/network/address:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: changeAddress
+      summary: Add or remove an interface address (administrator, feature-flagged)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Command result}
+  /api/v1/servers/{id}/network/route:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: changeRoute
+      summary: Add or remove a route (administrator, feature-flagged)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Command result}
+  /api/v1/servers/{id}/network/firewall:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: changeFirewall
+      summary: Add a ufw/firewalld port rule (administrator, feature-flagged)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Command result}
+
 components:
   securitySchemes:
     cookieAuth:
