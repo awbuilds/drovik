@@ -120,7 +120,10 @@ func (s *Service) DockerAction(ctx context.Context, ownerID, serverID, container
 	case "start", "stop", "restart", "remove":
 		command = "docker " + action + " " + containerID
 		if action == "remove" {
-			command = "docker rm " + containerID
+			// The UI offers removal for running containers. A plain docker rm
+			// refuses a running container, so remove must force after the
+			// explicit confirmation dialog.
+			command = "docker rm -f " + containerID
 		}
 	default:
 		return ErrInvalidTarget

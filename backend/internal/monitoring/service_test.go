@@ -84,6 +84,7 @@ func newMonitoringTestEnv(t *testing.T) *monitoringTestEnv {
 		storage.NewServerRepository(db),
 		users,
 		storage.NewAssignmentRepository(db),
+		storage.NewTeamRepository(db),
 		known,
 		storage.NewCapabilitiesRepository(db),
 		cipher,

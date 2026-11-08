@@ -7,6 +7,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-08
+
+### Added
+
+- Teams: administrator-managed groups with members and shared servers at `read` or `write`;
+  effective access is additive across direct and team assignments.
+- Audit search and export: server-side text, event-type, outcome and time filters plus bounded CSV
+  and JSON exports with formula-safe CSV.
+- Snippet import/export: versioned JSON export and a bounded, transactional import with duplicate
+  rejection.
+- Non-Linux read-only enforcement: detected macOS/BSD hosts reject every write route while keeping
+  monitoring available.
+- A live macOS collector test alongside the macOS/FreeBSD parser fixtures.
+
+### Fixed
+
+- Removing a running Docker container now uses the confirmed force-remove path; plain
+  `docker rm` refused running containers.
+- SFTP editor saves and uploads use the `posix-rename` extension so an existing file is
+  replaced atomically on OpenSSH.
+- Managed task creation handles an account with no crontab (`crontab -l` reports it on
+  stderr) and fails closed on silent or truncated crontab reads.
+
 ### Security
 
 - OIDC account linking now requires the local password and, when MFA is enabled, a current

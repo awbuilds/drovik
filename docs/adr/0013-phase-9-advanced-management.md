@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted — final Phase 9 scope (approved 2026-11-08). The read-first scope below is the permanent
-1.x boundary. The excluded items are not pending work; revisiting any of them requires a new ADR
+Accepted — Phase 9 scope (approved 2026-11-08, completed with teams, audit export and snippet
+import/export). The exclusions below are the 1.x boundary. Revisiting any of them requires a new ADR
 and its own threat model.
 
 ## Context
@@ -72,8 +72,10 @@ web session into unbounded root-equivalent authority by accident.
   hosts get read-only monitoring from portable collectors (`uname`, `sysctl`, `vm_stat`, `df`,
   `mount`, `netstat`, `top`): host identity, load, memory, filesystems, network counters and uptime.
   CPU usage on macOS is a point-in-time `top` sample; per-core counters, systemd, journal, Docker
-  and the Linux-only advanced actions remain unavailable and are labelled as such. Linux-specific
-  collectors are not claimed to work on other targets.
+  and the Linux-only advanced actions remain unavailable and are labelled as such. Once a host is
+  detected as non-Linux, every write route (terminal, SFTP mutations, package/task/Docker and
+  destructive host operations) returns `CAPABILITY_UNAVAILABLE`; read-only monitoring remains
+  available. Linux-specific collectors are not claimed to work on other targets.
 
 ## Permanently out of scope for the 1.x line
 
@@ -81,7 +83,9 @@ The following Phase 9 candidates were reviewed and are not planned for the 1.x s
 
 - Unattended or scheduled destructive operations (the flag remains manual and disabled by default).
 - Repository configuration changes and automatic update scheduling.
-- systemd timer or unit-file editing.
+- systemd timer or unit-file editing. This is a root-level persistent host mutation and is
+  deliberately excluded; Drovik-managed user crontab tasks cover the non-destructive scheduling
+  use case.
 - Additional secret-manager backends beyond Vault KV v2 and additional federated identity
   providers.
 - Email, chat or paging notification channels (webhooks are implemented).
@@ -89,7 +93,7 @@ The following Phase 9 candidates were reviewed and are not planned for the 1.x s
 - Write operations on macOS/BSD hosts beyond read-only monitoring.
 
 Rationale: each changes the product's threat model or support matrix, and several can destroy data
-or lock an operator out of a host. The current read-first surface preserves the project's rule that
+or lock an operator out of a host. The current surface preserves the project's rule that
 destructive host changes need independent risk review and explicit design. Adding any of them later
 is a new feature programme, not a completion criterion for Phase 9.
 

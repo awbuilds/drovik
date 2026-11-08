@@ -209,6 +209,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  /api/v1/activity/export:
+    get:
+      tags: [Activity]
+      operationId: exportActivity
+      summary: Export scoped audit history as CSV or JSON
+      description: Exports up to 5000 matching events. CSV values that begin with a spreadsheet formula character are prefixed with an apostrophe.
+      security: [{cookieAuth: []}]
+      parameters:
+        - name: format
+          in: query
+          schema: {type: string, enum: [csv, json], default: csv}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 5000, default: 100}
+        - name: q
+          in: query
+          schema: {type: string, maxLength: 200}
+        - name: event_type
+          in: query
+          schema: {type: string, maxLength: 100}
+        - name: outcome
+          in: query
+          schema: {type: string, enum: [success, failure, denied, unknown]}
+      responses:
+        "200": {description: Audit export}
+        "422": {$ref: "#/components/responses/ValidationError"}
+
   /api/v1/servers:
     get:
       tags: [Servers]
@@ -1029,9 +1056,9 @@ paths:
       operationId: listActivity
       summary: List scoped audit history
       description: |
-        Returns recent audit events for the current actor or servers owned by
-        the current user. Audit history is metadata only and never includes
-        credentials, file contents or log contents.
+        Returns audit events for the current actor or servers the user owns,
+        is assigned, or receives through a team. Audit history is metadata only
+        and never includes credentials, file contents or log contents.
       security:
         - cookieAuth: []
       parameters:
@@ -1349,6 +1376,40 @@ paths:
       parameters: [{$ref: "#/components/parameters/CsrfToken"}]
       responses:
         "201": {description: Created}
+  /api/v1/snippets/export:
+    get:
+      tags: [Snippets]
+      operationId: exportSnippets
+      summary: Export the current user's snippets as JSON
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Versioned JSON snippet export}
+  /api/v1/snippets/import:
+    post:
+      tags: [Snippets]
+      operationId: importSnippets
+      summary: Import 1 to 100 snippets
+      description: Rejects duplicate names and any invalid snippet before creating anything.
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [snippets]
+              properties:
+                snippets:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: {type: object}
+      responses:
+        "201": {description: Imported snippets}
+        "409": {description: A snippet name already exists}
+        "422": {$ref: "#/components/responses/ValidationError"}
+
   /api/v1/snippets/{id}:
     parameters:
       - name: id
@@ -1740,6 +1801,141 @@ paths:
       responses:
         "204": {description: Unlinked}
         "401": {$ref: "#/components/responses/Unauthorized"}
+
+  /api/v1/teams:
+    get:
+      tags: [Teams]
+      operationId: listTeams
+      summary: List teams with member and server counts
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Teams}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    post:
+      tags: [Teams]
+      operationId: createTeam
+      summary: Create a team
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 2, maxLength: 64}
+                description: {type: string, maxLength: 500}
+      responses:
+        "201": {description: Team created}
+        "409": {description: Team name already exists}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /api/v1/teams/{teamID}:
+    parameters:
+      - name: teamID
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: [Teams]
+      operationId: getTeam
+      summary: Get a team with members and shared servers
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Team detail}
+        "404": {$ref: "#/components/responses/NotFound"}
+    patch:
+      tags: [Teams]
+      operationId: updateTeam
+      summary: Update a team
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 2, maxLength: 64}
+                description: {type: string, maxLength: 500}
+      responses:
+        "200": {description: Team updated}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [Teams]
+      operationId: deleteTeam
+      summary: Delete a team
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "204": {description: Team deleted}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/v1/teams/{teamID}/members/{userID}:
+    parameters:
+      - name: teamID
+        in: path
+        required: true
+        schema: {type: string}
+      - name: userID
+        in: path
+        required: true
+        schema: {type: string}
+    put:
+      tags: [Teams]
+      operationId: addTeamMember
+      summary: Add a user to a team
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "204": {description: Member added}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [Teams]
+      operationId: removeTeamMember
+      summary: Remove a user from a team
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "204": {description: Member removed}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/v1/teams/{teamID}/servers/{serverID}:
+    parameters:
+      - name: teamID
+        in: path
+        required: true
+        schema: {type: string}
+      - $ref: "#/components/parameters/ServerID"
+    put:
+      tags: [Teams]
+      operationId: setTeamServer
+      summary: Share a server with a team
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [access_level]
+              properties:
+                access_level: {type: string, enum: [read, write]}
+      responses:
+        "204": {description: Server assigned}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [Teams]
+      operationId: removeTeamServer
+      summary: Remove a server from a team
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "204": {description: Server removed}
+        "404": {$ref: "#/components/responses/NotFound"}
+
 
 components:
   securitySchemes:

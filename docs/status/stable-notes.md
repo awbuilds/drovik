@@ -1,9 +1,10 @@
 # Stable release notes
 
-**Release line:** `v1.3.0`
+**Release line:** `v1.3.1`
 
-Drovik 1.0 was the first stable MVP for self-hosted, agentless Linux server management. `v1.3.0`
-completes the Phase 9 scope. It includes:
+Drovik 1.0 was the first stable MVP for self-hosted, agentless Linux server management. `v1.3.1`
+completes the Phase 9 scope. The patch release adds teams, audit search/export, snippet
+import/export, strict non-Linux read-only enforcement, and fixes found by live Lima testing. It includes:
 
 - setup, Argon2id authentication, sessions and CSRF;
 - encrypted SSH credentials with strict host-key approval;
@@ -33,7 +34,7 @@ Only the latest stable minor release and the current beta line receive security 
 
 ## Security patches
 
-`v1.3.0` completes Phase 9 and fixes six issues found by the final source-first audit, including
+`v1.3.0` completed Phase 9 and fixed six issues found by the final source-first audit, including
 OIDC link step-up, MFA re-enrollment, OIDC browser binding and webhook URL logging.
 
 `v1.1.1` fixed seven issues found by the second source-first audit of the Phase 9 tree and pins

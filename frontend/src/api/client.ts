@@ -2,6 +2,10 @@ import type { ApiErrorBody, AuthResponse, SetupStatus, VersionInfo } from './typ
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 
+export function apiURL(path: string): string {
+  return `${API_BASE}${path}`
+}
+
 export class ApiError extends Error {
   readonly code: string
   readonly status: number
@@ -174,4 +178,27 @@ export function me(signal?: AbortSignal): Promise<AuthResponse> {
 
 export function getVersion(signal?: AbortSignal): Promise<VersionInfo> {
   return apiRequest<VersionInfo>('/api/v1/version', { signal })
+}
+
+
+export async function apiDownload(path: string, signal?: AbortSignal): Promise<Blob> {
+  let response: Response
+  try {
+    response = await fetch(apiURL(path), { credentials: 'include', signal })
+  } catch (caught) {
+    throw new ApiError('NETWORK_ERROR', 0, 'The download could not be started.', undefined, caught)
+  }
+  if (!response.ok) {
+    let code = 'INTERNAL_ERROR'
+    let message = 'The download failed.'
+    try {
+      const body = (await response.json()) as ApiErrorBody
+      code = body.error?.code ?? code
+      message = body.error?.message ?? message
+    } catch {
+      // Keep the generic message when the body is not JSON.
+    }
+    throw new ApiError(code, response.status, message)
+  }
+  return response.blob()
 }

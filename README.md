@@ -12,7 +12,7 @@ saved SSH connections, an interactive terminal, SFTP file management, system hea
 systemd services, logs and audit history. It uses the SSH access you already have. It installs
 nothing on the servers you manage.
 
-> **Status:** stable (`v1.3.0`). Drovik provides authentication with local MFA and optional OIDC,
+> **Status:** stable (`v1.3.1`). Drovik provides authentication with local MFA and optional OIDC,
 > strict SSH host-key trust, terminal, SFTP files, agentless monitoring, process/service/log
 > operations, Docker and host diagnostics, package lifecycle, managed cron tasks, snippets, local
 > users/server assignments, history, alerts and audit. Vault KV v2 can hold SSH credentials.
@@ -55,9 +55,9 @@ what it is doing:
 | Secrets | Optional HashiCorp Vault KV v2 credentials; only the path is stored |
 | Alerts | In-app threshold rules with encrypted external webhooks |
 | Snippets | Reusable command templates with substituted preview and explicit confirmation |
-| Users | Local accounts, roles and per-server `read`/`write` assignments |
+| Users | Local accounts, roles, teams and per-server `read`/`write` assignments |
 | History | Optional bounded metric retention, charts and in-app threshold alerts |
-| Audit | Local metadata for logins, connections and sensitive actions |
+| Audit | Local metadata for logins, connections and sensitive actions, with search and CSV/JSON export |
 
 See the full [product requirements and roadmap](docs/product/PRD.md) for scope, non-goals and
 acceptance criteria.
@@ -83,7 +83,7 @@ See [the architecture overview](docs/architecture/overview.md) and the
 The supported deployment is a self-hosted container on Linux:
 
 ```bash
-docker pull ghcr.io/awbuilds/drovik:v1.3.0
+docker pull ghcr.io/awbuilds/drovik:v1.3.1
 ```
 
 Use the [Compose example](deploy/compose/docker-compose.yml) with a persistent `/data` volume, a

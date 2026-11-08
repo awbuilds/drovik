@@ -316,7 +316,7 @@ multi-user RBAC, file-based log browsing, resumable transfers and unit-file edit
 separate design and threat model before implementation.
 
 
-## Phase 9 — Advanced management (read-first scope)
+## Phase 9 — Advanced management
 
 | Area | Status | Implementation / evidence |
 |---|---|---|
@@ -331,19 +331,21 @@ separate design and threat model before implementation.
 | 9.3 Interface/address/route/firewall changes | Tested | Feature-flagged, admin-only, validated interface/CIDR/port, confirm, audit; unit + Colima network-namespace tests |
 | 9.4 Package manager detection/list | Tested | dpkg/rpm/apk/pacman detection and bounded list |
 | 9.4 Install/update/remove | Tested | Enumerated apt/dnf/apk/pacman actions, confirmation, validated names, audit; service and HTTP tests |
-| 9.5 Snippets CRUD/variables | Tested | Storage + service tests; variables and shell quoting |
+| 9.5 Snippets CRUD/variables | Tested | Storage + service tests; variables and shell quoting; JSON import/export with a 100-item bound and duplicate-name rejection |
 | 9.5 Preview/confirm/execute | Tested | Preview endpoint, confirm required, audit, output bounds |
 | 9.6 Cron/timer inspection | Tested | Fixed cron/timer collector parser tests |
 | 9.6 Task editing | Tested | Drovik-marked user-crontab blocks, validation, SFTP staging, audit; lifecycle tests |
 | 9.7 Local users/roles | Tested | User service, last-admin guard, HTTP read-only test |
 | 9.7 Server assignment/read-only | Tested | `server_assignments`, effective access checks, route guard |
+| 9.7 Teams/groups | Tested | Teams, members and team-server read/write assignments; additive effective access; admin-only management; storage, service and HTTP tests |
+| 9.7 Audit search/export | Tested | Scoped server-side search, event/outcome/date filters, CSV/JSON export with formula-safe CSV; HTTP tests |
 | 9.7 Local MFA | Tested | TOTP enrollment, encrypted secrets, recovery codes, login challenge; HTTP tests |
 | 9.7 OIDC/SSO | Tested | Authorization-code + PKCE, discovery issuer check, single-use state, explicit account linking, no auto-provision; mock-provider unit and HTTP tests |
 | 9.7 External secrets | Tested | HashiCorp Vault KV v2 paths, connect-time fetch, no DB credential, egress-checked, fail-closed; mock Vault and SSH tests |
 | 9.8 Metric retention/history | Implemented | SQLite samples, retention/cap, history API and chart |
 | 9.8 Threshold alerts | Implemented | In-app threshold rules; no external notifications |
 | 9.8 Notifications | Tested | Encrypted alert webhooks, egress-checked delivery, cooldown; delivery test |
-| 9.9 Additional OS | Tested | macOS/BSD read-only monitoring (host, load, memory, filesystems, network, uptime); portable collector and macOS/FreeBSD parser tests; Linux-only panels labelled unavailable |
+| 9.9 Additional OS | Tested | macOS/BSD read-only monitoring (host, load, memory, filesystems, network, uptime); macOS/FreeBSD fixtures plus a live macOS collector test; non-Linux write routes return `CAPABILITY_UNAVAILABLE` |
 
 ### Phase 9 notes
 

@@ -317,6 +317,10 @@ func (s *Server) requireServerWrite(next http.Handler) http.Handler {
 			writeError(w, r, NewAPIError(http.StatusForbidden, CodeAuthForbidden, "You have read-only access to this server."))
 			return
 		}
+		if s.servers.ReadOnlyHost(r.Context(), user.ID, chi.URLParam(r, "id")) {
+			writeError(w, r, NewAPIError(http.StatusForbidden, CodeCapabilityUnavailable, "This host is monitored read-only; write operations are unavailable."))
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
