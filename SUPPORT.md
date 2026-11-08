@@ -13,8 +13,9 @@ Drovik is a volunteer-maintained open-source project.
 
 1. Read the [README](README.md) and [development setup](docs/development/setup.md).
 2. Search existing issues and discussions.
-3. Check the [compatibility matrix](docs/product/PRD.md) and known limitations.
-4. Reproduce on the latest `main`.
+3. Check the [compatibility matrix](docs/development/compatibility.md) and the current release
+   notes ([beta](docs/status/beta-notes.md) or [stable](docs/status/stable-notes.md)).
+4. Reproduce on the latest supported release.
 
 ## What we cannot support
 

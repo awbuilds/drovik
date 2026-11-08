@@ -124,3 +124,11 @@ func TestSystemdUnavailable(t *testing.T) {
 		t.Fatalf("expected ErrUnavailable, got %v", err)
 	}
 }
+
+func BenchmarkParseUnits(b *testing.B) {
+	for index := 0; index < b.N; index++ {
+		if units, _ := parseUnits(unitFixture, 100); len(units) != 2 {
+			b.Fatalf("unexpected units: %+v", units)
+		}
+	}
+}

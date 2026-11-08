@@ -170,3 +170,13 @@ func TestSignalValidation(t *testing.T) {
 func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
+
+func BenchmarkParseProcessLine(b *testing.B) {
+	now := time.Now().UTC()
+	line := "  4242     1 root      Ssl   1.5  2.3  40960   5000 /usr/sbin/sshd -D"
+	for index := 0; index < b.N; index++ {
+		if _, ok := parseProcessLine(line, now); !ok {
+			b.Fatal("expected a parsable process")
+		}
+	}
+}

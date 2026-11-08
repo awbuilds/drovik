@@ -286,6 +286,35 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
   SHA-256 checksums.
 - Beta limitations are listed in `docs/status/beta-notes.md`.
 
+
+## Phase 8 — Stable release and operational maturity
+
+| Area | Status | Evidence |
+|---|---|---|
+| Stable versioning and cadence | Implemented | `docs/development/release.md`, SemVer tags |
+| Compatibility matrix | Implemented | `docs/development/compatibility.md` |
+| Migration/rollback guidance | Implemented | `docs/development/backup-restore.md`, release runbook |
+| Automated release pipeline | Implemented | `.github/workflows/release.yml`; beta tag run |
+| Checksums and container publishing | Implemented | SHA-256 archives + GHCR image; no signing in MVP |
+| Security policy and disclosure | Implemented | `SECURITY.md`, supported-version table |
+| Code ownership | Implemented | `.github/CODEOWNERS` |
+| Performance/load validation | Partial | Parser benchmarks in `docs/development/performance.md`; no real-host load harness |
+| Upgrade/backup procedures | Implemented | Backup/restore and release docs |
+| Translation framework | Deferred | No community demand yet |
+
+### Phase 8 notes
+
+- Release artifacts carry version, commit and build-date metadata; stable tags also update the
+  `latest` container tag.
+- Checksums are published, but artifacts are not cryptographically signed yet.
+- Real-host load and distribution matrix validation remain ongoing operational work.
+
+## Phase 9 — Advanced server management (post-MVP)
+
+Deferred as a product decision. Planned candidates: Docker/Podman management, historical metrics,
+multi-user RBAC, file-based log browsing, resumable transfers and unit-file editing. Each requires a
+separate design and threat model before implementation.
+
 ## Later phases
 
 The remaining requirement groups are tracked in the PRD and will be added here when their phase

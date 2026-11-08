@@ -367,10 +367,12 @@ covered.
   and tested.
 - Phase 7: complete. Audit history UI/API, scoped audit queries, accessibility skip link,
   compatibility/troubleshooting/backup/security-testing docs and the release workflow are in place.
-- Phase 8: next. Stable release, migration/compatibility validation and operational maturity.
+- Phase 8: complete. Tag-driven release pipeline, stable release notes, versioned support policy,
+  release runbook and parser benchmarks are in place.
+- Phase 9 is post-MVP and deferred; its features require individual design and threat modeling.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
-- Read the latest handoff in `docs/handoffs/` before starting Phase 8.
+- Read the latest handoff in `docs/handoffs/` before starting any post-MVP work.
 
 ## Decision inheritance
 
