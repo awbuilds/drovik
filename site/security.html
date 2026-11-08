@@ -86,7 +86,7 @@
         <p class="lead">Drovik holds credentials for machines that matter. The design assumes the browser is untrusted, the network is hostile and a remote host can lie. The controls are enforced in the Go service, not in the React UI.</p>
       </div>
       <dl class="page-head__meta">
-        <div><dt>Applies to</dt><dd>v1.2.0</dd></div>
+        <div><dt>Applies to</dt><dd>v1.3.0</dd></div>
         <div><dt>Audit basis</dt><dd>v1.0.0 + v1.1.0</dd></div>
         <div><dt>Reviewed</dt><dd>8 November 2026</dd></div>
         <div><dt>Source</dt><dd>docs/security</dd></div>
@@ -289,8 +289,11 @@
             <h3>Snippets and the terminal</h3>
             <p>The terminal and user-authored snippets are arbitrary-command paths by design. Snippet values are shell-quoted, the substituted command is previewed, and a specific server must be confirmed before execution. Snippets run as the SSH user, never with hidden elevation. Access control is the security boundary — not a promise that a user-authored command is safe.</p>
 
-            <h3>Read-first diagnostics</h3>
-            <p>Storage, network, package and scheduled-task views are read-only. Destructive disk, firewall, interface, package and cron changes are intentionally absent until separately designed and threat-modeled.</p>
+            <h3>Destructive host operations</h3>
+            <p>Mount, format, partition, interface, address, route and firewall actions are disabled by default. When an operator enables <code>DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS</code>, they remain administrator-only, require CSRF and explicit confirmation, reject protected mountpoints and mounted devices, and are audited. Format and partition require typing the exact device. A wrong command can still destroy data or cut the host's connectivity; test on a disposable target.</p>
+
+            <h3>Credentials and identity</h3>
+            <p>SSH credentials are encrypted with AES-256-GCM unless an operator stores only a HashiCorp Vault KV v2 path; Vault secrets are fetched at connect time and never written to Drovik. Local TOTP secrets are encrypted and recovery codes are hashed. OIDC uses authorization-code + PKCE, checks the discovery issuer, and never auto-provisions or matches accounts by username: a signed-in user links an existing account explicitly.</p>
           </div>
 
           <div class="note note--warn mt-lg">
@@ -302,7 +305,7 @@
           <p class="label">06 / Audit record</p>
           <h2 id="audit-title">Two runs, twelve fixes, no clean bill of health.</h2>
           <div class="prose mt-md">
-            <p>Two source-first audit runs were completed on 8 November 2026. The first covered the <code>v1.0.0</code> tree and fixed five confirmed findings in <code>v1.0.1</code>. The second covered the Phase 9 tree at <code>v1.1.0</code> and fixed seven confirmed findings in <code>v1.2.0</code>, plus additional hardening. Further validation leads were recorded with non-destructive reproduction plans; they were not confirmed vulnerabilities and were not assigned severity. The full report and evidence live outside the repository; the public summary is in the audit note.</p>
+            <p>Two source-first audit runs were completed on 8 November 2026. The first covered the <code>v1.0.0</code> tree and fixed five confirmed findings in <code>v1.0.1</code>. The second covered the Phase 9 tree at <code>v1.1.0</code> and fixed seven confirmed findings in <code>v1.3.0</code>, plus additional hardening. Further validation leads were recorded with non-destructive reproduction plans; they were not confirmed vulnerabilities and were not assigned severity. The full report and evidence live outside the repository; the public summary is in the audit note.</p>
           </div>
 
           <p class="label mt-2xl">v1.0.1 / first run</p>
@@ -321,8 +324,8 @@
             </table>
           </div>
 
-          <p class="label mt-2xl">v1.2.0 / second run</p>
-          <div class="table-wrap mt-sm" tabindex="0" role="region" aria-label="Security fixes in v1.2.0">
+          <p class="label mt-2xl">v1.3.0 / second run</p>
+          <div class="table-wrap mt-sm" tabindex="0" role="region" aria-label="Security fixes in v1.3.0">
             <table class="table">
               <thead>
                 <tr><th scope="col">Severity</th><th scope="col">Issue</th><th scope="col">Fix</th></tr>
@@ -424,7 +427,7 @@
           <span class="logo__word">Drovik</span>
         </a>
         <p class="footer__desc">A self-hosted, agentless workspace for the Linux servers you actually run.</p>
-        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.2.0 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
+        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.3.0 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
       </div>
 
       <nav class="footer__col" aria-label="Product">
