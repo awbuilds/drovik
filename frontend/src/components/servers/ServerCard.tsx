@@ -1,4 +1,4 @@
-import { FolderTree, Pencil, Play, Server as ServerIcon, SquareTerminal, Trash2 } from 'lucide-react'
+import { FolderTree, Pencil, Play, Server as ServerIcon, SquareTerminal, Trash2, Users } from 'lucide-react'
 import type { Capabilities, Server } from '@/api/servers'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -11,9 +11,12 @@ interface ServerCardProps {
   server: Server
   capabilities?: Capabilities
   testing: boolean
+  canWrite: boolean
+  isAdmin: boolean
   onTest: () => void
   onTerminal: () => void
   onFiles: () => void
+  onAccess: () => void
   onEdit: () => void
   onDelete: () => void
 }
@@ -22,9 +25,12 @@ export function ServerCard({
   server,
   capabilities,
   testing,
+  canWrite,
+  isAdmin,
   onTest,
   onTerminal,
   onFiles,
+  onAccess,
   onEdit,
   onDelete,
 }: ServerCardProps) {
@@ -95,21 +101,27 @@ export function ServerCard({
       </CardContent>
 
       <CardFooter className="justify-between">
-        <Button size="sm" variant="outline" onClick={onTest} loading={testing}>
-          <Play className="h-3.5 w-3.5" aria-hidden="true" />
-          Test connection
-        </Button>
+        {canWrite ? (
+          <Button size="sm" variant="outline" onClick={onTest} loading={testing}>
+            <Play className="h-3.5 w-3.5" aria-hidden="true" />
+            Test connection
+          </Button>
+        ) : (
+          <Badge variant="outline">read-only access</Badge>
+        )}
         <div className="flex items-center gap-1">
-          <Tooltip label="Open terminal">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onTerminal}
-              aria-label={`Open terminal for ${server.display_name}`}
-            >
-              <SquareTerminal className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
-          </Tooltip>
+          {canWrite ? (
+            <Tooltip label="Open terminal">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onTerminal}
+                aria-label={`Open terminal for ${server.display_name}`}
+              >
+                <SquareTerminal className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+          ) : null}
           <Tooltip label="Browse files">
             <Button
               variant="ghost"
@@ -120,27 +132,43 @@ export function ServerCard({
               <FolderTree className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>
           </Tooltip>
-          <Tooltip label="Edit server">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onEdit}
-              aria-label={`Edit ${server.display_name}`}
-            >
-              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip label="Delete server">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onDelete}
-              aria-label={`Delete ${server.display_name}`}
-              className="hover:text-rose-400"
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
-          </Tooltip>
+          {isAdmin ? (
+            <Tooltip label="Manage access">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onAccess}
+                aria-label={`Manage access to ${server.display_name}`}
+              >
+                <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+          ) : null}
+          {isAdmin ? (
+            <>
+              <Tooltip label="Edit server">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onEdit}
+                  aria-label={`Edit ${server.display_name}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </Tooltip>
+              <Tooltip label="Delete server">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onDelete}
+                  aria-label={`Delete ${server.display_name}`}
+                  className="hover:text-rose-400"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </Tooltip>
+            </>
+          ) : null}
         </div>
       </CardFooter>
     </Card>

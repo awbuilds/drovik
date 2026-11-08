@@ -210,3 +210,30 @@ func TestLoadRejectsInvalidOperationsConfiguration(t *testing.T) {
 		t.Fatal("expected a negative log line limit to be rejected")
 	}
 }
+
+func TestLoadAdvancedConfiguration(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_ADVANCED_TIMEOUT"] = "7s"
+	env["DROVIK_DOCKER_MAX_CONTAINERS"] = "42"
+	env["DROVIK_SNIPPET_MAX_COMMAND_BYTES"] = "4096"
+	env["DROVIK_METRICS_RETENTION"] = "48h"
+	env["DROVIK_METRICS_MAX_SAMPLES"] = "5000"
+	cfg, err := load(lookupFrom(env))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.AdvancedTimeout != 7*time.Second || cfg.DockerMaxContainers != 42 || cfg.SnippetMaxCommandBytes != 4096 {
+		t.Fatalf("unexpected advanced config: %+v", cfg)
+	}
+	if cfg.MetricsRetention != 48*time.Hour || cfg.MetricsMaxSamples != 5000 {
+		t.Fatalf("unexpected metrics config: %s %d", cfg.MetricsRetention, cfg.MetricsMaxSamples)
+	}
+}
+
+func TestLoadRejectsInvalidAdvancedConfiguration(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_METRICS_RETENTION"] = "0s"
+	if _, err := load(lookupFrom(env)); err == nil {
+		t.Fatal("expected zero retention to be rejected")
+	}
+}

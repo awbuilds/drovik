@@ -82,6 +82,8 @@ func newMonitoringTestEnv(t *testing.T) *monitoringTestEnv {
 	serverService := servers.NewService(
 		cfg,
 		storage.NewServerRepository(db),
+		users,
+		storage.NewAssignmentRepository(db),
 		known,
 		storage.NewCapabilitiesRepository(db),
 		cipher,

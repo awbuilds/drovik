@@ -104,6 +104,88 @@ func (r *ServerRepository) ListByOwner(ctx context.Context, ownerID string) ([]S
 	return servers, nil
 }
 
+func (r *ServerRepository) ListAll(ctx context.Context) ([]Server, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, owner_user_id, display_name, host, port, username, auth_method,
+		       encrypted_secret, secret_nonce, secret_version,
+		       encrypted_passphrase, passphrase_nonce, passphrase_version,
+		       tags, notes, created_at, updated_at, last_connected_at, is_active
+		FROM servers WHERE is_active = 1
+		ORDER BY display_name COLLATE NOCASE`)
+	if err != nil {
+		return nil, fmt.Errorf("list all servers: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	return scanServerRows(rows)
+}
+
+func (r *ServerRepository) ListAccessible(ctx context.Context, userID string) ([]Server, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, owner_user_id, display_name, host, port, username, auth_method,
+		       encrypted_secret, secret_nonce, secret_version,
+		       encrypted_passphrase, passphrase_nonce, passphrase_version,
+		       tags, notes, created_at, updated_at, last_connected_at, is_active
+		FROM servers
+		WHERE is_active = 1
+		  AND (owner_user_id = ? OR id IN (SELECT server_id FROM server_assignments WHERE user_id = ?))
+		ORDER BY display_name COLLATE NOCASE`, userID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list accessible servers: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	return scanServerRows(rows)
+}
+
+func scanServerRows(rows *sql.Rows) ([]Server, error) {
+	servers := make([]Server, 0, 16)
+	for rows.Next() {
+		server, err := scanServer(rows)
+		if err != nil {
+			return nil, err
+		}
+		servers = append(servers, *server)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate servers: %w", err)
+	}
+	return servers, nil
+}
+
+func (r *ServerRepository) UpdateByID(ctx context.Context, server Server) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE servers SET
+			display_name = ?, host = ?, port = ?, username = ?, auth_method = ?,
+			encrypted_secret = ?, secret_nonce = ?, secret_version = ?,
+			encrypted_passphrase = ?, passphrase_nonce = ?, passphrase_version = ?,
+			tags = ?, notes = ?, updated_at = ?, is_active = ?
+		WHERE id = ?`,
+		server.DisplayName, server.Host, server.Port, server.Username, server.AuthMethod,
+		server.EncryptedSecret, server.SecretNonce, server.SecretVersion,
+		nullableText(server.EncryptedPassphrase), nullableText(server.PassphraseNonce),
+		nullableInt(server.PassphraseVersion), server.Tags, server.Notes,
+		formatTime(server.UpdatedAt), boolToInt(server.IsActive), server.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update server by id: %w", err)
+	}
+	return nil
+}
+
+func (r *ServerRepository) DeleteByID(ctx context.Context, id string) error {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM servers WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete server by id: %w", err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count deleted servers: %w", err)
+	}
+	if deleted == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (r *ServerRepository) GetByID(ctx context.Context, id string) (*Server, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id, owner_user_id, display_name, host, port, username, auth_method,

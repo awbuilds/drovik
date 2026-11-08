@@ -369,7 +369,11 @@ covered.
   compatibility/troubleshooting/backup/security-testing docs and the release workflow are in place.
 - Phase 8: complete. Tag-driven release pipeline, stable release notes, versioned support policy,
   release runbook and parser benchmarks are in place.
-- Phase 9 is post-MVP and deferred; its features require individual design and threat modeling.
+- Phase 9: complete for the read-first advanced-management scope. Docker inspection/actions, storage,
+  network, package and scheduled-task inspection, snippets, local users/server assignments, metric
+  retention/history and in-app threshold alerts are implemented and tested. Destructive host
+  changes, OIDC/MFA, external notifications and non-Linux support remain deferred with their own
+  threat-model requirements.
 - Security audit 2026-11-08 complete: five confirmed findings fixed in `v1.0.1`; twelve leads and
   their validation plans are recorded outside the repository and summarized in
   `docs/security/audit-2026-11-08.md`.

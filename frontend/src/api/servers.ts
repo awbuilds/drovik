@@ -15,6 +15,7 @@ export interface Server {
   updated_at: string
   last_connected_at?: string | null
   is_active: boolean
+  access_level?: 'read' | 'write'
 }
 
 export interface HostKeyInfo {
@@ -95,4 +96,44 @@ export function trustHostKey(id: string, input: TrustHostKeyInput, csrf: string)
 
 export function getServerCapabilities(id: string, signal?: AbortSignal): Promise<Capabilities> {
   return apiRequest<Capabilities>(`/api/v1/servers/${id}/capabilities`, { signal })
+}
+
+export interface ServerAssignment {
+  user_id: string
+  access_level: 'read' | 'write'
+  created_at: string
+}
+
+export function listServerAssignments(
+  serverId: string,
+  signal?: AbortSignal,
+): Promise<{ assignments: ServerAssignment[] }> {
+  return apiRequest<{ assignments: ServerAssignment[] }>(
+    `/api/v1/servers/${serverId}/access`,
+    { signal },
+  )
+}
+
+export function setServerAssignment(
+  serverId: string,
+  userId: string,
+  accessLevel: 'read' | 'write',
+  csrf: string,
+): Promise<void> {
+  return apiRequest<void>(`/api/v1/servers/${serverId}/access/${userId}`, {
+    method: 'PUT',
+    csrf,
+    body: { access_level: accessLevel },
+  })
+}
+
+export function removeServerAssignment(
+  serverId: string,
+  userId: string,
+  csrf: string,
+): Promise<void> {
+  return apiRequest<void>(`/api/v1/servers/${serverId}/access/${userId}`, {
+    method: 'DELETE',
+    csrf,
+  })
 }

@@ -28,6 +28,9 @@ tags:
   - name: Services
   - name: Logs
   - name: Activity
+  - name: Users
+  - name: Advanced
+  - name: Snippets
   - name: Terminal
   - name: System
 
@@ -1057,6 +1060,348 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/ValidationError"
+
+  /api/v1/users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List local users (administrator)
+      security: [{cookieAuth: []}]
+      responses:
+        "200":
+          description: Users
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a local user (administrator)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, role]
+              properties:
+                username: {type: string}
+                password: {type: string, format: password}
+                role: {type: string, enum: [admin, operator, read_only]}
+      responses:
+        "201": {description: Created}
+        "403": {$ref: "#/components/responses/Forbidden"}
+
+  /api/v1/users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Change role or active state (administrator)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: {type: string, enum: [admin, operator, read_only]}
+                is_active: {type: boolean}
+      responses:
+        "200": {description: Updated}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {description: Last active administrator guard}
+    delete:
+      tags: [Users]
+      operationId: deleteUser
+      summary: Delete a local user (administrator)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "204": {description: Deleted}
+        "409": {description: Self-delete or last administrator guard}
+
+  /api/v1/users/{id}/password:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: [Users]
+      operationId: resetUserPassword
+      summary: Reset a local password and revoke sessions (administrator)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: {type: string, format: password}
+      responses:
+        "204": {description: Password reset}
+        "403": {$ref: "#/components/responses/Forbidden"}
+
+  /api/v1/servers/{id}/access:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    get:
+      tags: [Users]
+      operationId: listServerAssignments
+      summary: List server assignments (administrator)
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Assignments}
+        "403": {$ref: "#/components/responses/Forbidden"}
+
+  /api/v1/servers/{id}/access/{userID}:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+      - name: userID
+        in: path
+        required: true
+        schema: {type: string}
+    put:
+      tags: [Users]
+      operationId: setServerAssignment
+      summary: Grant read or write access (administrator)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [access_level]
+              properties:
+                access_level: {type: string, enum: [read, write]}
+      responses:
+        "204": {description: Assignment saved}
+    delete:
+      tags: [Users]
+      operationId: removeServerAssignment
+      summary: Remove a server assignment (administrator)
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "204": {description: Assignment removed}
+
+  /api/v1/servers/{id}/docker:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    get:
+      tags: [Advanced]
+      operationId: inspectDocker
+      summary: List Docker containers and images
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Docker overview}
+        "422": {$ref: "#/components/responses/ValidationError"}
+
+  /api/v1/servers/{id}/docker/{container}/action:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+      - name: container
+        in: path
+        required: true
+        schema: {type: string, pattern: '^[a-f0-9]{12,64}$'}
+    post:
+      tags: [Advanced]
+      operationId: dockerAction
+      summary: Start, stop, restart or remove a container
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: {type: string, enum: [start, stop, restart, remove]}
+      responses:
+        "204": {description: Action completed}
+        "403": {$ref: "#/components/responses/Forbidden"}
+
+  /api/v1/servers/{id}/storage-tools:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    get:
+      tags: [Advanced]
+      operationId: inspectStorage
+      summary: Read block devices, capacity and inode usage
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Storage overview}
+  /api/v1/servers/{id}/network-tools:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    get:
+      tags: [Advanced]
+      operationId: inspectNetwork
+      summary: Read interfaces, routes and listeners
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Network overview}
+  /api/v1/servers/{id}/packages:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    get:
+      tags: [Advanced]
+      operationId: inspectPackages
+      summary: Read installed packages
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Package overview}
+  /api/v1/servers/{id}/schedules:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    get:
+      tags: [Advanced]
+      operationId: inspectSchedules
+      summary: Read cron entries and systemd timers
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Schedule overview}
+
+  /api/v1/servers/{id}/history:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    get:
+      tags: [Advanced]
+      operationId: getMetricHistory
+      summary: Get retained metric samples and alert state
+      security: [{cookieAuth: []}]
+      parameters:
+        - name: range
+          in: query
+          schema: {type: string, enum: [1h, 24h, 7d, 30d], default: 1h}
+      responses:
+        "200": {description: History}
+  /api/v1/servers/{id}/alerts:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    get:
+      tags: [Advanced]
+      operationId: listAlertRules
+      summary: List in-app threshold rules
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Rules}
+  /api/v1/servers/{id}/alerts/{ruleID}:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+      - name: ruleID
+        in: path
+        required: true
+        schema: {type: string}
+    put:
+      tags: [Advanced]
+      operationId: saveAlertRule
+      summary: Create or update an in-app threshold rule
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Saved}
+    delete:
+      tags: [Advanced]
+      operationId: deleteAlertRule
+      summary: Delete an in-app threshold rule
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "204": {description: Deleted}
+
+  /api/v1/snippets:
+    get:
+      tags: [Snippets]
+      operationId: listSnippets
+      summary: List the current user's snippets
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Snippets}
+    post:
+      tags: [Snippets]
+      operationId: createSnippet
+      summary: Create a command snippet
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "201": {description: Created}
+  /api/v1/snippets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: [Snippets]
+      operationId: getSnippet
+      summary: Get a snippet
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Snippet}
+    patch:
+      tags: [Snippets]
+      operationId: updateSnippet
+      summary: Update a snippet
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Updated}
+    delete:
+      tags: [Snippets]
+      operationId: deleteSnippet
+      summary: Delete a snippet
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "204": {description: Deleted}
+  /api/v1/snippets/{id}/preview:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: [Snippets]
+      operationId: previewSnippet
+      summary: Render the fully substituted command
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200": {description: Preview}
+  /api/v1/servers/{id}/snippets/{snippet}/run:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+      - name: snippet
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: [Snippets]
+      operationId: runSnippet
+      summary: Execute a snippet after explicit confirmation
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirm]
+              properties:
+                values: {type: object, additionalProperties: {type: string}}
+                confirm: {type: boolean}
+      responses:
+        "200": {description: Execution result}
+        "403": {$ref: "#/components/responses/Forbidden"}
 
 components:
   securitySchemes:

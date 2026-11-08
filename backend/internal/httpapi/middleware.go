@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/awbuilds/drovik/backend/internal/auth"
 	"github.com/awbuilds/drovik/backend/internal/security"
 )
@@ -262,4 +264,59 @@ func newRequestID() string {
 		return strings.Repeat("0", 32)
 	}
 	return hex.EncodeToString(raw)
+}
+
+func (s *Server) requireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := CurrentUser(r.Context())
+		if user == nil || user.Role != "admin" || !user.IsActive {
+			writeError(w, r, NewAPIError(http.StatusForbidden, CodeAuthForbidden, "Administrator role required."))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireWriteAccess blocks roles that are intentionally read-only from any
+// server-scoped mutation, terminal, snippet execution or transfer.
+func (s *Server) requireWriteAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := CurrentUser(r.Context())
+		if user == nil || !user.IsActive {
+			writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthRequired, "Authentication required."))
+			return
+		}
+		if user.Role == "read_only" {
+			writeError(w, r, NewAPIError(http.StatusForbidden, CodeAuthForbidden, "This account has read-only access."))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireServerWrite enforces the effective per-server access level. Account
+// role and server assignment are both considered; a read-only assignment
+// cannot perform mutations even if the account is an operator.
+func (s *Server) requireServerWrite(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := CurrentUser(r.Context())
+		if user == nil || !user.IsActive {
+			writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthRequired, "Authentication required."))
+			return
+		}
+		if user.Role == "read_only" {
+			writeError(w, r, NewAPIError(http.StatusForbidden, CodeAuthForbidden, "This account has read-only access."))
+			return
+		}
+		level, err := s.servers.AccessLevel(r.Context(), user.ID, chi.URLParam(r, "id"))
+		if err != nil {
+			writeError(w, r, NewAPIError(http.StatusForbidden, CodeAuthForbidden, "You do not have write access to this server."))
+			return
+		}
+		if level != "write" {
+			writeError(w, r, NewAPIError(http.StatusForbidden, CodeAuthForbidden, "You have read-only access to this server."))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

@@ -61,6 +61,7 @@ type serverResponse struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 	LastConnectedAt *time.Time `json:"last_connected_at,omitempty"`
 	IsActive        bool       `json:"is_active"`
+	AccessLevel     string     `json:"access_level,omitempty"`
 }
 
 type connectionTestResponse struct {
@@ -83,7 +84,11 @@ func (s *Server) handleListServers(w http.ResponseWriter, r *http.Request) {
 	}
 	response := make([]serverResponse, 0, len(list))
 	for _, server := range list {
-		response = append(response, toServerResponse(server))
+		item := toServerResponse(server)
+		if level, err := s.servers.AccessLevel(r.Context(), user.ID, server.ID); err == nil {
+			item.AccessLevel = level
+		}
+		response = append(response, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"servers": response})
 }
@@ -121,7 +126,11 @@ func (s *Server) handleGetServer(w http.ResponseWriter, r *http.Request) {
 		s.writeServerError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toServerResponse(*server))
+	item := toServerResponse(*server)
+	if level, err := s.servers.AccessLevel(r.Context(), user.ID, server.ID); err == nil {
+		item.AccessLevel = level
+	}
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (s *Server) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
@@ -171,8 +180,12 @@ func (s *Server) handleTestConnection(w http.ResponseWriter, r *http.Request) {
 		s.writeServerError(w, r, err)
 		return
 	}
+	item := toServerResponse(*server)
+	if level, err := s.servers.AccessLevel(r.Context(), user.ID, server.ID); err == nil {
+		item.AccessLevel = level
+	}
 	writeJSON(w, http.StatusOK, connectionTestResponse{
-		Server:       toServerResponse(*server),
+		Server:       item,
 		HostKey:      result.HostKey,
 		Capabilities: result.Capabilities,
 	})

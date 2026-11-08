@@ -18,6 +18,7 @@ import {
 import { getServerOverview } from '@/api/monitoring'
 import { listServers } from '@/api/servers'
 import { PageHeader } from '@/components/PageHeader'
+import { HistoryPanel } from '@/components/monitoring/HistoryPanel'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -552,12 +553,15 @@ export function MonitoringPage() {
             </CardContent>
           </Card>
 
+          <HistoryPanel serverId={serverId} />
+
           <div className="border-ink-700 bg-ink-900/60 flex gap-3 rounded-lg border p-4">
             <Database className="text-mint-400 mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <p className="text-ink-400 text-xs leading-5">
               Metrics are read from <span className="font-mono">/proc</span> and{' '}
               <span className="font-mono">df</span> over a short-lived SSH connection, cached per
-              host for the minimum interval and never stored as historical time series.
+              host for the minimum interval. A bounded local history is retained only when the
+              optional retention window is enabled.
             </p>
           </div>
         </>

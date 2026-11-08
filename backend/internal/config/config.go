@@ -75,6 +75,15 @@ type Config struct {
 	ServiceMaxUnits   int
 	LogMaxLines       int
 	LogMaxOutputBytes int
+
+	AdvancedTimeout        time.Duration
+	AdvancedMaxOutputBytes int
+	DockerMaxContainers    int
+	PackageMaxEntries      int
+	SnippetMaxCommandBytes int
+
+	MetricsRetention  time.Duration
+	MetricsMaxSamples int
 }
 
 func Load() (*Config, error) {
@@ -308,6 +317,38 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		return nil, errors.New("operations limits must be greater than zero")
 	}
 
+	advancedTimeout, err := parseDuration(lookup, "DROVIK_ADVANCED_TIMEOUT", 20*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	advancedMaxOutput, err := parseInt(lookup, "DROVIK_ADVANCED_MAX_OUTPUT_BYTES", 1<<20)
+	if err != nil {
+		return nil, err
+	}
+	dockerMaxContainers, err := parseInt(lookup, "DROVIK_DOCKER_MAX_CONTAINERS", 500)
+	if err != nil {
+		return nil, err
+	}
+	packageMaxEntries, err := parseInt(lookup, "DROVIK_PACKAGE_MAX_ENTRIES", 5000)
+	if err != nil {
+		return nil, err
+	}
+	snippetMaxCommand, err := parseInt(lookup, "DROVIK_SNIPPET_MAX_COMMAND_BYTES", 8192)
+	if err != nil {
+		return nil, err
+	}
+	metricsRetention, err := parseDuration(lookup, "DROVIK_METRICS_RETENTION", 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+	metricsMaxSamples, err := parseInt(lookup, "DROVIK_METRICS_MAX_SAMPLES", 20000)
+	if err != nil {
+		return nil, err
+	}
+	if advancedTimeout <= 0 || advancedMaxOutput <= 0 || dockerMaxContainers <= 0 || packageMaxEntries <= 0 || snippetMaxCommand <= 0 || metricsRetention <= 0 || metricsMaxSamples <= 0 {
+		return nil, errors.New("advanced management limits must be greater than zero")
+	}
+
 	maxSessionsPerUser, err := parseInt(lookup, "DROVIK_SSH_MAX_SESSIONS_PER_USER", 2)
 	if err != nil {
 		return nil, err
@@ -383,6 +424,13 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		ServiceMaxUnits:         serviceMaxUnits,
 		LogMaxLines:             logMaxLines,
 		LogMaxOutputBytes:       logMaxOutput,
+		AdvancedTimeout:         advancedTimeout,
+		AdvancedMaxOutputBytes:  advancedMaxOutput,
+		DockerMaxContainers:     dockerMaxContainers,
+		PackageMaxEntries:       packageMaxEntries,
+		SnippetMaxCommandBytes:  snippetMaxCommand,
+		MetricsRetention:        metricsRetention,
+		MetricsMaxSamples:       metricsMaxSamples,
 	}, nil
 }
 

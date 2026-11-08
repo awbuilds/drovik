@@ -21,6 +21,9 @@ func (s *Server) handleServerOverview(w http.ResponseWriter, r *http.Request) {
 		s.writeMonitoringError(w, r, err)
 		return
 	}
+	if !snapshot.Cached {
+		s.advanced.RecordSnapshot(r.Context(), snapshot)
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, snapshot)
 }
