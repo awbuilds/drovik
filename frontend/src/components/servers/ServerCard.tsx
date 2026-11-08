@@ -1,4 +1,4 @@
-import { Pencil, Play, Server as ServerIcon, SquareTerminal, Trash2 } from 'lucide-react'
+import { FolderTree, Pencil, Play, Server as ServerIcon, SquareTerminal, Trash2 } from 'lucide-react'
 import type { Capabilities, Server } from '@/api/servers'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -13,6 +13,7 @@ interface ServerCardProps {
   testing: boolean
   onTest: () => void
   onTerminal: () => void
+  onFiles: () => void
   onEdit: () => void
   onDelete: () => void
 }
@@ -23,6 +24,7 @@ export function ServerCard({
   testing,
   onTest,
   onTerminal,
+  onFiles,
   onEdit,
   onDelete,
 }: ServerCardProps) {
@@ -106,6 +108,16 @@ export function ServerCard({
               aria-label={`Open terminal for ${server.display_name}`}
             >
               <SquareTerminal className="h-3.5 w-3.5" aria-hidden="true" />
+            </Button>
+          </Tooltip>
+          <Tooltip label="Browse files">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onFiles}
+              aria-label={`Browse files on ${server.display_name}`}
+            >
+              <FolderTree className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>
           </Tooltip>
           <Tooltip label="Edit server">

@@ -117,6 +117,53 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
 - The session pool is bounded per user and globally; shutdown closes registered sessions.
 - Terminal content is never written to the database by default.
 
+
+## Phase 4 — SFTP file manager and editor
+
+| ID | Requirement | Status | Implementation / evidence |
+|---|---|---|---|
+| FILE-001 | Directory listing | Tested | `files.Service.List`; HTTP/service tests |
+| FILE-002 | Navigation | Implemented | Breadcrumbs and directory navigation |
+| FILE-003 | Metadata | Implemented | Name/type/size/mode/mtime/UID/GID |
+| FILE-004 | Sorting | Implemented | Frontend name/type/size/modified sorting |
+| FILE-005 | Hidden files | Implemented | Client-side dotfile toggle |
+| FILE-006 | Upload | Tested | Multipart streaming upload; HTTP test |
+| FILE-007 | Download | Tested | Streamed download; HTTP test |
+| FILE-008 | Upload progress/cancel | Implemented | XHR progress + abort signal |
+| FILE-009 | Download progress | Partial | Browser download manager; no in-app cancel |
+| FILE-010 | Create folder | Tested | `Mkdir`; HTTP test |
+| FILE-011 | Create file | Tested | `Touch`; HTTP test |
+| FILE-012 | Rename | Tested | `Rename`; service/HTTP tests |
+| FILE-013 | Move | Implemented | SFTP rename semantics |
+| FILE-014 | Delete / recursive guard | Tested | Recursive flag + bounded traversal; tests |
+| FILE-015 | Permissions inspection | Partial | Mode shown; chmod deferred |
+| FILE-016 | Text editor | Implemented | `FileEditorDialog` + bounded read/write |
+| FILE-017 | Explicit save | Implemented | Save writes only on action |
+| FILE-018 | Unsaved changes prompt | Implemented | Discard confirmation dialog |
+| FILE-019 | Editor size limit | Tested | `ErrTooLarge`; service test |
+| FILE-020 | Binary detection | Tested | NUL/UTF-8 check; service test |
+| FILE-021 | Transfer collision | Implemented | `409 FILE_CONFLICT` + overwrite confirmation |
+| FILE-022 | Path safety | Tested | Absolute-only normalization; invalid-path test |
+| FILE-023 | Symlink handling | Tested | Lstat, no follow for editor/recursive; test |
+| FILE-024 | Partial transfer | Implemented | Temp file + rename, cleanup on error |
+| FILE-025 | Permission feedback | Implemented | `SFTP_PERMISSION_DENIED` mapping |
+| FILE-026 | SFTP unavailable | Implemented | Typed `SFTP_UNAVAILABLE` error |
+| FILE-027 | No external upload | Implemented | Content stays in memory/stream |
+| FILE-028 | User-selected files | Implemented | Browser file input only |
+| FILE-029 | Refresh | Implemented | Refresh button |
+| FILE-030 | Stale editor detection | Tested | mtime + size check; `TestFilesHTTPFlow` stale case |
+
+### Phase 4 notes
+
+- All remote paths must be absolute; `path.Clean` normalizes them and the SFTP user's permissions
+  remain the authority. No shell is used.
+- Writes and uploads use a temporary remote file and rename to reduce partial-file exposure.
+- Recursive delete never follows symlinks and is bounded by entry count and depth.
+- Editor content is bounded by `DROVIK_SFTP_MAX_EDITOR_BYTES`; uploads by
+  `DROVIK_SFTP_MAX_UPLOAD_BYTES`.
+- Download progress is delegated to the browser's download manager; no in-app transfer job is
+  implemented.
+
 ## Later phases
 
 The remaining requirement groups are tracked in the PRD and will be added here when their phase
