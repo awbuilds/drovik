@@ -846,3 +846,63 @@ func TestSnippetImportExport(t *testing.T) {
 		t.Fatalf("expected bounded import rejection, got %v", err)
 	}
 }
+
+func TestManagedTaskEmptyAndSilentCrontab(t *testing.T) {
+	var staged string
+	installed := 0
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case command == "crontab -l":
+			return "", "no crontab for root\n", 1, true
+		case strings.HasPrefix(command, "crontab /tmp/drovik-crontab-"):
+			content, err := os.ReadFile(strings.TrimPrefix(command, "crontab "))
+			if err != nil {
+				return "", "read failed\n", 1, true
+			}
+			staged = string(content)
+			installed++
+			return "", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	ctx := context.Background()
+	result, err := service.CreateTask(ctx, env.User.ID, env.Server.ID, TaskInput{
+		Schedule: "*/5 * * * *", Command: "echo first task",
+	}, true)
+	if err != nil {
+		t.Fatalf("empty crontab CreateTask: %v", err)
+	}
+	if installed != 1 || !strings.Contains(staged, "# drovik-task:"+result.Task.ID) {
+		t.Fatalf("unexpected staged crontab: %q", staged)
+	}
+
+	silentEnv, silentService := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		if command == "crontab -l" {
+			return "", "", 1, true
+		}
+		if strings.HasPrefix(command, "crontab /tmp/drovik-crontab-") {
+			t.Fatal("a silent crontab read must not install anything")
+		}
+		return "", "", 0, false
+	})
+	if _, err := silentService.CreateTask(ctx, silentEnv.User.ID, silentEnv.Server.ID, TaskInput{
+		Schedule: "*/5 * * * *", Command: "echo should fail",
+	}, true); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("expected silent failure to fail closed, got %v", err)
+	}
+
+	truncatedEnv, truncatedService := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		if command == "crontab -l" {
+			return "0 3 * * * /backup\n[output truncated]\n", "", 0, true
+		}
+		if strings.HasPrefix(command, "crontab /tmp/drovik-crontab-") {
+			t.Fatal("a truncated crontab read must not install anything")
+		}
+		return "", "", 0, false
+	})
+	if _, err := truncatedService.CreateTask(ctx, truncatedEnv.User.ID, truncatedEnv.Server.ID, TaskInput{
+		Schedule: "*/5 * * * *", Command: "echo should fail",
+	}, true); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected truncated crontab rejection, got %v", err)
+	}
+}

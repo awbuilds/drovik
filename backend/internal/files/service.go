@@ -254,9 +254,9 @@ func (s *Service) WriteFile(ctx context.Context, ownerID, serverID, rawPath, tex
 			_ = client.Remove(temp)
 			return fmt.Errorf("preserve file mode: %w", err)
 		}
-		if err := client.Rename(temp, clean); err != nil {
+		if err := replaceFile(client, temp, clean); err != nil {
 			_ = client.Remove(temp)
-			return mapSFTPError(err)
+			return err
 		}
 		s.record(ctx, ownerID, serverID, "file.write", clean, "success", "")
 		return nil
@@ -320,7 +320,11 @@ func (s *Service) Rename(ctx context.Context, ownerID, serverID, fromRaw, toRaw 
 				return mapSFTPError(err)
 			}
 		}
-		if err := client.Rename(from, to); err != nil {
+		if overwrite {
+			if err := replaceFile(client, from, to); err != nil {
+				return err
+			}
+		} else if err := client.Rename(from, to); err != nil {
 			return mapSFTPError(err)
 		}
 		s.record(ctx, ownerID, serverID, "file.rename", from+" -> "+to, "success", "")
@@ -461,9 +465,9 @@ func (s *Service) Upload(ctx context.Context, ownerID, serverID, rawPath string,
 			_ = client.Remove(temp)
 			return fmt.Errorf("preserve file mode: %w", err)
 		}
-		if err := client.Rename(temp, clean); err != nil {
+		if err := replaceFile(client, temp, clean); err != nil {
 			_ = client.Remove(temp)
-			return mapSFTPError(err)
+			return err
 		}
 		s.record(ctx, ownerID, serverID, "file.upload", clean, "success", "")
 		return nil
@@ -605,6 +609,17 @@ func toEntry(directory string, info os.FileInfo) Entry {
 		entry.GID = stat.GID
 	}
 	return entry
+}
+
+// replaceFile performs an atomic overwrite. OpenSSH's standard SFTP rename
+// refuses to replace an existing target; the posix-rename extension is the
+// correct primitive for editor saves and uploads. Fail closed when the server
+// does not expose it rather than deleting the target first.
+func replaceFile(client *sftp.Client, oldPath, newPath string) error {
+	if err := client.PosixRename(oldPath, newPath); err != nil {
+		return fmt.Errorf("atomic replace failed: %w", mapSFTPError(err))
+	}
+	return nil
 }
 
 func mapSFTPError(err error) error {

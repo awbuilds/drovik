@@ -131,12 +131,21 @@ func (s *Service) DeleteTask(
 func (s *Service) readCrontab(ctx context.Context, client *ssh.Client) (string, error) {
 	output, stderr, err := s.run(ctx, client, "crontab -l")
 	if err != nil {
-		// crontab exits non-zero when the account has no crontab; any other
-		// diagnostic means the command is missing or inaccessible.
-		if strings.TrimSpace(stderr) == "" {
+		message := strings.TrimSpace(stderr)
+		// Only the explicit no-crontab diagnostic means the account has no
+		// entries. A silent failure (timeout, channel error or an unexpected
+		// implementation) must fail closed: overwriting an unknown crontab
+		// would delete existing jobs.
+		if strings.Contains(strings.ToLower(message), "no crontab for") {
 			return "", nil
 		}
+		if message == "" {
+			return "", fmt.Errorf("%w: crontab read failed without a diagnostic", ErrUnavailable)
+		}
 		return "", classify(stderr, err)
+	}
+	if strings.Contains(output, "[output truncated]") {
+		return "", fmt.Errorf("%w: the crontab is too large to edit safely", ErrInvalidTarget)
 	}
 	return output, nil
 }
