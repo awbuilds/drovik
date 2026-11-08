@@ -30,7 +30,7 @@ const (
 	maxOutputBytes  = 1 << 20
 )
 
-var unitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@:-]*\.service$`)
+const unitExpression = `^[A-Za-z0-9][A-Za-z0-9_.@:-]*\.service$`
 
 var ranges = map[string]string{
 	"":    "",
@@ -78,7 +78,8 @@ func (s *Service) Read(
 		return nil, ErrInvalidUnit
 	}
 	if unit != "" {
-		if !unitPattern.MatchString(unit) {
+		validUnit := regexp.MustCompile(unitExpression).MatchString(unit)
+		if !validUnit {
 			return nil, ErrInvalidUnit
 		}
 	}

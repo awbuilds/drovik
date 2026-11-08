@@ -41,7 +41,9 @@ const listCommand = `systemctl list-units --type=service --all --no-legend --no-
 printf '@@drovik-unit-files@@\n'
 systemctl list-unit-files --type=service --no-legend --no-pager`
 
-var unitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@:-]*\.service$`)
+const unitExpression = `^[A-Za-z0-9][A-Za-z0-9_.@:-]*\.service$`
+
+var unitPattern = regexp.MustCompile(unitExpression)
 
 type Unit struct {
 	Name        string `json:"name"`
@@ -167,7 +169,11 @@ func (s *Service) Action(
 	ctx context.Context,
 	ownerID, serverID, unitName, action string,
 ) (*ActionResult, error) {
-	if len(unitName) > 256 || !unitPattern.MatchString(unitName) {
+	if len(unitName) > 256 {
+		return nil, ErrInvalidUnit
+	}
+	validUnit := regexp.MustCompile(unitExpression).MatchString(unitName)
+	if !validUnit {
 		return nil, ErrInvalidUnit
 	}
 	if !validAction(action) {
