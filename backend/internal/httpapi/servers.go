@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -281,6 +282,9 @@ func (s *Server) writeServerError(w http.ResponseWriter, r *http.Request, err er
 		return
 	}
 
-	s.logger.Error("server operation failed", "error", err, "request_id", RequestID(r.Context()))
+	s.logger.Error("server operation failed",
+		"error_type", fmt.Sprintf("%T", err),
+		"request_id", RequestID(r.Context()),
+	)
 	writeError(w, r, NewAPIError(http.StatusBadGateway, CodeSSHConnectionFailed, "The SSH operation could not be completed."))
 }
