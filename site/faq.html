@@ -86,9 +86,9 @@
         <p class="lead">What Drovik does, what it deliberately will not do, and what you are responsible for when you run it. No agent, no account and no telemetry — but also no pretending that a privileged server tool is a toy.</p>
       </div>
       <dl class="page-head__meta">
-        <div><dt>Applies to</dt><dd>v1.2.0</dd></div>
-        <div><dt>Managed hosts</dt><dd>Linux only</dd></div>
-        <div><dt>Accounts</dt><dd>local users</dd></div>
+        <div><dt>Applies to</dt><dd>v1.3.0</dd></div>
+        <div><dt>Managed hosts</dt><dd>Linux full; macOS/BSD read-only</dd></div>
+        <div><dt>Accounts</dt><dd>local, MFA, OIDC</dd></div>
         <div><dt>License</dt><dd>AGPL-3.0-only</dd></div>
       </dl>
     </div>
@@ -125,8 +125,8 @@
               <p class="qa__a">No. Drovik acts as the SSH user you configure and never silently escalates. Remote permissions remain authoritative: if the account cannot read a file, restart a service or use Docker, the operation fails visibly. A Drovik administrator is still a privileged role for the servers assigned to that account.</p>
             </article>
             <article class="qa__item">
-              <h3 class="qa__q">Which Linux hosts are supported?</h3>
-              <p class="qa__a">The validated matrix includes Ubuntu Server 22.04/24.04 LTS, Debian 12, Rocky Linux 9, AlmaLinux 9 and Fedora Server 40+. Other current Linux distributions with the required tools are expected to work. The controller needs Linux <code>amd64</code> or <code>arm64</code> for the container or release archive. Windows and macOS managed hosts are not supported.</p>
+              <h3 class="qa__q">Which hosts are supported?</h3>
+              <p class="qa__a">Linux is the full-feature target: the validated matrix includes Ubuntu Server 22.04/24.04 LTS, Debian 12, Rocky Linux 9, AlmaLinux 9 and Fedora Server 40+. Other current Linux distributions with the required tools are expected to work. macOS and BSD get read-only monitoring (host, load, memory, filesystems, network and uptime); Linux-only panels are unavailable there. Windows is not supported. The controller needs Linux <code>amd64</code> or <code>arm64</code>.</p>
             </article>
             <article class="qa__item">
               <h3 class="qa__q">What does a host need?</h3>
@@ -138,11 +138,11 @@
             </article>
             <article class="qa__item">
               <h3 class="qa__q">Can it change disks, firewall, network, packages or cron?</h3>
-              <p class="qa__a">No. Storage, network, package and scheduled-task views are read-only diagnostics. Destructive host changes are intentionally absent until they are separately designed and threat-modeled. The terminal and snippets can still run commands as your SSH user; access to those features is the security boundary.</p>
+              <p class="qa__a">Packages and Drovik-managed cron entries are supported with validation, confirmation and audit. Disk, network and firewall changes are opt-in: they stay disabled until the operator sets <code>DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS=true</code>, and then require an administrator, CSRF, explicit confirmation and audit. Format and partition require typing the exact device; protected mountpoints and mounted devices are refused. These commands can still destroy data or cut off the host, so test on a disposable target.</p>
             </article>
             <article class="qa__item">
               <h3 class="qa__q">Does it keep metric history and raise alerts?</h3>
-              <p class="qa__a">Yes, within limits. The v1.1 line retains local metric samples for a configurable window (24 hours by default) with a hard sample cap, draw history charts and evaluate in-app threshold rules. There are no external notification channels and no long-term time-series platform. Treat it as a local operational aid, not an enterprise monitoring system.</p>
+              <p class="qa__a">Yes, within limits. Drovik retains local metric samples for a configurable window (24 hours by default) with a hard sample cap, draws history charts and evaluates in-app threshold rules. A rule can also deliver an encrypted webhook; there is no email, chat or pager integration and no long-term time-series platform. Treat it as a local operational aid, not an enterprise monitoring system.</p>
             </article>
           </div>
         </section>
@@ -170,11 +170,11 @@
             </article>
             <article class="qa__item">
               <h3 class="qa__q">Can several people use one instance?</h3>
-              <p class="qa__a">Yes. The v1.1 line adds local users; administrators can create accounts with administrator, operator or read-only roles and assign per-server read or write access. Owners and administrators retain write access; at least one administrator must remain. SSO, OIDC and MFA are not implemented.</p>
+              <p class="qa__a">Yes. Administrators create local accounts with administrator, operator or read-only roles and assign per-server read or write access; at least one administrator must remain. Local TOTP MFA is available. Optional OIDC sign-in links to a pre-existing local account and never auto-provisions users. HashiCorp Vault KV v2 can supply SSH credentials without storing the secret in Drovik.</p>
             </article>
             <article class="qa__item">
               <h3 class="qa__q">What can a read-only user actually do?</h3>
-              <p class="qa__a">Inspect the servers assigned to them. The backend blocks a PTY, file mutations, process and service actions, Docker actions, snippet execution and alert changes. The menu hiding a button is not the control; the server-side authorization check is.</p>
+              <p class="qa__a">Inspect the servers assigned to them. The backend blocks a PTY, file mutations, process, service, Docker and destructive host actions, snippet execution and alert changes. The menu hiding a button is not the control; the server-side authorization check is.</p>
             </article>
             <article class="qa__item">
               <h3 class="qa__q">Where does my data live?</h3>
@@ -198,15 +198,15 @@
             </article>
             <article class="qa__item">
               <h3 class="qa__q">What are the known limitations?</h3>
-              <p class="qa__a">Linux managed hosts only. Read-first host diagnostics; no destructive disk, network, firewall, package or cron changes. No OIDC/SSO/MFA. No external alert notifications. No resumable transfers or background transfer jobs. No systemd unit-file editing. SQLite allows one writer, so use local storage and stop Drovik for cold backups. Real-host validation is bounded by the documented matrix and automated fixtures.</p>
+              <p class="qa__a">Linux is the full-feature target; macOS/BSD are read-only monitoring and Windows is unsupported. Destructive disk/network/firewall actions are opt-in and can still destroy data or cut off a host. Identity is local or OIDC, and alerting stops at webhooks. There are no resumable transfers or background transfer jobs and no systemd unit-file editing. SQLite allows one writer, so use local storage and stop Drovik for cold backups. Real-host validation is bounded by the documented matrix and automated fixtures.</p>
             </article>
             <article class="qa__item">
               <h3 class="qa__q">Which browsers are supported?</h3>
               <p class="qa__a">Current Chrome, Firefox, Safari and Edge with ES2022, WebSocket and <code>ResizeObserver</code> support. The workspace is not designed for legacy browsers or embedded webviews with restricted storage and WebSocket behavior.</p>
             </article>
             <article class="qa__item">
-              <h3 class="qa__q">Is v1.2.0 production-ready?</h3>
-              <p class="qa__a">It is the current stable line: the Phase 9 advanced-management release plus a security patch after a second source-first audit. The first audit of v1.0.0 fixed five findings in v1.0.1; the second audit of the Phase 9 tree fixed seven findings in v1.2.0. It is volunteer-maintained and carries the documented limits above. Treat it as one more privileged tool: put it behind TLS, restrict who can reach it, use a strong administrator password and test your backups.</p>
+              <h3 class="qa__q">Is v1.3.0 production-ready?</h3>
+              <p class="qa__a">It is the current stable line: the Phase 9 advanced-management release plus a security patch after a second source-first audit. The first audit of v1.0.0 fixed five findings in v1.0.1; the second audit of the Phase 9 tree fixed seven findings in v1.3.0. It is volunteer-maintained and carries the documented limits above. Treat it as one more privileged tool: put it behind TLS, restrict who can reach it, use a strong administrator password and test your backups.</p>
             </article>
             <article class="qa__item">
               <h3 class="qa__q">What happens when a host is missing a tool?</h3>
@@ -287,7 +287,7 @@
           <span class="logo__word">Drovik</span>
         </a>
         <p class="footer__desc">A self-hosted, agentless workspace for the Linux servers you actually run.</p>
-        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.2.0 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
+        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.3.0 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
       </div>
 
       <nav class="footer__col" aria-label="Product">

@@ -84,7 +84,7 @@
         <p class="label">Terms of Service</p>
         <h1>The terms, in plain language.</h1>
         <p class="lead">Drovik is free, self-hosted software, not a service the project runs for you. These terms cover this website and the published software. The AGPL governs the code; your deployment and your data remain your responsibility.</p>
-        <p class="legal-updated">Effective 8 November 2026 · Applies to this website and to Drovik v1.2.0.</p>
+        <p class="legal-updated">Effective 8 November 2026 · Applies to this website and to Drovik v1.3.0.</p>
       </div>
       <dl class="page-head__meta">
         <div><dt>Software license</dt><dd>AGPL-3.0-only</dd></div>
@@ -165,7 +165,7 @@
           <li><strong>Terminal and snippets.</strong> These execute commands as your SSH user. Snippets preview and confirm a substituted command, but the operator remains responsible for the command's effect. Never store secrets in a snippet.</li>
           <li><strong>Process and service actions.</strong> Signals and service changes affect running systems. A confirmation dialog is not a guarantee of safety; the remote permissions and your review are.</li>
           <li><strong>File operations.</strong> Delete and overwrite operations change remote files. Drovik validates paths and guards recursion, but it cannot know which files are important to you.</li>
-          <li><strong>Read-first diagnostics.</strong> Storage, network, package and scheduled-task views are read-only. Destructive host changes are intentionally absent; do not assume the UI covers every administrative task.</li>
+          <li><strong>Destructive host operations.</strong> They are disabled by default and, when enabled, administrator-only and confirmed. They can destroy data or cut off a host. Do not assume the UI covers every administrative task or that a confirmation dialog makes an operation safe.</li>
         </ul>
 
         <h2 id="security-testing">7. Security testing</h2>
@@ -234,7 +234,7 @@
           <span class="logo__word">Drovik</span>
         </a>
         <p class="footer__desc">A self-hosted, agentless workspace for the Linux servers you actually run.</p>
-        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.2.0 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
+        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.3.0 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
       </div>
 
       <nav class="footer__col" aria-label="Product">

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Features — Drovik</title>
-  <meta name="description" content="Tour Drovik v1.2.0: strict SSH host-key trust, a real terminal, SFTP files, agentless health and history, process and systemd operations, Docker and host diagnostics, snippets, users and audit.">
+  <meta name="description" content="Tour Drovik v1.3.0: strict SSH host-key trust, a real terminal, SFTP files, agentless health and history, process and systemd operations, Docker and host diagnostics, snippets, users and audit.">
   <meta name="author" content="Abhijith Warrier">
   <meta name="theme-color" content="#07090c">
   <meta name="color-scheme" content="dark light">
@@ -20,7 +20,7 @@
   <meta property="og:site_name" content="Drovik">
   <meta property="og:locale" content="en_US">
   <meta property="og:title" content="Drovik features — every room in the workspace">
-  <meta property="og:description" content="Tour Drovik v1.2.0: strict SSH host-key trust, a real terminal, SFTP files, agentless health and history, process and systemd operations, Docker and host diagnostics, snippets, users and audit.">
+  <meta property="og:description" content="Tour Drovik v1.3.0: strict SSH host-key trust, a real terminal, SFTP files, agentless health and history, process and systemd operations, Docker and host diagnostics, snippets, users and audit.">
   <meta property="og:url" content="https://awbuilds.github.io/drovik/features.html">
   <meta property="og:image" content="https://awbuilds.github.io/drovik/assets/og.png">
   <meta property="og:image:width" content="1200">
@@ -28,7 +28,7 @@
   <meta property="og:image:alt" content="Drovik — a self-hosted, agentless Linux server workspace.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Drovik features — every room in the workspace">
-  <meta name="twitter:description" content="Tour Drovik v1.2.0: strict SSH host-key trust, a real terminal, SFTP files, agentless health and history, process and systemd operations, Docker and host diagnostics, snippets, users and audit.">
+  <meta name="twitter:description" content="Tour Drovik v1.3.0: strict SSH host-key trust, a real terminal, SFTP files, agentless health and history, process and systemd operations, Docker and host diagnostics, snippets, users and audit.">
   <meta name="twitter:image" content="https://awbuilds.github.io/drovik/assets/og.png">
   <script src="js/site.js" defer></script>
 </head>
@@ -86,7 +86,7 @@
         <p class="lead">Drovik is not a dashboard bolted onto a shell. It is one workspace with a shared server context, a real terminal, verified state and an audit trail that stays on your instance.</p>
       </div>
       <dl class="page-head__meta">
-        <div><dt>Release</dt><dd>v1.2.0</dd></div>
+        <div><dt>Release</dt><dd>v1.3.0</dd></div>
         <div><dt>License</dt><dd>AGPL-3.0-only</dd></div>
         <div><dt>Managed hosts</dt><dd>Linux · OpenSSH</dd></div>
         <div><dt>Agent</dt><dd>None</dd></div>
@@ -236,12 +236,13 @@
           <div class="feature__copy">
             <p class="label">Health, history &amp; alerts</p>
             <h2 id="health-title">Agentless health, with a memory.</h2>
-            <p>CPU, load, memory, filesystems, network counters and uptime come from <code>/proc</code> and the standard tools already on the host. v1.1.0 added configurable local samples and in-app threshold alerts — not a hosted monitoring platform.</p>
+            <p>CPU, load, memory, filesystems, network counters and uptime come from <code>/proc</code> on Linux and portable tools on macOS/BSD. Drovik keeps configurable local samples and evaluates in-app threshold alerts — not a hosted monitoring platform.</p>
             <ul class="feature__points">
               <li><strong>Two-sample rates.</strong> CPU and network deltas appear on the second sample; the first is honestly marked as a baseline.</li>
               <li><strong>Missing is missing.</strong> An unavailable collector is reported individually; the rest of the overview still renders.</li>
               <li><strong>Bounded local history.</strong> A configurable retention window, 24 hours by default, with a hard sample cap.</li>
-              <li><strong>In-app alerts only.</strong> Threshold rules are evaluated locally. There are no external notification channels.</li>
+              <li><strong>Alerts stay local by default.</strong> Threshold rules are evaluated in the app. An optional encrypted webhook can notify one external endpoint; there is no email, chat or pager integration.</li>
+              <li><strong>Read-only non-Linux.</strong> macOS and BSD report host, load, memory, filesystems, network and uptime; Linux-only panels are labelled unavailable.</li>
             </ul>
           </div>
           <div class="feature__visual">
@@ -272,7 +273,7 @@
               <li><strong>Enumerated signals.</strong> SIGTERM and SIGKILL only, after a PID identity check. No arbitrary signal strings.</li>
               <li><strong>No hidden elevation.</strong> Actions run as the SSH account; a permission failure is a visible failure.</li>
               <li><strong>State re-reads.</strong> systemd actions show the state the host reports after the request.</li>
-              <li><strong>No unit editing.</strong> Activation and inspection, not a unit-file editor or a package manager.</li>
+              <li><strong>No unit editing.</strong> Activation and inspection, not a unit-file editor or a general package-configuration manager.</li>
             </ul>
           </div>
           <div class="feature__visual">
@@ -292,13 +293,14 @@
         <section class="feature feature--reverse" id="advanced" aria-labelledby="advanced-title">
           <div class="feature__copy">
             <p class="label">Advanced host tools</p>
-            <h2 id="advanced-title">Docker and diagnostics, read-first.</h2>
-            <p>Docker is reached through the host's CLI over SSH — never a mounted socket. Containers can be inspected, logged, started, stopped, restarted or removed by validated ID. Storage, network, package and scheduled-task views are read-only.</p>
+            <h2 id="advanced-title">Docker and host operations, with the risk visible.</h2>
+            <p>Docker is reached through the host's CLI over SSH — never a mounted socket. Containers can be inspected, logged, started, stopped, restarted or removed by validated ID. Package lifecycle and Drovik-managed cron tasks are enumerated and audited. Destructive storage and network commands are opt-in, administrator-only and require explicit confirmation.</p>
             <ul class="feature__points">
               <li><strong>Potentially root-equivalent.</strong> The UI says so. Docker actions are confirmed, authorized and audited.</li>
               <li><strong>Enumerated actions.</strong> Start, stop, restart and remove; no arbitrary Docker commands and no Compose or Kubernetes manager.</li>
-              <li><strong>Read-only diagnostics.</strong> Disks, interfaces, package lists and timers are inspected; destructive host changes are deliberately absent.</li>
-              <li><strong>Read-only users are blocked.</strong> A read assignment cannot run a container action.</li>
+              <li><strong>Destructive changes are opt-in.</strong> Mount/format/partition and interface/route/firewall actions stay disabled until the operator sets <code>DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS=true</code>.</li>
+              <li><strong>Typed confirmation.</strong> Format and partition require the exact device name; protected mountpoints and mounted devices are refused.</li>
+              <li><strong>Read-only users are blocked.</strong> A read assignment cannot run a container or host action.</li>
             </ul>
           </div>
           <div class="feature__visual">
@@ -321,10 +323,10 @@
                   </tbody>
                 </table>
                 <div class="diag-chips">
-                  <span class="diag-chip">storage <span>read-only</span></span>
-                  <span class="diag-chip">network <span>read-only</span></span>
-                  <span class="diag-chip">packages <span>read-only</span></span>
-                  <span class="diag-chip">schedules <span>read-only</span></span>
+                  <span class="diag-chip">storage <span>guarded</span></span>
+                  <span class="diag-chip">network <span>guarded</span></span>
+                  <span class="diag-chip">packages <span>audited</span></span>
+                  <span class="diag-chip">schedules <span>managed</span></span>
                 </div>
                 <div class="verified-line"><span class="status-dot status-dot--ok"></span> No Docker socket mounted into Drovik.</div>
               </div>
@@ -396,10 +398,10 @@ journalctl -u {{service}} -n 20 --no-pager</code></pre>
             <h2 id="limits-title">What Drovik still refuses to do.</h2>
             <p>These are not footnotes. They are the boundary that keeps the tool reviewable and its privilege model understandable.</p>
             <ul class="feature__points">
-              <li><strong>Linux only.</strong> Windows and macOS managed hosts are not supported; Linux <code>/proc</code> and standard tools are assumed.</li>
-              <li><strong>Read-first host diagnostics.</strong> No destructive disk, network, firewall, package or cron changes.</li>
-              <li><strong>No enterprise identity.</strong> Local accounts only; OIDC/SSO and MFA are deferred.</li>
-              <li><strong>No external alerting.</strong> Threshold alerts stay in the app. There is no pager, email or webhook integration.</li>
+              <li><strong>Linux first.</strong> Linux gets the full feature set. macOS and BSD get read-only monitoring; Windows is not supported.</li>
+              <li><strong>Destructive changes are opt-in.</strong> Disk, network and firewall actions are disabled by default, administrator-only and confirmed. A wrong command can still destroy data or cut the host off.</li>
+              <li><strong>Identity is local or OIDC.</strong> Local MFA is available. OIDC links to a pre-existing account and never auto-provisions users. Vault can supply SSH credentials without storing them.</li>
+              <li><strong>Alerting stops at webhooks.</strong> Threshold alerts stay in the app or go to an encrypted webhook; there is no email, chat or pager integration.</li>
               <li><strong>No resumable transfers or unit editing.</strong> Transfers stream; systemd actions are enumerated.</li>
               <li><strong>SQLite single-writer.</strong> Use local storage and stop Drovik for cold backups; forward-only migrations require a backup.</li>
             </ul>
@@ -451,7 +453,7 @@ journalctl -u {{service}} -n 20 --no-pager</code></pre>
           <span class="logo__word">Drovik</span>
         </a>
         <p class="footer__desc">A self-hosted, agentless workspace for the Linux servers you actually run.</p>
-        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.2.0 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
+        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.3.0 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
       </div>
 
       <nav class="footer__col" aria-label="Product">
