@@ -40,6 +40,10 @@ web session into unbounded root-equivalent authority by accident.
   a `read` assignment both block terminal, process/service actions, file mutations, Docker actions,
   snippet execution and alert mutations. At least one active administrator must remain; a user
   cannot delete themselves.
+- **Alert webhooks:** each threshold rule may carry an HTTPS/HTTP webhook. URLs are encrypted at
+  rest, resolved once through the egress policy (blocking loopback/link-local/metadata by default),
+  delivered with a bounded timeout, no redirects and a 15-minute per-rule cooldown. Delivery
+  failures are logged and retried after the cooldown. Email/paging integrations remain future work.
 - **History:** optional local SQLite samples are retained for a configured window and sample cap.
   Existing snapshots are recorded on non-cached overview requests. Threshold rules are evaluated
   in-app; external notification channels are not implemented. The UI states that this is not an

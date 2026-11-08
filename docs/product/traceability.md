@@ -341,7 +341,7 @@ separate design and threat model before implementation.
 | 9.7 OIDC/SSO/external secrets | Out of scope | Federated identity needs a separate threat model |
 | 9.8 Metric retention/history | Implemented | SQLite samples, retention/cap, history API and chart |
 | 9.8 Threshold alerts | Implemented | In-app threshold rules; no external notifications |
-| 9.8 Notifications | In progress | Alert webhook delivery is the next increment |
+| 9.8 Notifications | Tested | Encrypted alert webhooks, egress-checked delivery, cooldown; delivery test |
 | 9.9 Additional OS | Out of scope | Final Phase 9 scope (ADR 0013); non-Linux targets need a new support matrix |
 
 ### Phase 9 notes

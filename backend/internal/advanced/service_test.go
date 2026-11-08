@@ -2,16 +2,20 @@ package advanced
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/awbuilds/drovik/backend/internal/monitoring"
+	"github.com/awbuilds/drovik/backend/internal/secrets"
 	"github.com/awbuilds/drovik/backend/internal/storage"
 	"github.com/awbuilds/drovik/backend/internal/testenv"
 	"github.com/awbuilds/drovik/backend/internal/testssh"
@@ -31,11 +35,16 @@ func newAdvancedEnv(t *testing.T, hook func(string) (string, string, int, bool))
 	}
 	t.Cleanup(func() { _ = env.Close() })
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cipher, err := secrets.New([]byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("secrets.New: %v", err)
+	}
 	service := NewService(
 		env.Cfg, env.ServerService,
 		storage.NewSnippetRepository(env.DB),
 		storage.NewMetricRepository(env.DB),
 		storage.NewAlertRepository(env.DB),
+		cipher,
 		env.Audit, logger,
 	)
 	return env, service
@@ -530,5 +539,60 @@ func TestDockerActionCancellationKeepsAudit(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected a docker.action audit row for the delivered command")
+	}
+}
+
+func TestAlertWebhookDelivery(t *testing.T) {
+	received := make(chan webhookPayload, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload webhookPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
+			received <- payload
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	env, service := newAdvancedEnv(t, nil)
+	ctx := context.Background()
+	rule, err := service.SaveAlertRule(ctx, env.User.ID, env.Server.ID, "", AlertRuleInput{
+		Metric: "disk_percent", Comparator: "gte", Threshold: 80, Enabled: true,
+		WebhookURL: server.URL + "/hook",
+	})
+	if err != nil {
+		t.Fatalf("SaveAlertRule: %v", err)
+	}
+	if rule.WebhookEncrypted == "" {
+		t.Fatal("expected an encrypted webhook secret")
+	}
+	if _, err := service.SaveAlertRule(ctx, env.User.ID, env.Server.ID, "", AlertRuleInput{
+		Metric: "cpu_percent", Comparator: "gt", Threshold: 1, Enabled: true,
+		WebhookURL: "file:///etc/passwd",
+	}); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected invalid webhook scheme rejection, got %v", err)
+	}
+
+	snapshot := &monitoring.Snapshot{
+		ServerID: env.Server.ID, CollectedAt: time.Now().UTC(),
+		CPU: monitoring.CPUMetrics{Available: true}, Memory: monitoring.MemoryMetrics{Available: true},
+		Load:        monitoring.LoadAverage{Available: true, One: 0.2},
+		Filesystems: []monitoring.Filesystem{{UsedPercent: ptr(92)}}, FilesystemsAvailable: true,
+		NetworkAvailable: true,
+	}
+	service.RecordSnapshot(ctx, snapshot)
+	select {
+	case payload := <-received:
+		if payload.RuleID != rule.ID || payload.Metric != "disk_percent" || payload.Value != 92 {
+			t.Fatalf("unexpected webhook payload: %+v", payload)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("webhook was not delivered")
+	}
+	// A second snapshot inside the cooldown must not notify again.
+	service.RecordSnapshot(ctx, snapshot)
+	select {
+	case payload := <-received:
+		t.Fatalf("cooldown was not respected: %+v", payload)
+	case <-time.After(300 * time.Millisecond):
 	}
 }

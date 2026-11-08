@@ -1306,6 +1306,22 @@ paths:
       summary: Create or update an in-app threshold rule
       security: [{cookieAuth: []}]
       parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metric, comparator, threshold, enabled]
+              properties:
+                metric: {type: string, enum: [cpu_percent, memory_percent, disk_percent, load_one]}
+                comparator: {type: string, enum: [gt, gte]}
+                threshold: {type: number}
+                enabled: {type: boolean}
+                webhook_url:
+                  type: string
+                  format: uri
+                  description: Optional external webhook; stored encrypted and egress-checked.
       responses:
         "200": {description: Saved}
     delete:

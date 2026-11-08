@@ -57,6 +57,7 @@ export function HistoryPanel({ serverId, canWrite }: { serverId: string; canWrit
   const [metric, setMetric] = useState('cpu_percent')
   const [comparator, setComparator] = useState('gt')
   const [threshold, setThreshold] = useState('85')
+  const [webhook, setWebhook] = useState('')
   const [busy, setBusy] = useState(false)
 
   const historyQuery = useQuery({
@@ -85,7 +86,12 @@ export function HistoryPanel({ serverId, canWrite }: { serverId: string; canWrit
     if (!Number.isFinite(value)) return
     setBusy(true)
     try {
-      await saveAlertRule(serverId, '', { metric, comparator, threshold: value, enabled: true }, csrfToken)
+      await saveAlertRule(
+        serverId,
+        '',
+        { metric, comparator, threshold: value, enabled: true, webhook_url: webhook.trim() || undefined },
+        csrfToken,
+      )
       toast({ title: 'Alert rule saved', variant: 'success' })
       await queryClient.invalidateQueries({ queryKey: ['alert-rules', serverId] })
       await queryClient.invalidateQueries({ queryKey: ['history', serverId, range] })
@@ -167,6 +173,7 @@ export function HistoryPanel({ serverId, canWrite }: { serverId: string; canWrit
               <div key={ruleID(rule)} className="border-ink-800 flex items-center gap-3 rounded-md border px-3 py-2 text-xs">
                 <Badge variant="outline">{rule.metric}</Badge>
                 <span className="text-ink-300 font-mono text-[10px]">{rule.comparator === 'gt' ? '>' : '≥'} {rule.threshold}</span>
+                {rule.webhook_configured ? <Badge variant="mint">webhook</Badge> : null}
                 <span className="text-ink-500 ml-auto font-mono text-[9px]">{rule.enabled ? 'enabled' : 'disabled'}</span>
                 {canWrite ? (
                   <Button size="icon" variant="ghost" className="hover:text-rose-400 h-6 w-6" aria-label="Delete alert rule" onClick={() => void removeRule(ruleID(rule))}>
@@ -190,6 +197,7 @@ export function HistoryPanel({ serverId, canWrite }: { serverId: string; canWrit
               <option value="gte">at least</option>
             </Select>
             <Input value={threshold} onChange={(event) => setThreshold(event.target.value)} type="number" className="h-8 w-24 text-xs" aria-label="Alert threshold" />
+            <Input value={webhook} onChange={(event) => setWebhook(event.target.value)} placeholder="https://hooks.example.com/…" className="h-8 w-64 text-xs" aria-label="Webhook URL" />
             <Button size="sm" variant="outline" onClick={() => void addRule()} loading={busy}>
               <Plus className="h-3.5 w-3.5" aria-hidden="true" />
               Add rule

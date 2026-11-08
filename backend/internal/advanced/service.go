@@ -14,6 +14,7 @@ import (
 
 	"github.com/awbuilds/drovik/backend/internal/audit"
 	"github.com/awbuilds/drovik/backend/internal/config"
+	"github.com/awbuilds/drovik/backend/internal/secrets"
 	"github.com/awbuilds/drovik/backend/internal/servers"
 	"github.com/awbuilds/drovik/backend/internal/sshclient"
 	"github.com/awbuilds/drovik/backend/internal/storage"
@@ -32,6 +33,7 @@ type Service struct {
 	snippets *storage.SnippetRepository
 	metrics  *storage.MetricRepository
 	alerts   *storage.AlertRepository
+	cipher   *secrets.Cipher
 	audit    *audit.Service
 	logger   *slog.Logger
 }
@@ -42,12 +44,13 @@ func NewService(
 	snippetRepository *storage.SnippetRepository,
 	metricRepository *storage.MetricRepository,
 	alertRepository *storage.AlertRepository,
+	cipher *secrets.Cipher,
 	auditService *audit.Service,
 	logger *slog.Logger,
 ) *Service {
 	return &Service{
 		cfg: cfg, servers: serverService, snippets: snippetRepository,
-		metrics: metricRepository, alerts: alertRepository,
+		metrics: metricRepository, alerts: alertRepository, cipher: cipher,
 		audit: auditService, logger: logger,
 	}
 }
