@@ -1,6 +1,6 @@
 # Drovik
 
-> Drovik is an open-source, self-hosted, agentless web workspace for Linux servers. It brings SSH, SFTP files, host health, Docker and host diagnostics, snippets, local users and audit history into one browser interface over the SSH access you already have. AGPL-3.0-only. Current stable line: v1.3.0.
+> Drovik is an open-source, self-hosted, agentless web workspace for Linux servers. It brings SSH, SFTP files, host health, Docker and host diagnostics, snippets, local users and audit history into one browser interface over the SSH access you already have. AGPL-3.0-only. Current stable line: v1.3.1.
 
 Drovik is made by Abhijith Warrier and published at <https://github.com/awbuilds/drovik>. It is free software with no paid tier, no hosted service and no telemetry. The browser talks only to the Drovik backend; the backend talks to managed hosts over SSH and SFTP. Nothing is installed on the managed host.
 
@@ -39,7 +39,7 @@ Drovik is made by Abhijith Warrier and published at <https://github.com/awbuilds
 - [Install](https://awbuilds.github.io/drovik/install.html): Docker Compose, TLS proxy, source build, backup and upgrade.
 - [Documentation](https://awbuilds.github.io/drovik/docs.html): curated links to the repository docs.
 - [FAQ](https://awbuilds.github.io/drovik/faq.html): agentless design, data, limits and project questions.
-- [Changelog](https://awbuilds.github.io/drovik/changelog.html): v1.3.0, v1.1.0, v1.0.1, v1.0.0 and the public beta.
+- [Changelog](https://awbuilds.github.io/drovik/changelog.html): v1.3.1, v1.1.0, v1.0.1, v1.0.0 and the public beta.
 - [Privacy policy](https://awbuilds.github.io/drovik/privacy.html): what the website and an instance store.
 - [Terms of service](https://awbuilds.github.io/drovik/terms.html): AGPL license and operator responsibilities.
 - [Accessibility](https://awbuilds.github.io/drovik/accessibility.html): WCAG 2.2 AA target and known limits.
@@ -51,7 +51,7 @@ Drovik is made by Abhijith Warrier and published at <https://github.com/awbuilds
 - License: GNU Affero General Public License v3.0 only (`AGPL-3.0-only`).
 - Price: free software; no paid tier.
 - Platform: self-hosted controller on Linux amd64/arm64 (container or release archive); managed hosts are Linux with OpenSSH and standard tools.
-- Current stable line: v1.3.0. Two source-first audit runs fixed five findings in v1.0.1 and seven Phase 9 findings in v1.3.0.
+- Current stable line: v1.3.1. Two source-first audit runs fixed five findings in v1.0.1 and seven Phase 9 findings in v1.3.1.
 - No telemetry, analytics, advertising or vendor cloud.
 - Repository: <https://github.com/awbuilds/drovik>.
 - Publisher: Abhijith Warrier / AW Builds.

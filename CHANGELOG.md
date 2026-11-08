@@ -7,6 +7,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-08
+
 ### Added
 
 - Teams: administrator-managed groups with members and shared servers at `read` or `write`;

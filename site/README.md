@@ -84,7 +84,7 @@ header/footer blocks and version references consistent.
 
 ## Release checklist
 
-The site currently targets **v1.3.0** (the stable line declared in the
+The site currently targets **v1.3.1** (the stable line declared in the
 repository's README). Do not publish it before that tag exists, or revert the
 version to the last published tag first.
 
