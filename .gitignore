@@ -36,9 +36,10 @@ data/
 *.sqlite-shm
 *.sqlite-wal
 
-# Logs
+# Runtime logs (not source packages named logs)
 *.log
-logs/
+/logs/
+deploy/**/logs/
 
 # Go
 backend/bin/
