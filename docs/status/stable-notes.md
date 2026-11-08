@@ -38,10 +38,11 @@ exhaustion. See [`docs/security/audit-2026-11-08.md`](../security/audit-2026-11-
 
 ## Known limitations
 
-Local users and server assignments replace the original single-operator limitation. Remaining
-limitations: destructive storage/network/package/cron changes are not exposed, OIDC/MFA and external
-notifications are not implemented, there are no resumable transfers or privilege escalation, unit
-editing is unavailable, SQLite allows one writer, and real-host validation remains limited. The
+Local users and server assignments replace the original single-operator limitation. Destructive
+storage/network/package/cron changes, OIDC/MFA, external notifications and non-Linux targets are
+permanently out of scope for the 1.x line (ADR 0013), not pending work. Other remaining limitations:
+no resumable transfers or privilege escalation, no unit editing, SQLite single writer and limited
+real-host validation. The
 Phase 9 threat model is recorded in ADR 0013 and the 2026-11-08 audit summary.
 
 ## Verification

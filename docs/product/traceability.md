@@ -326,22 +326,22 @@ separate design and threat model before implementation.
 | 9.1 Logs/inspect | Tested | Bounded `docker logs`, JSON inspect |
 | 9.1 Compose/socket warning | Implemented | No socket mount; UI warns root-equivalent access; Compose deferred |
 | 9.2 Block devices/filesystems/inodes | Tested | `lsblk -J`, `df -Pk`, `df -Pki`, `/proc/mounts` parser tests |
-| 9.2 Mount/format/partition | Deferred | Read-only inspection only, per risk review requirement |
+| 9.2 Mount/format/partition | Out of scope | Final Phase 9 scope (ADR 0013); destructive storage needs a new ADR and risk review |
 | 9.3 Interfaces/routes/listeners | Tested | `ip -j addr/route`, `ss -tulpn` parser tests |
-| 9.3 Network changes | Deferred | Read-only only; disconnect safeguards required |
+| 9.3 Network changes | Out of scope | Final Phase 9 scope (ADR 0013); firewall/interface changes need a new ADR |
 | 9.4 Package manager detection/list | Tested | dpkg/rpm/apk/pacman detection and bounded list |
-| 9.4 Install/update/remove | Deferred | Read-only list/search only |
+| 9.4 Install/update/remove | Out of scope | Final Phase 9 scope (ADR 0013); package mutations need a new ADR |
 | 9.5 Snippets CRUD/variables | Tested | Storage + service tests; variables and shell quoting |
 | 9.5 Preview/confirm/execute | Tested | Preview endpoint, confirm required, audit, output bounds |
 | 9.6 Cron/timer inspection | Tested | Fixed cron/timer collector parser tests |
-| 9.6 Task editing | Deferred | Read-only only; backup/validation design required |
+| 9.6 Task editing | Out of scope | Final Phase 9 scope (ADR 0013); cron/timer edits need backup/validation design |
 | 9.7 Local users/roles | Tested | User service, last-admin guard, HTTP read-only test |
 | 9.7 Server assignment/read-only | Tested | `server_assignments`, effective access checks, route guard |
-| 9.7 OIDC/MFA/external secrets | Deferred | Requires separate identity threat model |
+| 9.7 OIDC/MFA/external secrets | Out of scope | Final Phase 9 scope (ADR 0013); federated identity needs a separate threat model |
 | 9.8 Metric retention/history | Implemented | SQLite samples, retention/cap, history API and chart |
 | 9.8 Threshold alerts | Implemented | In-app threshold rules; no external notifications |
-| 9.8 Notifications | Deferred | No external channels in this scope |
-| 9.9 Additional OS | Deferred | Linux-only support matrix; macOS/BSD explicitly unsupported |
+| 9.8 Notifications | Out of scope | Final Phase 9 scope (ADR 0013); external channels need egress/secret design |
+| 9.9 Additional OS | Out of scope | Final Phase 9 scope (ADR 0013); non-Linux targets need a new support matrix |
 
 ### Phase 9 notes
 
@@ -353,6 +353,8 @@ separate design and threat model before implementation.
   intentionally absent.
 - Read-only accounts and read-only server assignments are enforced by backend middleware, not only
   UI controls.
+- The read-first boundary is final for the 1.x line (ADR 0013). The out-of-scope rows above are not
+  pending implementation; each requires a new ADR and threat model.
 - History is local, bounded and explicitly not a substitute for enterprise monitoring. External
   notifications and OIDC/MFA remain post-Phase-9 hardening items.
 
