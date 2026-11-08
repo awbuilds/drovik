@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help verify backend-test backend-bench backend-lint backend-fmt frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-build security hooks
+.PHONY: help verify backend-test backend-bench backend-lint backend-fmt frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-build site-check site-serve security hooks
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -39,6 +39,12 @@ frontend-test: ## Run frontend tests
 
 frontend-build: ## Build the frontend
 	cd frontend && pnpm build
+
+site-check: ## Check the static project website
+	python3 scripts/check-site.py
+
+site-serve: ## Preview the project website at http://127.0.0.1:4173/
+	python3 -m http.server 4173 --directory site
 
 security: ## Run local security checks
 	@command -v gitleaks >/dev/null 2>&1 && gitleaks detect --source . --redact -v || echo "gitleaks not installed; skipped"

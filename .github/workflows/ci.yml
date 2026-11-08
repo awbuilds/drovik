@@ -122,6 +122,18 @@ jobs:
       - name: Validate OpenAPI document
         run: ruby -e 'require "yaml"; YAML.load_file("docs/api/openapi.yaml")'
 
+  site:
+    name: Site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check static site
+        run: python3 scripts/check-site.py
+
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest

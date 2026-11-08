@@ -1,5 +1,10 @@
 # Drovik
 
+[![CI](https://github.com/awbuilds/drovik/actions/workflows/ci.yml/badge.svg)](https://github.com/awbuilds/drovik/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/awbuilds/drovik?sort=semver)](https://github.com/awbuilds/drovik/releases)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-awbuilds.github.io%2Fdrovik-2ea043)](https://awbuilds.github.io/drovik/)
+
 **A self-hosted, agentless web workspace for your Linux servers.**
 
 Drovik brings the everyday work of managing Linux machines into one deliberate interface:
@@ -9,8 +14,12 @@ nothing on the servers you manage.
 
 > **Status:** stable (`v1.1.1`). Drovik provides authentication, strict SSH host-key trust, terminal,
 > SFTP files, agentless monitoring, process/service/log operations, Docker and host diagnostics,
-> snippets, local users/server assignments and history. Drovik is a working name pending trademark
-> clearance.
+> snippets, local users/server assignments, history and audit. Drovik is a working name pending
+> trademark clearance.
+
+[Website](https://awbuilds.github.io/drovik/) · [Documentation](docs/) ·
+[Install](deploy/README.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) ·
+[Support](SUPPORT.md)
 
 ## Why Drovik
 
@@ -25,18 +34,23 @@ what it is doing:
 - **Local ownership.** Self-hosted, no mandatory cloud account, no default telemetry.
 - **Capability-aware.** Missing tools and distribution differences are shown, not hidden.
 
-## What it will do
+## What it does
 
 | Area | Capability |
 |---|---|
-| Servers | Save and verify multiple SSH hosts, password or key auth, strict host-key trust |
+| Servers | Save and verify SSH hosts, password or key auth, strict host-key trust, per-server assignments |
 | Workspace | One shell with persistent server context and multiple tool panels |
 | Terminal | Full interactive SSH PTY with resize, copy/paste and clean lifecycle |
-| Files | SFTP browsing, upload/download, create/rename/delete, text editing |
+| Files | SFTP browsing, streamed transfers, create/rename/delete and a bounded text editor |
 | Overview | CPU, memory, disk, uptime, load and network counters without an agent |
-| Processes | Inspect and safely signal processes your SSH user owns |
-| Services | Inspect and control systemd units where permitted |
+| Processes | Inspect and safely signal processes your SSH user owns, with PID identity checks |
+| Services | Inspect and control systemd units where permitted, with post-action state |
 | Logs | Bounded journal viewing with safe text rendering |
+| Docker | Inspect containers and images; start, stop, restart or remove after confirmation |
+| Advanced | Read-only storage, network, package and scheduled-task diagnostics |
+| Snippets | Reusable command templates with substituted preview and explicit confirmation |
+| Users | Local accounts, roles and per-server `read`/`write` assignments |
+| History | Optional bounded metric retention, charts and in-app threshold alerts |
 | Audit | Local metadata for logins, connections and sensitive actions |
 
 See the full [product requirements and roadmap](docs/product/PRD.md) for scope, non-goals and
@@ -58,10 +72,24 @@ The browser never connects directly to managed hosts and never receives stored S
 See [the architecture overview](docs/architecture/overview.md) and the
 [threat model](docs/security/threat-model.md).
 
-## Quick start
+## Install
 
-> The application is under active construction. These commands describe the intended local
-> development setup and will be kept current as each phase lands.
+The supported deployment is a self-hosted container on Linux:
+
+```bash
+docker pull ghcr.io/awbuilds/drovik:v1.1.1
+```
+
+Use the [Compose example](deploy/compose/docker-compose.yml) with a persistent `/data` volume, a
+separate encryption key secret, `DROVIK_PUBLIC_URL`, and a TLS reverse proxy. Release archives with
+the frontend included are attached to each [GitHub release](https://github.com/awbuilds/drovik/releases).
+Read the [compatibility matrix](docs/development/compatibility.md) and
+[backup guide](docs/development/backup-restore.md) before production use.
+
+> Drovik is stable, but it is a gateway to privileged systems. Start with a disposable host, verify
+> host keys out of band, and keep the encryption key outside the database.
+
+## Quick start (development)
 
 ```bash
 git clone https://github.com/awbuilds/drovik.git
@@ -87,6 +115,24 @@ The frontend dev server proxies `/api` to `http://127.0.0.1:8080` by default. Se
 `DROVIK_API_PROXY` if the backend runs elsewhere. For production deployment, see
 [deploy/README.md](deploy/README.md) and
 [docs/development/setup.md](docs/development/setup.md).
+
+## Website
+
+The project website is a dependency-free static site in [`site/`](site/). Preview it with
+`python3 -m http.server 4173 --directory site`, then open <http://127.0.0.1:4173/>. It makes no
+third-party requests and has no build step. See [site/README.md](site/README.md) for structure,
+checks and deployment.
+
+## Project
+
+- **Website:** <https://awbuilds.github.io/drovik/>
+- **Engineering docs:** [docs/](docs/) including the [PRD](docs/product/PRD.md),
+  [architecture](docs/architecture/overview.md) and [ADRs](docs/adr/)
+- **Roadmap:** [ROADMAP.md](ROADMAP.md)
+- **Changelog:** [CHANGELOG.md](CHANGELOG.md)
+- **Governance:** [GOVERNANCE.md](GOVERNANCE.md)
+- **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- **Support:** [SUPPORT.md](SUPPORT.md)
 
 ## Security
 

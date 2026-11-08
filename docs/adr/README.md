@@ -18,6 +18,8 @@ earlier one explicitly.
 | [0010](0010-licensing.md) | Licensing | Accepted |
 | [0011](0011-egress-policy.md) | Egress policy defaults | Accepted |
 | [0012](0012-deployment-model.md) | Deployment model | Accepted |
+| [0013](0013-phase-9-advanced-management.md) | Phase 9 advanced-management boundaries | Accepted |
+| [0014](0014-project-website.md) | Project website | Accepted |
 
 ## Template
 
