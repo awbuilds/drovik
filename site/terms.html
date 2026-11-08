@@ -125,8 +125,13 @@
             <li>There is no hosted Drovik service, no account with the project and no service-level agreement.</li>
             <li>If you run an instance, you are responsible for TLS, access, backups, the encryption key, upgrades and compliance.</li>
             <li>Docker, the terminal and snippets are powerful. Restrict who can use them and review what they run.</li>
+            <li>Use it with care. Drovik is published in good faith and without warranty; you are responsible for any data loss, so keep tested backups and review destructive actions before you run them.</li>
             <li>The software is provided as is, without warranty, to the extent the law allows.</li>
           </ul>
+        </div>
+
+        <div class="note note--warn mt-lg">
+          <p><strong>Use with care.</strong> Drovik is published in good faith and on an “as is” basis. It is a privileged tool for systems that may hold data you cannot recreate. You are responsible for backing up that data, testing changes and deciding whether an action is safe. The project cannot recover data that was not backed up, and, to the extent permitted by law, you bear the risk of any data loss arising from your deployment or use.</p>
         </div>
 
         <h2 id="agreement">1. Agreement and scope</h2>
@@ -154,6 +159,7 @@
           <li><strong>Identity and access.</strong> Use a strong administrator password, review local users, roles and per-server assignments, and remove access that is no longer needed.</li>
           <li><strong>Secrets.</strong> Generate the encryption key once, keep it out of the database and repository, restrict its file permissions, and store it separately from backups.</li>
           <li><strong>Backups and upgrades.</strong> Back up the database and the key, test restoration, read the release notes and treat a failed migration as a failed upgrade.</li>
+          <li><strong>Data and recovery.</strong> Drovik cannot recover data you have not backed up. You are responsible for any data loss arising from your deployment or use: keep tested backups, rehearse changes on a host you can afford to lose, and review destructive actions before you run them.</li>
           <li><strong>Compliance.</strong> Establish your own lawful basis, notices, retention and access policy for the data you hold. Comply with the law that applies to you and to the managed hosts.</li>
           <li><strong>Host authority.</strong> Drovik acts as the configured SSH user. You are responsible for what that account can do and for the commands you run through the terminal or snippets.</li>
         </ul>
