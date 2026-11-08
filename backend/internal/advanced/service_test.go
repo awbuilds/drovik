@@ -770,11 +770,13 @@ func TestAlertNotificationClaimIsAtomic(t *testing.T) {
 }
 
 func TestDestructiveCancellationAuditsUnknown(t *testing.T) {
+	entered := make(chan struct{})
 	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
 		if strings.HasPrefix(command, "lsblk -no MOUNTPOINT") {
 			return "", "", 0, true
 		}
 		if strings.HasPrefix(command, "mkfs.ext4") {
+			close(entered)
 			time.Sleep(300 * time.Millisecond)
 			return "", "", 0, true
 		}
@@ -783,7 +785,7 @@ func TestDestructiveCancellationAuditsUnknown(t *testing.T) {
 	service.cfg.EnableDestructiveHostOps = true
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		time.Sleep(50 * time.Millisecond)
+		<-entered
 		cancel()
 	}()
 	if _, err := service.Format(ctx, env.User.ID, env.Server.ID, "/dev/sdb1", "ext4", "/dev/sdb1", true); err != nil {
