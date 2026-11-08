@@ -17,6 +17,18 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
 import { WorkspacePage } from '@/pages/WorkspacePage'
 
+const UsersPage = lazy(() =>
+  import('@/pages/UsersPage').then((module) => ({ default: module.UsersPage })),
+)
+
+const AdvancedPage = lazy(() =>
+  import('@/pages/AdvancedPage').then((module) => ({ default: module.AdvancedPage })),
+)
+
+const SnippetsPage = lazy(() =>
+  import('@/pages/SnippetsPage').then((module) => ({ default: module.SnippetsPage })),
+)
+
 const ActivityPage = lazy(() =>
   import('@/pages/ActivityPage').then((module) => ({ default: module.ActivityPage })),
 )
@@ -157,6 +169,46 @@ function AppRoutes() {
           <AppShell>
             <Suspense fallback={<PageLoading label="Loading activity" />}>
               <ActivityPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/advanced"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading advanced tools" />}>
+              <AdvancedPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/advanced/:serverId"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading advanced tools" />}>
+              <AdvancedPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/snippets"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading snippets" />}>
+              <SnippetsPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading users" />}>
+              <UsersPage />
             </Suspense>
           </AppShell>
         }

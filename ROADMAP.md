@@ -60,10 +60,15 @@ short, human-readable summary.
 - Migration, backup/restore and compatibility guidance.
 - Parser benchmarks, stable support policy and release runbook.
 
-## Deferred — Phase 9: post-MVP advanced server management
+## Complete — Phase 9: advanced server management (read-first)
 
-Phase 9 features (Docker management, historical metrics, RBAC, file-based logs) are individually
-threat-modeled and intentionally outside the stable MVP scope.
+- Docker and host diagnostics with explicit actions and read-only blocking.
+- Snippets with substitution preview and confirmation.
+- Local users, roles and per-server read/write assignments.
+- Local metric retention, history charts and in-app threshold alerts.
+
+Destructive storage/network/package/cron changes, OIDC/MFA, external notifications and non-Linux
+target support remain documented hardening items rather than casual additions.
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

@@ -81,19 +81,23 @@ type ConnectionResult struct {
 }
 
 type Service struct {
-	repo   *storage.ServerRepository
-	known  *storage.KnownHostRepository
-	caps   *storage.CapabilitiesRepository
-	cipher *secrets.Cipher
-	dialer *sshclient.Dialer
-	audit  *audit.Service
-	logger *slog.Logger
-	cfg    *config.Config
+	repo        *storage.ServerRepository
+	users       *storage.UserRepository
+	assignments *storage.AssignmentRepository
+	known       *storage.KnownHostRepository
+	caps        *storage.CapabilitiesRepository
+	cipher      *secrets.Cipher
+	dialer      *sshclient.Dialer
+	audit       *audit.Service
+	logger      *slog.Logger
+	cfg         *config.Config
 }
 
 func NewService(
 	cfg *config.Config,
 	repo *storage.ServerRepository,
+	users *storage.UserRepository,
+	assignments *storage.AssignmentRepository,
 	known *storage.KnownHostRepository,
 	caps *storage.CapabilitiesRepository,
 	cipher *secrets.Cipher,
@@ -102,14 +106,16 @@ func NewService(
 	logger *slog.Logger,
 ) *Service {
 	return &Service{
-		repo:   repo,
-		known:  known,
-		caps:   caps,
-		cipher: cipher,
-		dialer: dialer,
-		audit:  auditService,
-		logger: logger,
-		cfg:    cfg,
+		repo:        repo,
+		users:       users,
+		assignments: assignments,
+		known:       known,
+		caps:        caps,
+		cipher:      cipher,
+		dialer:      dialer,
+		audit:       auditService,
+		logger:      logger,
+		cfg:         cfg,
 	}
 }
 
@@ -157,7 +163,14 @@ func (s *Service) Create(ctx context.Context, ownerID string, input CreateInput)
 }
 
 func (s *Service) List(ctx context.Context, ownerID string) ([]storage.Server, error) {
-	return s.repo.ListByOwner(ctx, ownerID)
+	user, err := s.users.GetByID(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Role == "admin" {
+		return s.repo.ListAll(ctx)
+	}
+	return s.repo.ListAccessible(ctx, ownerID)
 }
 
 func (s *Service) Get(ctx context.Context, ownerID, id string) (*storage.Server, error) {
@@ -165,10 +178,112 @@ func (s *Service) Get(ctx context.Context, ownerID, id string) (*storage.Server,
 	if err != nil {
 		return nil, err
 	}
-	if server.OwnerUserID != ownerID {
+	if server.OwnerUserID == ownerID {
+		return server, nil
+	}
+	user, err := s.users.GetByID(ctx, ownerID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, ErrUnauthorized
+		}
+		return nil, err
+	}
+	if user.Role == "admin" {
+		return server, nil
+	}
+	allowed, err := s.assignments.HasAccess(ctx, ownerID, id)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
 		return nil, ErrUnauthorized
 	}
 	return server, nil
+}
+
+// AccessLevel returns write for owners/admins and the assignment level for an
+// assigned user. Callers must treat any error as a denied authorization.
+func (s *Service) AccessLevel(ctx context.Context, userID, serverID string) (string, error) {
+	server, err := s.repo.GetByID(ctx, serverID)
+	if err != nil {
+		return "", err
+	}
+	if server.OwnerUserID == userID {
+		return "write", nil
+	}
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return "", ErrUnauthorized
+		}
+		return "", err
+	}
+	if user.Role == "admin" {
+		return "write", nil
+	}
+	assignment, err := s.assignments.Get(ctx, userID, serverID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return "", ErrUnauthorized
+		}
+		return "", err
+	}
+	return assignment.AccessLevel, nil
+}
+
+func (s *Service) ListAssignments(ctx context.Context, actorID, serverID string) ([]storage.ServerAssignment, error) {
+	if err := s.requireAdmin(ctx, actorID); err != nil {
+		return nil, err
+	}
+	if _, err := s.Get(ctx, actorID, serverID); err != nil {
+		return nil, err
+	}
+	return s.assignments.ListForServer(ctx, serverID)
+}
+
+func (s *Service) SetAssignment(ctx context.Context, actorID, serverID, targetUserID, accessLevel string) error {
+	if err := s.requireAdmin(ctx, actorID); err != nil {
+		return err
+	}
+	if accessLevel != "read" && accessLevel != "write" {
+		return &ValidationError{Field: "access_level", Message: "must be read or write"}
+	}
+	if _, err := s.Get(ctx, actorID, serverID); err != nil {
+		return err
+	}
+	if _, err := s.users.GetByID(ctx, targetUserID); err != nil {
+		return err
+	}
+	assignment := storage.ServerAssignment{
+		UserID: targetUserID, ServerID: serverID, AccessLevel: accessLevel, CreatedAt: time.Now().UTC(),
+	}
+	if err := s.assignments.Upsert(ctx, assignment); err != nil {
+		return err
+	}
+	s.record(ctx, actorID, &serverID, "server.assignment_updated", "success", "")
+	return nil
+}
+
+func (s *Service) RemoveAssignment(ctx context.Context, actorID, serverID, targetUserID string) error {
+	if err := s.requireAdmin(ctx, actorID); err != nil {
+		return err
+	}
+	if err := s.assignments.Delete(ctx, targetUserID, serverID); err != nil {
+		return err
+	}
+	s.record(ctx, actorID, &serverID, "server.assignment_removed", "success", "")
+	return nil
+}
+
+func (s *Service) requireAdmin(ctx context.Context, userID string) error {
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.Role != "admin" {
+		return ErrUnauthorized
+	}
+	return nil
 }
 
 func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateInput) (*storage.Server, error) {
@@ -294,7 +409,7 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 	}
 
 	server.UpdatedAt = time.Now().UTC()
-	if err := s.repo.Update(ctx, *server); err != nil {
+	if err := s.repo.UpdateByID(ctx, *server); err != nil {
 		return nil, err
 	}
 	if hostOrPortChanged {
@@ -309,7 +424,7 @@ func (s *Service) Delete(ctx context.Context, ownerID, id string) error {
 	if _, err := s.Get(ctx, ownerID, id); err != nil {
 		return err
 	}
-	if err := s.repo.Delete(ctx, id, ownerID); err != nil {
+	if err := s.repo.DeleteByID(ctx, id); err != nil {
 		return err
 	}
 	s.record(ctx, ownerID, &id, "server.deleted", "success", "")

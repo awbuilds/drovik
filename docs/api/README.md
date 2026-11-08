@@ -26,6 +26,20 @@ Current endpoints:
 | `GET` | `/api/v1/servers/{id}/services` | systemd service units |
 | `POST` | `/api/v1/servers/{id}/services/{unit}/action` | Enumerated service action |
 | `GET` | `/api/v1/servers/{id}/logs` | Bounded journal window |
+| `GET`/`PUT`/`DELETE` | `/api/v1/servers/{id}/alerts*` | In-app threshold rules |
+| `GET` | `/api/v1/servers/{id}/history` | Retained metric samples |
+| `GET` | `/api/v1/servers/{id}/docker` | Docker containers and images |
+| `POST` | `/api/v1/servers/{id}/docker/{container}/action` | Enumerated container action |
+| `GET` | `/api/v1/servers/{id}/storage-tools` | Block devices and inode usage |
+| `GET` | `/api/v1/servers/{id}/network-tools` | Interfaces, routes and listeners |
+| `GET` | `/api/v1/servers/{id}/packages` | Installed packages |
+| `GET` | `/api/v1/servers/{id}/schedules` | Cron and systemd timers |
+| `GET`/`POST` | `/api/v1/snippets` | List/create command snippets |
+| `POST` | `/api/v1/snippets/{id}/preview` | Substitute variables for preview |
+| `POST` | `/api/v1/servers/{id}/snippets/{snippet}/run` | Confirmed snippet execution |
+| `GET`/`POST` | `/api/v1/users` | Local users (administrator) |
+| `PATCH`/`DELETE` | `/api/v1/users/{id}` | Role/status/delete (administrator) |
+| `PUT`/`DELETE` | `/api/v1/servers/{id}/access/{userID}` | Server assignment |
 | `GET` | `/api/v1/servers/{id}/files` | List a remote directory over SFTP |
 | `POST` | `/api/v1/servers/{id}/files/upload` | Upload a file over SFTP |
 | `GET` | `/api/v1/servers/{id}/files/download` | Stream a remote file |

@@ -87,11 +87,20 @@ func New(dir string, sshServer *testssh.Server) (*Env, error) {
 		ServiceMaxUnits:         500,
 		LogMaxLines:             500,
 		LogMaxOutputBytes:       1 << 20,
+		AdvancedTimeout:         5 * time.Second,
+		AdvancedMaxOutputBytes:  1 << 20,
+		DockerMaxContainers:     100,
+		PackageMaxEntries:       1000,
+		SnippetMaxCommandBytes:  8192,
+		MetricsRetention:        time.Hour,
+		MetricsMaxSamples:       1000,
 	}
 	auditService := audit.New(storage.NewAuditRepository(db), logger)
 	serverService := servers.NewService(
 		cfg,
 		storage.NewServerRepository(db),
+		users,
+		storage.NewAssignmentRepository(db),
 		known,
 		storage.NewCapabilitiesRepository(db),
 		cipher,

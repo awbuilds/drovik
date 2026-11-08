@@ -106,6 +106,13 @@ func newTestApp(t *testing.T) *testApp {
 		ServiceMaxUnits:         500,
 		LogMaxLines:             500,
 		LogMaxOutputBytes:       1 << 20,
+		AdvancedTimeout:         5 * time.Second,
+		AdvancedMaxOutputBytes:  1 << 20,
+		DockerMaxContainers:     100,
+		PackageMaxEntries:       1000,
+		SnippetMaxCommandBytes:  8192,
+		MetricsRetention:        time.Hour,
+		MetricsMaxSamples:       1000,
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	auditService := audit.New(storage.NewAuditRepository(db), logger)

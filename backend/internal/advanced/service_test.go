@@ -1,0 +1,229 @@
+package advanced
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/awbuilds/drovik/backend/internal/monitoring"
+	"github.com/awbuilds/drovik/backend/internal/storage"
+	"github.com/awbuilds/drovik/backend/internal/testenv"
+	"github.com/awbuilds/drovik/backend/internal/testssh"
+)
+
+func newAdvancedEnv(t *testing.T, hook func(string) (string, string, int, bool)) (*testenv.Env, *Service) {
+	t.Helper()
+	sshServer, err := testssh.Start(t.TempDir())
+	if err != nil {
+		t.Fatalf("testssh.Start: %v", err)
+	}
+	t.Cleanup(sshServer.Close)
+	sshServer.CommandHook = hook
+	env, err := testenv.New(t.TempDir(), sshServer)
+	if err != nil {
+		t.Fatalf("testenv.New: %v", err)
+	}
+	t.Cleanup(func() { _ = env.Close() })
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := NewService(
+		env.Cfg, env.ServerService,
+		storage.NewSnippetRepository(env.DB),
+		storage.NewMetricRepository(env.DB),
+		storage.NewAlertRepository(env.DB),
+		env.Audit, logger,
+	)
+	return env, service
+}
+
+const dockerFixture = `{"ID":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Names":"/web","Image":"nginx:latest","State":"running","Status":"Up 2 hours","Ports":"0.0.0.0:80->80/tcp","CreatedAt":"2026-11-08 01:00:00 +0000 UTC","RunningFor":"2 hours ago"}
+`
+const imageFixture = `{"ID":"sha256:bbbb","Repository":"nginx","Tag":"latest","Size":"187MB","CreatedSince":"2 weeks ago"}
+`
+
+func TestDockerInspectionAndAction(t *testing.T) {
+	acted := ""
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case strings.Contains(command, "docker ps -a"):
+			return dockerFixture, "", 0, true
+		case strings.Contains(command, "docker images"):
+			return imageFixture, "", 0, true
+		case strings.Contains(command, "docker start "):
+			acted = command
+			return "", "", 0, true
+		case strings.Contains(command, "docker logs"):
+			return "container output\n", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	result, err := service.Docker(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("Docker: %v", err)
+	}
+	if len(result.Containers) != 1 || result.Containers[0].Name != "web" || len(result.Images) != 1 {
+		t.Fatalf("unexpected docker result: %+v", result)
+	}
+	if err := service.DockerAction(context.Background(), env.User.ID, env.Server.ID, result.Containers[0].ID, "start"); err != nil {
+		t.Fatalf("DockerAction: %v", err)
+	}
+	if !strings.HasPrefix(acted, "docker start ") {
+		t.Fatalf("unexpected action command: %q", acted)
+	}
+	if err := service.DockerAction(context.Background(), env.User.ID, env.Server.ID, "bad; rm -rf /", "start"); err != ErrInvalidTarget {
+		t.Fatalf("expected invalid target, got %v", err)
+	}
+	logs, err := service.DockerLogs(context.Background(), env.User.ID, env.Server.ID, result.Containers[0].ID, 50)
+	if err != nil || !strings.Contains(logs.Output, "container output") {
+		t.Fatalf("DockerLogs: %v %+v", err, logs)
+	}
+}
+
+func TestStorageNetworkPackagesSchedules(t *testing.T) {
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case strings.Contains(command, "@@lsblk@@"):
+			return `@@lsblk@@
+{"blockdevices":[{"name":"sda","type":"disk","size":"1000000","ro":false,"model":"Test Disk","tran":"sata","children":[{"name":"sda1","type":"part","size":"900000","fstype":"ext4","mountpoint":"/"}]}]}
+@@df@@
+Filesystem Inodes IUsed IFree IUse% Mounted on
+/dev/sda1 100000 25000 75000 25% /
+@@df-bytes@@
+Filesystem 1024-blocks Used Available Capacity Mounted on
+/dev/sda1 1000000 250000 750000 25% /
+@@mounts@@
+/dev/sda1 / ext4 rw,relatime 0 0
+`, "", 0, true
+		case strings.Contains(command, "@@addr@@"):
+			return `@@addr@@
+[{"ifname":"eth0","operstate":"UP","mtu":1500,"address":"aa:bb:cc:dd:ee:ff","addr_info":[{"family":"inet","local":"192.0.2.10","prefixlen":24}]}]
+@@route@@
+[{"dst":"default","gateway":"192.0.2.1","dev":"eth0","metric":100}]
+@@listen@@
+tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=1))
+`, "", 0, true
+		case strings.Contains(command, "dpkg-query"):
+			return "dpkg\ncurl\t8.0\nopenssh-server\t9.6\n", "", 0, true
+		case strings.Contains(command, "@@crontab@@"):
+			return `@@crontab@@
+0 3 * * * /usr/local/bin/backup
+@@etc-crontab@@
+@@cron-d@@
+### /etc/cron.d/test
+*/5 * * * * root /usr/bin/true
+@@timers@@
+Mon 2026-11-09 00:00:00 UTC 1h left Sun 2026-11-08 00:00:00 UTC 23h ago logrotate.timer logrotate.service
+`, "", 0, true
+		}
+		return "", "", 0, false
+	})
+
+	storageOverview, err := service.Storage(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("Storage: %v", err)
+	}
+	if len(storageOverview.BlockDevices) != 1 || len(storageOverview.BlockDevices[0].Children) != 1 {
+		t.Fatalf("unexpected storage: %+v", storageOverview)
+	}
+	if storageOverview.Filesystems[0].TotalBytes != 1024000000 || storageOverview.Filesystems[0].Inodes != 100000 {
+		t.Fatalf("unexpected filesystem: %+v", storageOverview.Filesystems[0])
+	}
+
+	networkOverview, err := service.Network(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("Network: %v", err)
+	}
+	if len(networkOverview.Interfaces) != 1 || len(networkOverview.Routes) != 1 || len(networkOverview.Listeners) != 1 {
+		t.Fatalf("unexpected network: %+v", networkOverview)
+	}
+
+	packages, err := service.Packages(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("Packages: %v", err)
+	}
+	if packages.Manager != "dpkg" || len(packages.Packages) != 2 {
+		t.Fatalf("unexpected packages: %+v", packages)
+	}
+
+	schedules, err := service.Schedules(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("Schedules: %v", err)
+	}
+	if len(schedules.Cron) != 2 || len(schedules.Timers) != 1 {
+		t.Fatalf("unexpected schedules: %+v", schedules)
+	}
+}
+
+func TestSnippetPreviewRunAndAlertRule(t *testing.T) {
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		if strings.Contains(command, "echo") {
+			return "ran\n", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	snippet, err := service.CreateSnippet(context.Background(), env.User.ID, SnippetInput{
+		Name: "Echo value", Command: "echo {{value}}",
+		Variables: []SnippetVariable{{Name: "value", Default: "hello"}},
+	})
+	if err != nil {
+		t.Fatalf("CreateSnippet: %v", err)
+	}
+	preview, err := service.PreviewSnippet(context.Background(), env.User.ID, snippet.ID, map[string]string{"value": "it's ok"})
+	if err != nil {
+		t.Fatalf("PreviewSnippet: %v", err)
+	}
+	if preview != "echo 'it'\"'\"'s ok'" {
+		t.Fatalf("unexpected preview: %q", preview)
+	}
+	if _, err := service.RunSnippet(context.Background(), env.User.ID, env.Server.ID, snippet.ID, map[string]string{}, false); err == nil {
+		t.Fatal("expected confirmation requirement")
+	}
+	result, err := service.RunSnippet(context.Background(), env.User.ID, env.Server.ID, snippet.ID, map[string]string{"value": "x"}, true)
+	if err != nil {
+		t.Fatalf("RunSnippet: %v", err)
+	}
+	if !strings.Contains(result.Output, "ran") {
+		t.Fatalf("unexpected run result: %+v", result)
+	}
+
+	snapshot := &monitoring.Snapshot{
+		ServerID: env.Server.ID, CollectedAt: time.Now().UTC(),
+		CPU: monitoring.CPUMetrics{Available: true}, Memory: monitoring.MemoryMetrics{Available: true},
+		Load:        monitoring.LoadAverage{Available: true, One: 0.5},
+		Filesystems: []monitoring.Filesystem{{UsedPercent: ptr(40)}}, FilesystemsAvailable: true,
+		Network: []monitoring.NetworkInterface{{ReceiveRateBps: ptr(10), TransmitRateBps: ptr(20)}}, NetworkAvailable: true,
+	}
+	service.RecordSnapshot(context.Background(), snapshot)
+	history, err := service.History(context.Background(), env.User.ID, env.Server.ID, "1h")
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	if len(history.Samples) != 1 {
+		t.Fatalf("expected one history sample: %+v", history)
+	}
+	rule, err := service.SaveAlertRule(context.Background(), env.User.ID, env.Server.ID, "", AlertRuleInput{
+		Metric: "disk_percent", Comparator: "gte", Threshold: 30, Enabled: true,
+	})
+	if err != nil || rule == nil {
+		t.Fatalf("SaveAlertRule: %v %+v", err, rule)
+	}
+	history, err = service.History(context.Background(), env.User.ID, env.Server.ID, "1h")
+	if err != nil || len(history.Alerts) != 1 || !history.Alerts[0].Active {
+		t.Fatalf("expected active alert: %v %+v", err, history)
+	}
+}
+
+func ptr(value float64) *float64 { return &value }
+
+func TestParseListenersRejectsShortLines(t *testing.T) {
+	// Exactly five fields previously indexed fields[5] and could panic on
+	// malformed or truncated remote output.
+	short := "tcp LISTEN 0 128 0.0.0.0:22"
+	valid := "tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:((\"sshd\",pid=1))"
+	listeners := parseListeners(short+"\n"+valid+"\n", 10)
+	if len(listeners) != 1 || listeners[0].Local != "0.0.0.0:22" {
+		t.Fatalf("unexpected listeners: %+v", listeners)
+	}
+}

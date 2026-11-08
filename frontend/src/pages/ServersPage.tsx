@@ -5,19 +5,24 @@ import { Cable, Plus, Server as ServerIcon, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/api/client'
 import {
   deleteServer,
+  listServerAssignments,
   listServers,
+  removeServerAssignment,
+  setServerAssignment,
   testServer,
   trustHostKey,
   type Capabilities,
   type HostKeyInfo,
   type Server,
 } from '@/api/servers'
+import { listUsers } from '@/api/users'
 import { useAuth } from '@/auth/useAuth'
 import { PageHeader } from '@/components/PageHeader'
 import { ConfirmDialog } from '@/components/servers/ConfirmDialog'
 import { HostKeyDialog } from '@/components/servers/HostKeyDialog'
 import { ServerCard } from '@/components/servers/ServerCard'
 import { ServerDialog } from '@/components/servers/ServerDialog'
+import { ServerAccessDialog } from '@/components/servers/ServerAccessDialog'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -52,7 +57,7 @@ function isChangedDetails(
 }
 
 export function ServersPage() {
-  const { csrfToken } = useAuth()
+  const { csrfToken, user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -64,6 +69,8 @@ export function ServersPage() {
   const [trusting, setTrusting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Server | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [accessTarget, setAccessTarget] = useState<Server | null>(null)
+  const [accessBusyUser, setAccessBusyUser] = useState<string | null>(null)
 
   const serversQuery = useQuery({
     queryKey: ['servers'],
@@ -71,6 +78,18 @@ export function ServersPage() {
   })
 
   const servers = serversQuery.data?.servers ?? []
+  const usersQuery = useQuery({
+    queryKey: ['users'],
+    queryFn: ({ signal }) => listUsers(signal),
+    enabled: user?.role === 'admin',
+    retry: 0,
+  })
+  const assignmentsQuery = useQuery({
+    queryKey: ['server-assignments', accessTarget?.id],
+    queryFn: ({ signal }) => listServerAssignments(accessTarget?.id ?? '', signal),
+    enabled: Boolean(accessTarget && user?.role === 'admin'),
+    retry: 0,
+  })
 
   const runTest = async (server: Server) => {
     setTestingId(server.id)
@@ -161,6 +180,23 @@ export function ServersPage() {
     }
   }
 
+  const handleAccessChange = async (userId: string, level: 'read' | 'write' | null) => {
+    if (!accessTarget) return
+    setAccessBusyUser(userId)
+    try {
+      if (level === null) {
+        await removeServerAssignment(accessTarget.id, userId, csrfToken)
+      } else {
+        await setServerAssignment(accessTarget.id, userId, level, csrfToken)
+      }
+      await queryClient.invalidateQueries({ queryKey: ['server-assignments', accessTarget.id] })
+    } catch (caught) {
+      toast({ title: 'Access update failed', description: userFacingError(caught), variant: 'error' })
+    } finally {
+      setAccessBusyUser(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -168,15 +204,17 @@ export function ServersPage() {
         title="Servers"
         description="Saved SSH connections. Drovik verifies each host key before trusting a server and never returns stored credentials to the browser."
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null)
-              setDialogOpen(true)
-            }}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add server
-          </Button>
+          user?.role === 'admin' ? (
+            <Button
+              onClick={() => {
+                setEditing(null)
+                setDialogOpen(true)
+              }}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add server
+            </Button>
+          ) : null
         }
       />
 
@@ -231,19 +269,22 @@ export function ServersPage() {
                 No servers yet
               </h2>
               <p className="text-ink-400 mt-2 max-w-md text-sm leading-6">
-                Add an SSH host to begin. The first connection shows the host-key fingerprint and
-                waits for your approval before sending credentials.
+                {user?.role === 'admin'
+                  ? 'Add an SSH host to begin. The first connection shows the host-key fingerprint and waits for your approval before sending credentials.'
+                  : 'No servers are assigned to this account yet. An administrator can grant read or write access from the Servers page.'}
               </p>
-              <Button
-                className="mt-5"
-                onClick={() => {
-                  setEditing(null)
-                  setDialogOpen(true)
-                }}
-              >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Add your first server
-              </Button>
+              {user?.role === 'admin' ? (
+                <Button
+                  className="mt-5"
+                  onClick={() => {
+                    setEditing(null)
+                    setDialogOpen(true)
+                  }}
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Add your first server
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
           <Card>
@@ -298,9 +339,12 @@ export function ServersPage() {
               server={server}
               capabilities={capabilities[server.id]}
               testing={testingId === server.id}
+              canWrite={server.access_level !== 'read'}
+              isAdmin={user?.role === 'admin'}
               onTest={() => void runTest(server)}
               onTerminal={() => navigate(`/terminal/${server.id}`)}
               onFiles={() => navigate(`/files/${server.id}`)}
+              onAccess={() => setAccessTarget(server)}
               onEdit={() => {
                 setEditing(server)
                 setDialogOpen(true)
@@ -332,6 +376,19 @@ export function ServersPage() {
         changed={hostKeyPrompt?.changed ?? false}
         busy={trusting}
         onTrust={(replace) => void handleTrust(replace)}
+      />
+
+      <ServerAccessDialog
+        open={accessTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setAccessTarget(null)
+        }}
+        server={accessTarget}
+        users={usersQuery.data?.users ?? []}
+        assignments={assignmentsQuery.data?.assignments ?? []}
+        loading={assignmentsQuery.isLoading || usersQuery.isLoading}
+        busyUserId={accessBusyUser}
+        onChange={(userId, level) => void handleAccessChange(userId, level)}
       />
 
       <ConfirmDialog

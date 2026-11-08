@@ -36,6 +36,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - First-run setup, local authentication, sessions and CSRF protection.
 - Docker Compose deployment with a separately mounted encryption secret.
 
+### Added
+
+- Phase 9 advanced management: Docker inspection and enumerated actions, read-only storage/network/
+  package/scheduled-task diagnostics, command snippets, local users with roles and per-server
+  assignments, retained metric history/charts and in-app threshold alerts.
+
 ### Security
 
 - Fixed a high-severity credential-exposure bug in `PATCH /api/v1/servers/{id}`: changing

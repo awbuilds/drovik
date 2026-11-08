@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/awbuilds/drovik/backend/internal/advanced"
 	"github.com/awbuilds/drovik/backend/internal/audit"
 	"github.com/awbuilds/drovik/backend/internal/auth"
 	"github.com/awbuilds/drovik/backend/internal/config"
@@ -24,6 +25,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/sshclient"
 	"github.com/awbuilds/drovik/backend/internal/storage"
 	"github.com/awbuilds/drovik/backend/internal/terminal"
+	useradmin "github.com/awbuilds/drovik/backend/internal/users"
 	"github.com/awbuilds/drovik/backend/internal/version"
 )
 
@@ -43,6 +45,8 @@ type Server struct {
 	services     *systemservices.Service
 	logs         *logs.Service
 	terminal     *terminal.Manager
+	userAdmin    *useradmin.Service
+	advanced     *advanced.Service
 	limiter      *security.LoginLimiter
 	setupLimiter *security.LoginLimiter
 	version      version.Info
@@ -62,10 +66,13 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 	knownHosts := storage.NewKnownHostRepository(db)
 	capabilities := storage.NewCapabilitiesRepository(db)
 	serverRepository := storage.NewServerRepository(db)
+	assignmentRepository := storage.NewAssignmentRepository(db)
 	dialer := sshclient.NewDialer(cfg, knownHosts, logger)
 	serverService := servers.NewService(
 		cfg,
 		serverRepository,
+		users,
+		assignmentRepository,
 		knownHosts,
 		capabilities,
 		cipher,
@@ -79,6 +86,16 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 	serviceService := systemservices.NewService(cfg, serverService, auditService, logger)
 	logService := logs.NewService(cfg, serverService, logger)
 	terminalManager := terminal.NewManager(cfg, serverService, logger)
+	userService := useradmin.NewService(users, sessions, auditService, logger)
+	advancedService := advanced.NewService(
+		cfg,
+		serverService,
+		storage.NewSnippetRepository(db),
+		storage.NewMetricRepository(db),
+		storage.NewAlertRepository(db),
+		auditService,
+		logger,
+	)
 
 	var staticHandler http.Handler
 	var indexHTML []byte
@@ -106,6 +123,8 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		services:   serviceService,
 		logs:       logService,
 		terminal:   terminalManager,
+		userAdmin:  userService,
+		advanced:   advancedService,
 		auth: auth.NewSessionManager(
 			sessions,
 			users,
@@ -152,31 +171,62 @@ func (s *Server) Handler() http.Handler {
 			r.With(s.requireCSRF).Post("/auth/logout", s.handleLogout)
 
 			r.Get("/servers", s.handleListServers)
-			r.With(s.requireCSRF).Post("/servers", s.handleCreateServer)
+			r.With(s.requireAdmin, s.requireCSRF).Post("/servers", s.handleCreateServer)
 			r.Get("/servers/{id}", s.handleGetServer)
-			r.With(s.requireCSRF).Patch("/servers/{id}", s.handleUpdateServer)
-			r.With(s.requireCSRF).Delete("/servers/{id}", s.handleDeleteServer)
-			r.With(s.requireCSRF).Post("/servers/{id}/test", s.handleTestConnection)
-			r.With(s.requireCSRF).Post("/servers/{id}/trust-host-key", s.handleTrustHostKey)
+			r.With(s.requireAdmin, s.requireCSRF).Patch("/servers/{id}", s.handleUpdateServer)
+			r.With(s.requireAdmin, s.requireCSRF).Delete("/servers/{id}", s.handleDeleteServer)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/test", s.handleTestConnection)
+			r.With(s.requireAdmin, s.requireCSRF).Post("/servers/{id}/trust-host-key", s.handleTrustHostKey)
 			r.Get("/servers/{id}/capabilities", s.handleCapabilities)
-			r.Get("/servers/{id}/terminal", s.handleTerminal)
+			r.With(s.requireServerWrite).Get("/servers/{id}/terminal", s.handleTerminal)
+
+			r.Get("/servers/{id}/access", s.handleListAssignments)
+			r.With(s.requireAdmin, s.requireCSRF).Put("/servers/{id}/access/{userID}", s.handleSetAssignment)
+			r.With(s.requireAdmin, s.requireCSRF).Delete("/servers/{id}/access/{userID}", s.handleRemoveAssignment)
+
+			r.With(s.requireAdmin).Get("/users", s.handleListUsers)
+			r.With(s.requireAdmin, s.requireCSRF).Post("/users", s.handleCreateUser)
+			r.With(s.requireAdmin, s.requireCSRF).Patch("/users/{id}", s.handleUpdateUser)
+			r.With(s.requireAdmin, s.requireCSRF).Post("/users/{id}/password", s.handleResetUserPassword)
+			r.With(s.requireAdmin, s.requireCSRF).Delete("/users/{id}", s.handleDeleteUser)
 
 			r.Get("/servers/{id}/overview", s.handleServerOverview)
 			r.Get("/servers/{id}/processes", s.handleListProcesses)
-			r.With(s.requireCSRF).Post("/servers/{id}/processes/{pid}/signal", s.handleSignalProcess)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/processes/{pid}/signal", s.handleSignalProcess)
 			r.Get("/servers/{id}/services", s.handleListServices)
-			r.With(s.requireCSRF).Post("/servers/{id}/services/{unit}/action", s.handleServiceAction)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/services/{unit}/action", s.handleServiceAction)
 			r.Get("/servers/{id}/logs", s.handleReadLogs)
+			r.Get("/servers/{id}/history", s.handleServerHistory)
+			r.Get("/servers/{id}/alerts", s.handleListAlertRules)
+			r.With(s.requireServerWrite, s.requireCSRF).Put("/servers/{id}/alerts/{ruleID}", s.handleSaveAlertRule)
+			r.With(s.requireServerWrite, s.requireCSRF).Delete("/servers/{id}/alerts/{ruleID}", s.handleDeleteAlertRule)
+
+			r.Get("/servers/{id}/docker", s.handleDocker)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/docker/{container}/action", s.handleDockerAction)
+			r.Get("/servers/{id}/docker/{container}/logs", s.handleDockerLogs)
+			r.Get("/servers/{id}/docker/{container}/inspect", s.handleDockerInspect)
+			r.Get("/servers/{id}/storage-tools", s.handleStorageTools)
+			r.Get("/servers/{id}/network-tools", s.handleNetworkTools)
+			r.Get("/servers/{id}/packages", s.handlePackages)
+			r.Get("/servers/{id}/schedules", s.handleSchedules)
+
+			r.Get("/snippets", s.handleListSnippets)
+			r.With(s.requireWriteAccess, s.requireCSRF).Post("/snippets", s.handleCreateSnippet)
+			r.Get("/snippets/{id}", s.handleGetSnippet)
+			r.With(s.requireWriteAccess, s.requireCSRF).Patch("/snippets/{id}", s.handleUpdateSnippet)
+			r.With(s.requireWriteAccess, s.requireCSRF).Delete("/snippets/{id}", s.handleDeleteSnippet)
+			r.With(s.requireWriteAccess, s.requireCSRF).Post("/snippets/{id}/preview", s.handlePreviewSnippet)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/snippets/{snippet}/run", s.handleRunSnippet)
 			r.Get("/servers/{id}/files", s.handleListFiles)
 			r.Get("/servers/{id}/files/stat", s.handleStatFile)
 			r.Get("/servers/{id}/files/download", s.handleDownloadFile)
 			r.Get("/servers/{id}/files/content", s.handleReadFile)
-			r.With(s.requireCSRF).Post("/servers/{id}/files/upload", s.handleUploadFile)
-			r.With(s.requireCSRF).Post("/servers/{id}/files/mkdir", s.handleMkdir)
-			r.With(s.requireCSRF).Post("/servers/{id}/files/touch", s.handleTouch)
-			r.With(s.requireCSRF).Patch("/servers/{id}/files/rename", s.handleRename)
-			r.With(s.requireCSRF).Delete("/servers/{id}/files", s.handleDeleteFile)
-			r.With(s.requireCSRF).Put("/servers/{id}/files/content", s.handleWriteFile)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/files/upload", s.handleUploadFile)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/files/mkdir", s.handleMkdir)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/files/touch", s.handleTouch)
+			r.With(s.requireServerWrite, s.requireCSRF).Patch("/servers/{id}/files/rename", s.handleRename)
+			r.With(s.requireServerWrite, s.requireCSRF).Delete("/servers/{id}/files", s.handleDeleteFile)
+			r.With(s.requireServerWrite, s.requireCSRF).Put("/servers/{id}/files/content", s.handleWriteFile)
 		})
 	})
 

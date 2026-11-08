@@ -315,6 +315,47 @@ Deferred as a product decision. Planned candidates: Docker/Podman management, hi
 multi-user RBAC, file-based log browsing, resumable transfers and unit-file editing. Each requires a
 separate design and threat model before implementation.
 
+
+## Phase 9 — Advanced management (read-first scope)
+
+| Area | Status | Implementation / evidence |
+|---|---|---|
+| 9.1 Docker detection | Tested | Fixed `docker ps/images` collector; `internal/advanced` tests |
+| 9.1 Container status/ports | Tested | Container JSON parsing, ports/state/status |
+| 9.1 Start/stop/restart/remove | Tested | Enumerated actions by validated ID, confirmation, audit, read-only block |
+| 9.1 Logs/inspect | Tested | Bounded `docker logs`, JSON inspect |
+| 9.1 Compose/socket warning | Implemented | No socket mount; UI warns root-equivalent access; Compose deferred |
+| 9.2 Block devices/filesystems/inodes | Tested | `lsblk -J`, `df -Pk`, `df -Pki`, `/proc/mounts` parser tests |
+| 9.2 Mount/format/partition | Deferred | Read-only inspection only, per risk review requirement |
+| 9.3 Interfaces/routes/listeners | Tested | `ip -j addr/route`, `ss -tulpn` parser tests |
+| 9.3 Network changes | Deferred | Read-only only; disconnect safeguards required |
+| 9.4 Package manager detection/list | Tested | dpkg/rpm/apk/pacman detection and bounded list |
+| 9.4 Install/update/remove | Deferred | Read-only list/search only |
+| 9.5 Snippets CRUD/variables | Tested | Storage + service tests; variables and shell quoting |
+| 9.5 Preview/confirm/execute | Tested | Preview endpoint, confirm required, audit, output bounds |
+| 9.6 Cron/timer inspection | Tested | Fixed cron/timer collector parser tests |
+| 9.6 Task editing | Deferred | Read-only only; backup/validation design required |
+| 9.7 Local users/roles | Tested | User service, last-admin guard, HTTP read-only test |
+| 9.7 Server assignment/read-only | Tested | `server_assignments`, effective access checks, route guard |
+| 9.7 OIDC/MFA/external secrets | Deferred | Requires separate identity threat model |
+| 9.8 Metric retention/history | Implemented | SQLite samples, retention/cap, history API and chart |
+| 9.8 Threshold alerts | Implemented | In-app threshold rules; no external notifications |
+| 9.8 Notifications | Deferred | No external channels in this scope |
+| 9.9 Additional OS | Deferred | Linux-only support matrix; macOS/BSD explicitly unsupported |
+
+### Phase 9 notes
+
+- Advanced host operations reuse the existing SSH connection, host verification, authorization
+  checks and audit pipeline from prior phases.
+- Docker access is explicitly labelled root-equivalent. The Docker socket is never mounted into the
+  Drovik container.
+- Storage, network, package and scheduled-task surfaces are read-only; destructive changes remain
+  intentionally absent.
+- Read-only accounts and read-only server assignments are enforced by backend middleware, not only
+  UI controls.
+- History is local, bounded and explicitly not a substitute for enterprise monitoring. External
+  notifications and OIDC/MFA remain post-Phase-9 hardening items.
+
 ## Later phases
 
 The remaining requirement groups are tracked in the PRD and will be added here when their phase

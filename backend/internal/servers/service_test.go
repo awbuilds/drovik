@@ -25,11 +25,13 @@ import (
 )
 
 type serviceTestEnv struct {
-	service *Service
-	users   storage.User
-	servers *storage.ServerRepository
-	known   *storage.KnownHostRepository
-	cfg     *config.Config
+	service     *Service
+	users       storage.User
+	userRepo    *storage.UserRepository
+	servers     *storage.ServerRepository
+	assignments *storage.AssignmentRepository
+	known       *storage.KnownHostRepository
+	cfg         *config.Config
 }
 
 func newServiceTestEnv(t *testing.T, sshServer *testssh.Server) *serviceTestEnv {
@@ -71,9 +73,11 @@ func newServiceTestEnv(t *testing.T, sshServer *testssh.Server) *serviceTestEnv 
 	}
 	dialer := sshclient.NewDialer(cfg, known, logger)
 	auditService := audit.New(storage.NewAuditRepository(db), logger)
-	service := NewService(cfg, serverRepo, known, caps, cipher, dialer, auditService, logger)
+	assignments := storage.NewAssignmentRepository(db)
+	service := NewService(cfg, serverRepo, users, assignments, known, caps, cipher, dialer, auditService, logger)
 	return &serviceTestEnv{
-		service: service, users: user, servers: serverRepo, known: known, cfg: cfg,
+		service: service, users: user, userRepo: users, servers: serverRepo,
+		assignments: assignments, known: known, cfg: cfg,
 	}
 }
 
@@ -313,5 +317,54 @@ func TestAuthMethodChangeRequiresNewCredential(t *testing.T) {
 		Password:   &newPassword,
 	}); err != nil {
 		t.Fatalf("Update with new password: %v", err)
+	}
+}
+
+func TestServerAccessLevels(t *testing.T) {
+	sshServer, err := testssh.Start(t.TempDir())
+	if err != nil {
+		t.Fatalf("testssh.Start: %v", err)
+	}
+	defer sshServer.Close()
+	env := newServiceTestEnv(t, sshServer)
+	ctx := context.Background()
+	server, err := env.service.Create(ctx, env.users.ID, testCreateInput(t, sshServer))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	operator := storage.User{
+		ID: storage.NewID(), Username: "operator", PasswordHash: "hash", Role: "operator",
+		IsActive: true, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := env.userRepo.Create(ctx, operator); err != nil {
+		t.Fatalf("Create operator: %v", err)
+	}
+	if err := env.assignments.Upsert(ctx, storage.ServerAssignment{
+		UserID: operator.ID, ServerID: server.ID, AccessLevel: "read", CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("Assign read: %v", err)
+	}
+	level, err := env.service.AccessLevel(ctx, operator.ID, server.ID)
+	if err != nil || level != "read" {
+		t.Fatalf("AccessLevel read: %v %s", err, level)
+	}
+	if _, err := env.service.Get(ctx, operator.ID, server.ID); err != nil {
+		t.Fatalf("Get assigned server: %v", err)
+	}
+	list, err := env.service.List(ctx, operator.ID)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("List assigned: %v %+v", err, list)
+	}
+	if err := env.assignments.Upsert(ctx, storage.ServerAssignment{
+		UserID: operator.ID, ServerID: server.ID, AccessLevel: "write", CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("Assign write: %v", err)
+	}
+	level, err = env.service.AccessLevel(ctx, operator.ID, server.ID)
+	if err != nil || level != "write" {
+		t.Fatalf("AccessLevel write: %v %s", err, level)
+	}
+	if level, err := env.service.AccessLevel(ctx, env.users.ID, server.ID); err != nil || level != "write" {
+		t.Fatalf("admin AccessLevel: %v %s", err, level)
 	}
 }

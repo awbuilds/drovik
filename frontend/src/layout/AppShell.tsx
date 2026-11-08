@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Activity,
+  Boxes,
   ChevronRight,
+  Code2,
   FolderTree,
   Gauge,
   LayoutDashboard,
@@ -17,6 +19,7 @@ import {
   Settings,
   SquareTerminal,
   Sun,
+  Users,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -36,6 +39,7 @@ interface NavItem {
   icon: LucideIcon
   enabled: boolean
   phase?: string
+  adminOnly?: boolean
 }
 
 const navigation: Array<{ label: string; items: NavItem[] }> = [
@@ -61,11 +65,16 @@ const navigation: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { to: '/processes', label: 'Processes', icon: ListTree, enabled: true },
       { to: '/services', label: 'Services', icon: Settings2, enabled: true },
+      { to: '/advanced', label: 'Advanced', icon: Boxes, enabled: true },
+      { to: '/snippets', label: 'Snippets', icon: Code2, enabled: true },
     ],
   },
   {
     label: 'System',
-    items: [{ to: '/settings', label: 'Settings', icon: Settings, enabled: true }],
+    items: [
+      { to: '/users', label: 'Users', icon: Users, enabled: true, adminOnly: true },
+      { to: '/settings', label: 'Settings', icon: Settings, enabled: true },
+    ],
   },
 ]
 
@@ -205,7 +214,9 @@ function SidebarContent({
               {section.label}
             </p>
             <ul className="space-y-1">
-              {section.items.map((item) => {
+              {section.items
+                .filter((item) => !item.adminOnly || user?.role === 'admin')
+                .map((item) => {
                 const Icon = item.icon
                 if (!item.enabled) {
                   return (
@@ -287,7 +298,7 @@ function SidebarContent({
           </Tooltip>
         </div>
         <p className="text-ink-600 mt-2 px-1 font-mono text-[9px] tracking-wider uppercase">
-          Phase 6 · Operations
+          Phase 9 · Advanced operations
         </p>
       </div>
     </>
