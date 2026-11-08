@@ -56,6 +56,7 @@ export function ServerCard({
         <Badge variant={server.auth_method === 'private_key' ? 'mint' : 'neutral'}>
           {server.auth_method === 'private_key' ? 'key' : 'password'}
         </Badge>
+        {server.secret_provider === 'vault' ? <Badge variant="outline">vault</Badge> : null}
       </CardHeader>
 
       <CardContent className="flex-1 space-y-4 pt-4">

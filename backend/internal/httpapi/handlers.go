@@ -51,6 +51,7 @@ type versionResponse struct {
 	GoVersion          string `json:"go_version"`
 	SchemaVersion      int64  `json:"schema_version"`
 	DestructiveHostOps bool   `json:"destructive_host_ops"`
+	VaultEnabled       bool   `json:"vault_enabled"`
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

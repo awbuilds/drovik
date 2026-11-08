@@ -257,3 +257,33 @@ func TestLoadDestructiveHostOpsFlag(t *testing.T) {
 		t.Fatal("destructive host ops must default to disabled")
 	}
 }
+
+func TestLoadVaultSettings(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_VAULT_ENABLED"] = "true"
+	env["DROVIK_VAULT_ADDR"] = "https://vault.example.com/"
+	env["DROVIK_VAULT_TOKEN"] = "token"
+	env["DROVIK_VAULT_NAMESPACE"] = "team-a"
+	env["DROVIK_VAULT_MOUNT"] = "kv"
+	env["DROVIK_VAULT_TIMEOUT"] = "3s"
+	cfg, err := load(lookupFrom(env))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.VaultEnabled || cfg.VaultAddress != "https://vault.example.com" ||
+		cfg.VaultNamespace != "team-a" || cfg.VaultMount != "kv" || cfg.VaultTimeout != 3*time.Second {
+		t.Fatalf("unexpected Vault config: %+v", cfg)
+	}
+
+	env = validEnv()
+	env["DROVIK_VAULT_ENABLED"] = "true"
+	env["DROVIK_VAULT_ADDR"] = "https://vault.example.com"
+	if _, err := load(lookupFrom(env)); err == nil {
+		t.Fatal("expected a missing token error")
+	}
+	env["DROVIK_VAULT_TOKEN"] = "token"
+	env["DROVIK_VAULT_ADDR"] = "file:///etc/passwd"
+	if _, err := load(lookupFrom(env)); err == nil {
+		t.Fatal("expected an invalid address error")
+	}
+}

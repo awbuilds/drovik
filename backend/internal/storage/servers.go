@@ -16,6 +16,8 @@ type Server struct {
 	Port                int
 	Username            string
 	AuthMethod          string
+	SecretProvider      string
+	SecretRef           string
 	EncryptedSecret     string
 	SecretNonce         string
 	SecretVersion       int
@@ -61,12 +63,14 @@ func (r *ServerRepository) Create(ctx context.Context, server Server) error {
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO servers (
 			id, owner_user_id, display_name, host, port, username, auth_method,
+			secret_provider, secret_ref,
 			encrypted_secret, secret_nonce, secret_version,
 			encrypted_passphrase, passphrase_nonce, passphrase_version,
 			tags, notes, created_at, updated_at, is_active
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		server.ID, server.OwnerUserID, server.DisplayName, server.Host, server.Port,
-		server.Username, server.AuthMethod, server.EncryptedSecret, server.SecretNonce,
+		server.Username, server.AuthMethod, server.SecretProvider, server.SecretRef,
+		server.EncryptedSecret, server.SecretNonce,
 		server.SecretVersion, nullableText(server.EncryptedPassphrase), nullableText(server.PassphraseNonce),
 		nullableInt(server.PassphraseVersion), server.Tags, server.Notes,
 		formatTime(server.CreatedAt), formatTime(server.UpdatedAt), boolToInt(server.IsActive),
@@ -80,6 +84,7 @@ func (r *ServerRepository) Create(ctx context.Context, server Server) error {
 func (r *ServerRepository) ListByOwner(ctx context.Context, ownerID string) ([]Server, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, owner_user_id, display_name, host, port, username, auth_method,
+		       secret_provider, secret_ref,
 		       encrypted_secret, secret_nonce, secret_version,
 		       encrypted_passphrase, passphrase_nonce, passphrase_version,
 		       tags, notes, created_at, updated_at, last_connected_at, is_active
@@ -107,6 +112,7 @@ func (r *ServerRepository) ListByOwner(ctx context.Context, ownerID string) ([]S
 func (r *ServerRepository) ListAll(ctx context.Context) ([]Server, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, owner_user_id, display_name, host, port, username, auth_method,
+		       secret_provider, secret_ref,
 		       encrypted_secret, secret_nonce, secret_version,
 		       encrypted_passphrase, passphrase_nonce, passphrase_version,
 		       tags, notes, created_at, updated_at, last_connected_at, is_active
@@ -122,6 +128,7 @@ func (r *ServerRepository) ListAll(ctx context.Context) ([]Server, error) {
 func (r *ServerRepository) ListAccessible(ctx context.Context, userID string) ([]Server, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, owner_user_id, display_name, host, port, username, auth_method,
+		       secret_provider, secret_ref,
 		       encrypted_secret, secret_nonce, secret_version,
 		       encrypted_passphrase, passphrase_nonce, passphrase_version,
 		       tags, notes, created_at, updated_at, last_connected_at, is_active
@@ -155,11 +162,13 @@ func (r *ServerRepository) UpdateByID(ctx context.Context, server Server) error 
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE servers SET
 			display_name = ?, host = ?, port = ?, username = ?, auth_method = ?,
+			secret_provider = ?, secret_ref = ?,
 			encrypted_secret = ?, secret_nonce = ?, secret_version = ?,
 			encrypted_passphrase = ?, passphrase_nonce = ?, passphrase_version = ?,
 			tags = ?, notes = ?, updated_at = ?, is_active = ?
 		WHERE id = ?`,
 		server.DisplayName, server.Host, server.Port, server.Username, server.AuthMethod,
+		server.SecretProvider, server.SecretRef,
 		server.EncryptedSecret, server.SecretNonce, server.SecretVersion,
 		nullableText(server.EncryptedPassphrase), nullableText(server.PassphraseNonce),
 		nullableInt(server.PassphraseVersion), server.Tags, server.Notes,
@@ -189,6 +198,7 @@ func (r *ServerRepository) DeleteByID(ctx context.Context, id string) error {
 func (r *ServerRepository) GetByID(ctx context.Context, id string) (*Server, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id, owner_user_id, display_name, host, port, username, auth_method,
+		       secret_provider, secret_ref,
 		       encrypted_secret, secret_nonce, secret_version,
 		       encrypted_passphrase, passphrase_nonce, passphrase_version,
 		       tags, notes, created_at, updated_at, last_connected_at, is_active
@@ -200,11 +210,13 @@ func (r *ServerRepository) Update(ctx context.Context, server Server) error {
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE servers SET
 			display_name = ?, host = ?, port = ?, username = ?, auth_method = ?,
+			secret_provider = ?, secret_ref = ?,
 			encrypted_secret = ?, secret_nonce = ?, secret_version = ?,
 			encrypted_passphrase = ?, passphrase_nonce = ?, passphrase_version = ?,
 			tags = ?, notes = ?, updated_at = ?, is_active = ?
 		WHERE id = ? AND owner_user_id = ?`,
 		server.DisplayName, server.Host, server.Port, server.Username, server.AuthMethod,
+		server.SecretProvider, server.SecretRef,
 		server.EncryptedSecret, server.SecretNonce, server.SecretVersion,
 		nullableText(server.EncryptedPassphrase), nullableText(server.PassphraseNonce),
 		nullableInt(server.PassphraseVersion), server.Tags, server.Notes,
@@ -389,7 +401,8 @@ func scanServer(row serverRowScanner) (*Server, error) {
 	)
 	if err := row.Scan(
 		&server.ID, &server.OwnerUserID, &server.DisplayName, &server.Host, &server.Port,
-		&server.Username, &server.AuthMethod, &encryptedSecret, &secretNonce, &server.SecretVersion,
+		&server.Username, &server.AuthMethod, &server.SecretProvider, &server.SecretRef,
+		&encryptedSecret, &secretNonce, &server.SecretVersion,
 		&encryptedPass, &passphraseNonce, &passphraseVersion, &server.Tags, &server.Notes,
 		&createdAt, &updatedAt, &lastConnectedAt, &isActive,
 	); err != nil {

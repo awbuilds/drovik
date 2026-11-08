@@ -1949,6 +1949,14 @@ components:
         auth_method:
           type: string
           enum: [password, private_key]
+        secret_provider:
+          type: string
+          enum: [stored, vault]
+          default: stored
+        secret_ref:
+          type: string
+          maxLength: 256
+          description: Vault KV v2 path; required when secret_provider is vault.
         password:
           type: string
           maxLength: 1024
@@ -1991,6 +1999,14 @@ components:
         auth_method:
           type: string
           enum: [password, private_key]
+        secret_provider:
+          type: string
+          enum: [stored, vault]
+          default: stored
+        secret_ref:
+          type: string
+          maxLength: 256
+          description: Vault KV v2 path; required when secret_provider is vault.
         password:
           type: string
           maxLength: 1024
@@ -2026,6 +2042,11 @@ components:
         auth_method:
           type: string
           enum: [password, private_key]
+        secret_provider:
+          type: string
+          enum: [stored, vault]
+        secret_ref:
+          type: string
         tags:
           type: string
         notes:

@@ -85,7 +85,7 @@ func newFilesTestEnv(t *testing.T) *filesTestEnv {
 	}
 	dialer := sshclient.NewDialer(cfg, known, logger)
 	auditService := audit.New(storage.NewAuditRepository(db), logger)
-	serverService := servers.NewService(cfg, serverRepo, users, storage.NewAssignmentRepository(db), known, caps, cipher, dialer, auditService, logger)
+	serverService := servers.NewService(cfg, serverRepo, users, storage.NewAssignmentRepository(db), known, caps, cipher, nil, dialer, auditService, logger)
 	filesService := NewService(cfg, serverService, auditService, logger)
 
 	host, portText, _ := net.SplitHostPort(sshServer.Addr)

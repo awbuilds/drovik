@@ -38,6 +38,7 @@ output and log contents are never included.
 | `SERVICE_UNAVAILABLE` | 503 | Process is shutting down |
 | `INTERNAL_ERROR` | 500 | Unexpected server error; correlation ID is logged |
 | `CAPABILITY_UNAVAILABLE` | 422 | The host lacks the required capability |
+| `SECRET_UNAVAILABLE` | 502 | A Vault-backed credential could not be resolved |
 
 ## SSH and servers
 

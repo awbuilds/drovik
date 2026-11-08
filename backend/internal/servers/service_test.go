@@ -22,6 +22,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/sshclient"
 	"github.com/awbuilds/drovik/backend/internal/storage"
 	"github.com/awbuilds/drovik/backend/internal/testssh"
+	"github.com/awbuilds/drovik/backend/internal/vault"
 )
 
 type serviceTestEnv struct {
@@ -35,6 +36,11 @@ type serviceTestEnv struct {
 }
 
 func newServiceTestEnv(t *testing.T, sshServer *testssh.Server) *serviceTestEnv {
+	t.Helper()
+	return newServiceTestEnvWith(t, sshServer, nil)
+}
+
+func newServiceTestEnvWith(t *testing.T, sshServer *testssh.Server, vaultClient *vault.Client) *serviceTestEnv {
 	t.Helper()
 	db, err := storage.Open(filepath.Join(t.TempDir(), "servers.db"))
 	if err != nil {
@@ -74,7 +80,7 @@ func newServiceTestEnv(t *testing.T, sshServer *testssh.Server) *serviceTestEnv 
 	dialer := sshclient.NewDialer(cfg, known, logger)
 	auditService := audit.New(storage.NewAuditRepository(db), logger)
 	assignments := storage.NewAssignmentRepository(db)
-	service := NewService(cfg, serverRepo, users, assignments, known, caps, cipher, dialer, auditService, logger)
+	service := NewService(cfg, serverRepo, users, assignments, known, caps, cipher, vaultClient, dialer, auditService, logger)
 	return &serviceTestEnv{
 		service: service, users: user, userRepo: users, servers: serverRepo,
 		assignments: assignments, known: known, cfg: cfg,

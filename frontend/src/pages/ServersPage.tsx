@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Cable, Plus, Server as ServerIcon, ShieldCheck } from 'lucide-react'
-import { ApiError } from '@/api/client'
+import { ApiError, getVersion } from '@/api/client'
 import {
   deleteServer,
   listServerAssignments,
@@ -75,6 +75,11 @@ export function ServersPage() {
   const serversQuery = useQuery({
     queryKey: ['servers'],
     queryFn: ({ signal }) => listServers(signal),
+  })
+  const versionQuery = useQuery({
+    queryKey: ['version'],
+    queryFn: ({ signal }) => getVersion(signal),
+    staleTime: 60_000,
   })
 
   const servers = serversQuery.data?.servers ?? []
@@ -360,6 +365,7 @@ export function ServersPage() {
         onOpenChange={setDialogOpen}
         server={editing}
         csrfToken={csrfToken}
+        vaultEnabled={Boolean(versionQuery.data?.vault_enabled)}
         onSaved={() => {
           void queryClient.invalidateQueries({ queryKey: ['servers'] })
         }}
