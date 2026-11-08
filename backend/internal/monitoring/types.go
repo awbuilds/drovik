@@ -29,6 +29,32 @@ printf '@@mounts@@\n'
 cat /proc/mounts 2>/dev/null || true
 printf '@@df@@\n'
 df -Pk 2>/dev/null || true
+printf '@@posix-boottime@@\n'
+sysctl -n kern.boottime 2>/dev/null || true
+printf '@@posix-load@@\n'
+sysctl -n vm.loadavg 2>/dev/null || true
+printf '@@posix-ncpu@@\n'
+sysctl -n hw.ncpu 2>/dev/null || true
+printf '@@posix-memsize@@\n'
+sysctl -n hw.memsize 2>/dev/null || true
+printf '@@posix-physmem@@\n'
+sysctl -n hw.physmem 2>/dev/null || true
+printf '@@posix-pagesize@@\n'
+sysctl -n hw.pagesize 2>/dev/null || true
+printf '@@posix-brand@@\n'
+sysctl -n machdep.cpu.brand_string 2>/dev/null || true
+printf '@@posix-model@@\n'
+sysctl -n hw.model 2>/dev/null || true
+printf '@@vmstat@@\n'
+vm_stat 2>/dev/null || true
+printf '@@sw-vers@@\n'
+sw_vers 2>/dev/null || true
+printf '@@top@@\n'
+top -l 1 -n 0 2>/dev/null || true
+printf '@@mount@@\n'
+mount 2>/dev/null || true
+printf '@@netstat@@\n'
+netstat -ibn 2>/dev/null || true
 printf '@@end@@\n'`
 
 type Snapshot struct {

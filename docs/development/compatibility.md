@@ -16,13 +16,15 @@ the managed host. The beta targets servers, not desktops.
 | Area | Requirement | Notes |
 |---|---|---|
 | SSH | OpenSSH 7.4+ or compatible | Password or private-key auth; strict host-key verification |
-| OS | Linux with `/proc` | Kernel pseudo-files and `uname` are used for monitoring |
+| OS | Linux with `/proc` | Full feature set: terminal, SFTP, monitoring, processes, systemd, journal, Docker and advanced actions |
+| OS | macOS (Darwin) or BSD | Read-only monitoring: host, load, memory, filesystems, network counters and uptime. Linux-only panels report `CAPABILITY_UNAVAILABLE` |
 | Architecture | x86_64, arm64, armv7 | Depends on the remote tools, not the Drovik binary |
 | Process tools | `ps` with `-eo` (procps-ng preferred) | BusyBox `ps` may lack the required format; the UI reports `PROCESS_UNAVAILABLE` |
 | Files | SFTP subsystem | Required for the Files page; terminal and monitoring still work without it |
 | Services | systemd 230+ with `systemctl` | Non-systemd hosts show `SERVICE_MANAGER_UNAVAILABLE` |
 | Logs | `journalctl` with JSON output | Journal permissions are enforced by the remote system |
-| Monitoring | `/proc/stat`, `/proc/meminfo`, `/proc/loadavg`, `/proc/uptime`, `/proc/net/dev`, `df` | Missing sections are individually marked unavailable |
+| Monitoring (Linux) | `/proc/stat`, `/proc/meminfo`, `/proc/loadavg`, `/proc/uptime`, `/proc/net/dev`, `df` | Missing sections are individually marked unavailable |
+| Monitoring (macOS/BSD) | `uname`, `sysctl`, `vm_stat`, `df`, `mount`, `netstat`, `top` (macOS CPU) | Optional sources degrade individually; CPU usage is point-in-time on macOS |
 
 ## Distribution matrix
 
@@ -37,14 +39,17 @@ Other current Linux distributions with the tools above are expected to work but 
 beta test matrix. Containers without systemd, minimal appliances and network devices are supported
 only for features whose tools are present.
 
-## Not supported in the MVP
+## Not supported
 
 - Windows hosts.
-- macOS hosts (the collector reads Linux `/proc`).
+- A validated write feature set on macOS/BSD hosts. Read-only monitoring is supported; the
+  terminal and SFTP use standard SSH but are outside the validated matrix. Process, systemd,
+  journal, Docker and Linux advanced actions are unavailable.
 - Editing systemd unit files or creating arbitrary units.
 - File-based log tailing outside the journal.
 - Destructive Docker/Podman changes beyond enumerated container start/stop/restart/remove.
-- Storage, network, package and cron mutations (inspection only).
+- Unattended destructive storage/network operations. Feature-flagged manual actions require
+  `DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS=true`, administrator access and explicit confirmation.
 
 Report compatibility gaps with the managed host distribution, tool versions and the stable Drovik
 error code.

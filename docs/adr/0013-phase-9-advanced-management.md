@@ -58,10 +58,14 @@ web session into unbounded root-equivalent authority by accident.
   failures are logged and retried after the cooldown. Email/paging integrations remain future work.
 - **History:** optional local SQLite samples are retained for a configured window and sample cap.
   Existing snapshots are recorded on non-cached overview requests. Threshold rules are evaluated
-  in-app; external notification channels are not implemented. The UI states that this is not an
-  enterprise monitoring system.
-- **Additional operating systems:** Linux remains the only supported target. macOS/BSD are detected
-  as unsupported for Linux-specific collectors; no unverified shell compatibility is claimed.
+  in-app and may deliver encrypted webhooks. The UI states that this is not an enterprise
+  monitoring system.
+- **Additional operating systems:** Linux remains the full-feature target. macOS (Darwin) and BSD
+  hosts get read-only monitoring from portable collectors (`uname`, `sysctl`, `vm_stat`, `df`,
+  `mount`, `netstat`, `top`): host identity, load, memory, filesystems, network counters and uptime.
+  CPU usage on macOS is a point-in-time `top` sample; per-core counters, systemd, journal, Docker
+  and the Linux-only advanced actions remain unavailable and are labelled as such. Linux-specific
+  collectors are not claimed to work on other targets.
 
 ## Permanently out of scope for the 1.x line
 
@@ -71,8 +75,9 @@ The following Phase 9 candidates were reviewed and are not planned for the 1.x s
 - Repository configuration changes and automatic update scheduling.
 - systemd timer or unit-file editing.
 - External secret managers or additional federated identity providers.
-- External notification channels (email, webhook, chat, paging).
-- macOS, BSD or Windows managed-host support.
+- Email, chat or paging notification channels (webhooks are implemented).
+- Windows managed-host support.
+- Write operations on macOS/BSD hosts beyond read-only monitoring.
 
 Rationale: each changes the product's threat model or support matrix, and several can destroy data
 or lock an operator out of a host. The current read-first surface preserves the project's rule that

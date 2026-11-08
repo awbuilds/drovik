@@ -256,6 +256,13 @@ export function MonitoringPage() {
               {snapshot.warning ?? 'Live metrics could not be refreshed.'}
             </Alert>
           ) : null}
+          {snapshot.host.os && snapshot.host.os !== 'Linux' ? (
+            <Alert variant="info" title={`Read-only ${snapshot.host.os} monitoring`}>
+              Host, load, memory, disk, network and uptime are collected without an agent. CPU
+              usage is a point-in-time sample; systemd, journal and Linux-only panel actions are
+              unavailable on this host.
+            </Alert>
+          ) : null}
 
           <Card>
             <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-4 py-5">
@@ -359,7 +366,7 @@ export function MonitoringPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Per-core CPU</CardTitle>
-                <CardDescription>Percentage since the previous sample.</CardDescription>
+                <CardDescription>Per-core counters where the host exposes them.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 pt-4">
                 {!snapshot.cpu.available ? (
@@ -395,7 +402,7 @@ export function MonitoringPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Memory detail</CardTitle>
-                <CardDescription>Kernel /proc/meminfo counters.</CardDescription>
+                <CardDescription>Kernel memory counters.</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4 pt-4">
                 {[
