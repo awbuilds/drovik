@@ -83,6 +83,40 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
 - Live connection-state transitions, reconnect policy and the bounded session pool land with the
   Phase 3 terminal work.
 
+
+## Phase 3 — Workspace and interactive terminal
+
+| ID | Requirement | Status | Implementation / evidence |
+|---|---|---|---|
+| TERM-001 | Interactive SSH PTY | Tested | `terminal.Manager` requests a PTY; `TestTerminalWebSocket` |
+| TERM-002 | xterm.js terminal | Implemented | `TerminalPanel` with `@xterm/xterm`; manual review |
+| TERM-003 | Bidirectional I/O | Tested | WebSocket input/output test |
+| TERM-004 | Resize propagation | Implemented | resize envelope + `ssh.Session.WindowChange`; test sends resize |
+| TERM-005 | Multiple sessions | Tested | per-user/global manager limits; `TestAcquireLimits` |
+| TERM-006 | Server identity | Implemented | Terminal header shows `user@host:port` |
+| TERM-007 | Session lifecycle | Tested | close/EOF cleanup and manager close |
+| TERM-008 | Disconnect handling | Implemented | UI reconnect state; no buffered replay |
+| TERM-009 | Safe output handling | Implemented | output written only to xterm; JSON text envelopes |
+| TERM-010 | WebSocket authentication | Tested | `TestTerminalRequiresAuthentication` |
+| TERM-011 | Origin validation | Tested | `TestTerminalRejectsUntrustedOrigin` |
+| TERM-012 | Message size/rate limits | Implemented | 64 KiB read limit; 200 msg/s input cap |
+| TERM-013 | No transcript storage | Implemented | no terminal content persisted |
+| TERM-014 | Explicit close | Implemented | close envelope and UI button |
+| TERM-015 | Paste safety warning | Deferred | SHOULD; follow-up |
+| TERM-016 | Clipboard permissions | Implemented | browser/xterm behavior |
+| TERM-017 | No command rewriting | Implemented | input written verbatim |
+| TERM-018 | TERM environment | Implemented | `xterm-256color` |
+| TERM-019 | Shell exit reporting | Partial | closed status; exit code not surfaced |
+| TERM-020 | Cleanup on disconnect/shutdown | Implemented | manager close, PTY/channel/client cleanup |
+
+### Phase 3 notes
+
+- The terminal WebSocket requires both the session cookie and a trusted `Origin`; the Origin check
+  is performed before the upgrade.
+- Input is bounded by a 64 KiB read limit and a per-second message cap. Output is chunked.
+- The session pool is bounded per user and globally; shutdown closes registered sessions.
+- Terminal content is never written to the database by default.
+
 ## Later phases
 
 The remaining requirement groups are tracked in the PRD and will be added here when their phase

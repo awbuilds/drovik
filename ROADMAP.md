@@ -24,17 +24,23 @@ short, human-readable summary.
 - Saved server CRUD, connection tests and capability detection.
 - Egress policy, password/private-key authentication and audit events.
 
-## Now — Phase 3: workspace and interactive terminal
+## Complete — Phase 3: workspace and interactive terminal
 
 - Authenticated WebSocket terminal with PTY and resize.
 - Bounded session pool and cleanup.
 - Terminal UI with server context and reconnect states.
 
+## Now — Phase 4: SFTP file manager and editor
+
+- Safe directory listing, uploads, downloads and transfers.
+- Create/rename/delete with traversal and symlink protections.
+- Bounded text editor with unsaved-change and stale-file handling.
+
 ## Then
 
 | Phase | Focus |
 |---|---|
-| 4 | SFTP file manager and editor |
+| 5 | System overview and metrics |
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

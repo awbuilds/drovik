@@ -1,4 +1,4 @@
-import { Pencil, Play, Server as ServerIcon, Trash2 } from 'lucide-react'
+import { Pencil, Play, Server as ServerIcon, SquareTerminal, Trash2 } from 'lucide-react'
 import type { Capabilities, Server } from '@/api/servers'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -12,6 +12,7 @@ interface ServerCardProps {
   capabilities?: Capabilities
   testing: boolean
   onTest: () => void
+  onTerminal: () => void
   onEdit: () => void
   onDelete: () => void
 }
@@ -21,6 +22,7 @@ export function ServerCard({
   capabilities,
   testing,
   onTest,
+  onTerminal,
   onEdit,
   onDelete,
 }: ServerCardProps) {
@@ -96,6 +98,16 @@ export function ServerCard({
           Test connection
         </Button>
         <div className="flex items-center gap-1">
+          <Tooltip label="Open terminal">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onTerminal}
+              aria-label={`Open terminal for ${server.display_name}`}
+            >
+              <SquareTerminal className="h-3.5 w-3.5" aria-hidden="true" />
+            </Button>
+          </Tooltip>
           <Tooltip label="Edit server">
             <Button
               variant="ghost"

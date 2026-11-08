@@ -18,6 +18,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/servers"
 	"github.com/awbuilds/drovik/backend/internal/sshclient"
 	"github.com/awbuilds/drovik/backend/internal/storage"
+	"github.com/awbuilds/drovik/backend/internal/terminal"
 	"github.com/awbuilds/drovik/backend/internal/version"
 )
 
@@ -31,6 +32,7 @@ type Server struct {
 	audit        *audit.Service
 	auth         *auth.SessionManager
 	servers      *servers.Service
+	terminal     *terminal.Manager
 	limiter      *security.LoginLimiter
 	setupLimiter *security.LoginLimiter
 	version      version.Info
@@ -61,6 +63,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		auditService,
 		logger,
 	)
+	terminalManager := terminal.NewManager(cfg, serverService, logger)
 
 	var staticHandler http.Handler
 	var indexHTML []byte
@@ -82,6 +85,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		sessions: sessions,
 		audit:    auditService,
 		servers:  serverService,
+		terminal: terminalManager,
 		auth: auth.NewSessionManager(
 			sessions,
 			users,
@@ -97,6 +101,10 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		staticHandler: staticHandler,
 		indexHTML:     indexHTML,
 	}, nil
+}
+
+func (s *Server) Close() {
+	s.terminal.Close()
 }
 
 func (s *Server) Handler() http.Handler {
@@ -130,6 +138,7 @@ func (s *Server) Handler() http.Handler {
 			r.With(s.requireCSRF).Post("/servers/{id}/test", s.handleTestConnection)
 			r.With(s.requireCSRF).Post("/servers/{id}/trust-host-key", s.handleTrustHostKey)
 			r.Get("/servers/{id}/capabilities", s.handleCapabilities)
+			r.Get("/servers/{id}/terminal", s.handleTerminal)
 		})
 	})
 
