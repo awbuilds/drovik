@@ -67,6 +67,8 @@ release/
 *.zip
 
 # Tooling caches
+__pycache__/
+*.pyc
 .gitleaks/
 .golangci-lint-cache/
 .air.toml.local

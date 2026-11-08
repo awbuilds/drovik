@@ -77,6 +77,14 @@ else
     skipped+=("frontend (no package.json yet)")
 fi
 
+if [[ -f site/index.html ]]; then
+    step "site: check"
+    python3 scripts/check-site.py
+    ran+=("site check")
+else
+    skipped+=("site (no site/index.html yet)")
+fi
+
 printf '\n==> Summary\n'
 printf 'Ran:\n'
 for item in "${ran[@]}"; do printf '  - %s\n' "$item"; done

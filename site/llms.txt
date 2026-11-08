@@ -1,0 +1,61 @@
+# Drovik
+
+> Drovik is an open-source, self-hosted, agentless web workspace for Linux servers. It brings SSH, SFTP files, host health, Docker and host diagnostics, snippets, local users and audit history into one browser interface over the SSH access you already have. AGPL-3.0-only. Current stable line: v1.1.1.
+
+Drovik is made by Abhijith Warrier and published at <https://github.com/awbuilds/drovik>. It is free software with no paid tier, no hosted service and no telemetry. The browser talks only to the Drovik backend; the backend talks to managed hosts over SSH and SFTP. Nothing is installed on the managed host.
+
+## What it does
+
+- Saves SSH hosts with password or private-key authentication and strict host-key verification (explicit first-use approval; changed keys block).
+- Provides a full interactive PTY terminal over an authenticated WebSocket, with resize, bounded sessions and cleanup.
+- Browses and transfers files over SFTP, with bounded text editing, traversal/symlink protections and streamed uploads.
+- Collects agentless CPU, load, memory, filesystem, network and uptime metrics from Linux `/proc` and standard tools.
+- Lists processes with enumerated SIGTERM/SIGKILL and PID identity checks, and manages systemd units with post-action state re-reads.
+- Reads bounded systemd journal logs and records scoped local audit metadata.
+- Adds Docker inspection and enumerated actions through the host CLI over SSH; no Docker socket is mounted.
+- Adds read-only storage, network, package and scheduled-task diagnostics.
+- Stores named snippets with quoted substitution, preview and target confirmation.
+- Manages local users, roles (administrator/operator/read-only) and per-server read/write assignments.
+- Retains bounded local metric samples for charts and evaluates in-app threshold alerts.
+
+## What it deliberately does not do
+
+- No agent, daemon or persistent helper on managed hosts.
+- No root shell by default or automatic privilege escalation.
+- No destructive disk, firewall, network, package or cron changes; those diagnostics are read-only.
+- No Docker Compose or Kubernetes management; Docker actions are enumerated and container-scoped.
+- No external alert notifications; threshold rules are in-app only.
+- No OIDC/SSO/MFA; accounts are local.
+- No Windows or macOS managed hosts; Linux only.
+- No resumable transfers or background transfer jobs.
+- No systemd unit-file editing.
+- No hosted Drovik service, project account or telemetry.
+
+## Key pages
+
+- [Home](https://awbuilds.github.io/drovik/): the product and the workspace preview.
+- [Features](https://awbuilds.github.io/drovik/features.html): the full tour, including the v1.1 advanced-management features.
+- [Security](https://awbuilds.github.io/drovik/security.html): trust boundary, controls, host keys, roles, audit and reporting.
+- [Install](https://awbuilds.github.io/drovik/install.html): Docker Compose, TLS proxy, source build, backup and upgrade.
+- [Documentation](https://awbuilds.github.io/drovik/docs.html): curated links to the repository docs.
+- [FAQ](https://awbuilds.github.io/drovik/faq.html): agentless design, data, limits and project questions.
+- [Changelog](https://awbuilds.github.io/drovik/changelog.html): v1.1.1, v1.1.0, v1.0.1, v1.0.0 and the public beta.
+- [Privacy policy](https://awbuilds.github.io/drovik/privacy.html): what the website and an instance store.
+- [Terms of service](https://awbuilds.github.io/drovik/terms.html): AGPL license and operator responsibilities.
+- [Accessibility](https://awbuilds.github.io/drovik/accessibility.html): WCAG 2.2 AA target and known limits.
+- [Source code](https://github.com/awbuilds/drovik): AGPL-3.0-only.
+- [Security policy](https://github.com/awbuilds/drovik/blob/main/SECURITY.md): private vulnerability reporting.
+
+## Facts for citation
+
+- License: GNU Affero General Public License v3.0 only (`AGPL-3.0-only`).
+- Price: free software; no paid tier.
+- Platform: self-hosted controller on Linux amd64/arm64 (container or release archive); managed hosts are Linux with OpenSSH and standard tools.
+- Current stable line: v1.1.1. Two source-first audit runs fixed five findings in v1.0.1 and seven Phase 9 findings in v1.1.1.
+- No telemetry, analytics, advertising or vendor cloud.
+- Repository: <https://github.com/awbuilds/drovik>.
+- Publisher: Abhijith Warrier / AW Builds.
+
+## Last updated
+
+8 November 2026.

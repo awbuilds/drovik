@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security — Drovik</title>
+  <meta name="description" content="How Drovik handles SSH credentials, host keys, sessions, authorization, Docker risk and logs — and how to report a vulnerability.">
+  <meta name="author" content="Abhijith Warrier">
+  <meta name="theme-color" content="#07090c">
+  <meta name="color-scheme" content="dark light">
+  <script src="js/theme-init.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/space-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/jetbrains-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="canonical" href="https://awbuilds.github.io/drovik/security.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Drovik">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="Drovik security — a gateway needs an argument">
+  <meta property="og:description" content="How Drovik handles SSH credentials, host keys, sessions, authorization, Docker risk and logs — and how to report a vulnerability.">
+  <meta property="og:url" content="https://awbuilds.github.io/drovik/security.html">
+  <meta property="og:image" content="https://awbuilds.github.io/drovik/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Drovik — a self-hosted, agentless Linux server workspace.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Drovik security — a gateway needs an argument">
+  <meta name="twitter:description" content="How Drovik handles SSH credentials, host keys, sessions, authorization, Docker risk and logs — and how to report a vulnerability.">
+  <meta name="twitter:image" content="https://awbuilds.github.io/drovik/assets/og.png">
+  <script src="js/site.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="logo" href="index.html" aria-label="Drovik home">
+        <svg class="logo__mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+            <rect class="logo__bg" width="64" height="64" rx="14" />
+            <rect class="logo__cell" x="14" y="14" width="15" height="15" rx="3" />
+            <rect class="logo__cell logo__cell--muted" x="35" y="14" width="15" height="15" rx="3" />
+            <rect class="logo__cell logo__cell--muted" x="14" y="35" width="15" height="15" rx="3" />
+            <rect class="logo__cell" x="35" y="35" width="15" height="15" rx="3" />
+            <path class="logo__slash" d="M14 46 L50 18" />
+          </svg>
+        <span class="logo__word">Drovik</span>
+      </a>
+
+      <nav class="nav" id="site-nav" aria-label="Primary">
+        <ul class="nav__list">
+          <li><a href="features.html">Features</a></li>
+          <li><a href="security.html" aria-current="page">Security</a></li>
+          <li><a href="docs.html">Docs</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="install.html" class="btn btn--primary btn--sm nav__cta">Install</a></li>
+        </ul>
+      </nav>
+
+      <div class="header-actions">
+        <a class="icon-link" href="https://github.com/awbuilds/drovik" target="_blank" rel="noopener noreferrer" aria-label="Drovik source on GitHub (opens in a new tab)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 7-5 5 5 5M15 7l5 5-5 5" /></svg>
+        </a>
+        <button class="theme-toggle" type="button" role="switch" aria-checked="true" aria-label="Dark theme">
+          <span class="theme-toggle__track" aria-hidden="true">
+            <svg class="theme-toggle__sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+            <span class="theme-toggle__thumb"></span>
+            <svg class="theme-toggle__moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5 8.5 8.5 0 1 0 20.5 14.5Z" /></svg>
+          </span>
+        </button>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+  <section class="page-head">
+    <div class="container page-head__grid">
+      <div class="page-head__copy">
+        <p class="label">Security</p>
+        <h1>A gateway needs a security argument.</h1>
+        <p class="lead">Drovik holds credentials for machines that matter. The design assumes the browser is untrusted, the network is hostile and a remote host can lie. The controls are enforced in the Go service, not in the React UI.</p>
+      </div>
+      <dl class="page-head__meta">
+        <div><dt>Applies to</dt><dd>v1.1.1</dd></div>
+        <div><dt>Audit basis</dt><dd>v1.0.0 + v1.1.0</dd></div>
+        <div><dt>Reviewed</dt><dd>8 November 2026</dd></div>
+        <div><dt>Source</dt><dd>docs/security</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container manual-layout">
+      <aside class="manual-rail">
+        <p class="toc__label">On this page</p>
+        <nav class="toc" aria-label="Security sections">
+          <a href="#boundary">Boundary</a>
+          <a href="#controls">Controls</a>
+          <a href="#host-keys">Host keys</a>
+          <a href="#authorization">Authorization</a>
+          <a href="#high-risk">High-risk surfaces</a>
+          <a href="#audit">Audit record</a>
+          <a href="#reporting">Report a vulnerability</a>
+          <a href="#versions">Supported versions</a>
+        </nav>
+      </aside>
+
+      <div class="manual-body">
+        <section class="manual-section" id="boundary" aria-labelledby="boundary-title">
+          <p class="label">01 / Boundary</p>
+          <h2 id="boundary-title">The service is the only door.</h2>
+          <div class="prose mt-md">
+            <p>The browser talks to one Go service over HTTPS and WebSocket. It never opens an SSH connection, never receives a stored SSH secret, and never chooses the address Drovik connects to. The service authenticates the session, authorizes the resource, decrypts a credential only at connection time, and runs a structured operation over SSH or SFTP.</p>
+          </div>
+
+          <div class="arch arch--stacked mt-lg">
+            <div class="arch__node">
+              <p class="arch__label">Browser</p>
+              <h3 class="arch__title">React workspace</h3>
+              <ul class="arch__list">
+                <li>Session cookie + CSRF token</li>
+                <li>No SSH credentials</li>
+                <li>Remote text rendered as text</li>
+              </ul>
+              <p class="arch__foot">HTTPS / WSS</p>
+            </div>
+            <div class="arch__link" aria-hidden="true">
+              <span>HTTPS / WSS</span>
+              <svg viewBox="0 0 46 12" fill="none" stroke="currentColor" stroke-width="1" focusable="false"><path d="M0 6h42" /><path d="m38 2 4 4-4 4" /></svg>
+            </div>
+            <div class="arch__node arch__node--core">
+              <p class="arch__label">Drovik service</p>
+              <h3 class="arch__title">Go backend</h3>
+              <ul class="arch__list">
+                <li>Auth, sessions, CSRF, rate limits</li>
+                <li>Authorization per server</li>
+                <li>AES-256-GCM secret handling</li>
+                <li>Structured SSH / SFTP operations</li>
+              </ul>
+              <p class="arch__foot">SQLite metadata · key outside the database</p>
+            </div>
+            <div class="arch__link" aria-hidden="true">
+              <span>SSH / SFTP</span>
+              <svg viewBox="0 0 46 12" fill="none" stroke="currentColor" stroke-width="1" focusable="false"><path d="M0 6h42" /><path d="m38 2 4 4-4 4" /></svg>
+            </div>
+            <div class="arch__node">
+              <p class="arch__label">Managed host</p>
+              <h3 class="arch__title">OpenSSH + SFTP</h3>
+              <ul class="arch__list">
+                <li>No Drovik agent</li>
+                <li>Your SSH user's permissions</li>
+                <li>Strict host-key verification</li>
+              </ul>
+              <p class="arch__foot">Remote state remains authoritative</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="manual-section" id="controls" aria-labelledby="controls-title">
+          <p class="label">02 / Controls</p>
+          <h2 id="controls-title">Controls that fail closed.</h2>
+          <div class="prose mt-md">
+            <p>Every request passes through recovery, request identity, security headers, body limits, authentication, CSRF, authorization, validation, a bounded handler context and safe error mapping. The groups below are the parts that matter most.</p>
+          </div>
+
+          <dl class="control-list mt-lg">
+            <div class="control">
+              <dt>Authentication</dt>
+              <dd>Argon2id password hashes with per-password salts and versioned encoding. Login responses are generic; failures are rate-limited by IP. First-run setup exists only while no administrator exists.</dd>
+            </div>
+            <div class="control">
+              <dt>Sessions</dt>
+              <dd>Opaque 256-bit session tokens; only their SHA-256 hash is stored. Idle and absolute expiry are enforced server-side. Logout revokes the session, and password changes revoke the account's other sessions.</dd>
+            </div>
+            <div class="control">
+              <dt>CSRF &amp; origin</dt>
+              <dd>Cookie-authenticated mutations require a session-bound synchronizer token and an accepted <code>Origin</code>/<code>Sec-Fetch-Site</code>. <code>SameSite=Lax</code> is an additional layer, not the only one.</dd>
+            </div>
+            <div class="control">
+              <dt>Secrets</dt>
+              <dd>SSH credentials use AES-256-GCM with a random nonce and associated data binding the record. The key comes from the environment or a mounted file, never from SQLite or the image. Decryption happens only immediately before a connection.</dd>
+            </div>
+            <div class="control">
+              <dt>Authorization</dt>
+              <dd>Every server-scoped request is authorized in the backend. Local roles and per-server read/write assignments are enforced on the route, not in the sidebar. Read-only accounts cannot open a PTY or change remote state.</dd>
+            </div>
+            <div class="control">
+              <dt>Remote operations</dt>
+              <dd>Structured operations only, with enumerated signals and service actions. The terminal and user-authored snippets are the only arbitrary-command paths. Paths are normalized and checked for traversal and symlink escapes.</dd>
+            </div>
+            <div class="control">
+              <dt>Bounds</dt>
+              <dd>Timeouts, output sizes, upload limits, concurrent destinations, session counts and request bodies are bounded. A missing capability fails with a stable code rather than retrying indefinitely.</dd>
+            </div>
+            <div class="control">
+              <dt>Egress</dt>
+              <dd>Loopback, link-local, multicast, unspecified, reserved and cloud metadata endpoints are denied by default. Public and RFC1918 targets are allowed by default for self-hosted use, with operator overrides; deny wins over allow.</dd>
+            </div>
+            <div class="control">
+              <dt>Browser surface</dt>
+              <dd>The app uses a strict CSP and security headers, validates WebSocket authentication and origin, enforces message size and rate limits, and renders filenames, logs and terminal output as text — never raw HTML.</dd>
+            </div>
+            <div class="control">
+              <dt>Logging</dt>
+              <dd>Structured logs carry a stable code, correlation ID and safe context. Authorization headers, cookies, passwords, keys, tokens, file contents, terminal I/O and log contents are redacted. There is no external telemetry.</dd>
+            </div>
+            <div class="control">
+              <dt>Deployment</dt>
+              <dd>The supported container runs non-root on a distroless image with a read-only root filesystem, no Linux capabilities and <code>no-new-privileges</code>. The encryption key is a separate secret; port 8080 binds to loopback behind TLS.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="manual-section" id="host-keys" aria-labelledby="host-keys-title">
+          <p class="label">03 / Host keys</p>
+          <h2 id="host-keys-title">A changed key stops the connection.</h2>
+          <div class="prose mt-md">
+            <p>Host-key verification is strict and has no insecure fallback. The first connection is a deliberate decision; every later connection is a comparison.</p>
+          </div>
+
+          <div class="hostkey hostkey--stacked mt-lg">
+            <div class="hostkey__state">
+              <p class="label">Unknown</p>
+              <h3>Review the fingerprint</h3>
+              <p>The first connection shows the key type and fingerprint. Approve it only if it matches the host you intended to reach.</p>
+              <span class="tag tag--signal">blocked until approved</span>
+            </div>
+            <div class="hostkey__arrow" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" focusable="false"><path d="M2 9h13" /><path d="m10 4 5 5-5 5" /></svg>
+            </div>
+            <div class="hostkey__state">
+              <p class="label">Trusted</p>
+              <h3>Connect and compare</h3>
+              <p>The stored key is checked on every dial. A match proceeds; a mismatch is treated as a changed host, not a warning.</p>
+              <span class="tag tag--ok">stored per server</span>
+            </div>
+            <div class="hostkey__arrow" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.2" focusable="false"><path d="M2 9h13" /><path d="m10 4 5 5-5 5" /></svg>
+            </div>
+            <div class="hostkey__state hostkey__state--danger">
+              <p class="label">Changed</p>
+              <h3>Block and investigate</h3>
+              <p>The connection fails with a stable changed-key error. Re-approving is a deliberate administrative act, never a silent continue.</p>
+              <span class="tag tag--danger">connection blocked</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="manual-section" id="authorization" aria-labelledby="authorization-title">
+          <p class="label">04 / Authorization</p>
+          <h2 id="authorization-title">Roles are enforced on the route.</h2>
+          <div class="prose mt-md">
+            <p>Administrators manage users and servers. Operators work within their assignments. Read-only users can inspect assigned servers but cannot change remote state. Owners and administrators retain write access; the backend checks both the account role and the assignment.</p>
+          </div>
+
+          <div class="table-wrap mt-lg" tabindex="0" role="region" aria-label="Role capability table">
+            <table class="table">
+              <thead>
+                <tr><th scope="col">Capability</th><th scope="col">Read-only</th><th scope="col">Operator (write)</th><th scope="col">Administrator</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Inspect assigned servers</td><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+                <tr><td>Open a terminal</td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+                <tr><td>Change files</td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+                <tr><td>Signal processes or services</td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+                <tr><td>Run Docker actions</td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+                <tr><td>Run snippets</td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+                <tr><td>Edit alert rules</td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td><td><span class="yes">Yes</span></td></tr>
+                <tr><td>Manage servers and users</td><td><span class="no">No</span></td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="fine-print muted mt-sm">The table is a product summary, not the full policy. Assignments, owner access and the last-administrator invariant are implemented in the backend.</p>
+        </section>
+
+        <section class="manual-section" id="high-risk" aria-labelledby="high-risk-title">
+          <p class="label">05 / High-risk surfaces</p>
+          <h2 id="high-risk-title">Power that is named as power.</h2>
+
+          <div class="prose mt-md">
+            <h3>Docker</h3>
+            <p>Docker access is reached through the host's CLI over SSH. Drovik never mounts a Docker socket into its own container. The interface exposes listed containers, images, logs and inspection, plus start, stop, restart and remove by a validated container ID. These actions are potentially root-equivalent; they require confirmation, are audited, and are blocked for read-only assignments. This is not a Compose or Kubernetes manager.</p>
+
+            <h3>Snippets and the terminal</h3>
+            <p>The terminal and user-authored snippets are arbitrary-command paths by design. Snippet values are shell-quoted, the substituted command is previewed, and a specific server must be confirmed before execution. Snippets run as the SSH user, never with hidden elevation. Access control is the security boundary — not a promise that a user-authored command is safe.</p>
+
+            <h3>Read-first diagnostics</h3>
+            <p>Storage, network, package and scheduled-task views are read-only. Destructive disk, firewall, interface, package and cron changes are intentionally absent until separately designed and threat-modeled.</p>
+          </div>
+
+          <div class="note note--warn mt-lg">
+            <p><strong>Treat a Drovik administrator as privileged.</strong> The app can reach every server assigned to that account. Run it behind TLS, restrict who can reach it, and keep the encryption key and database backups separate.</p>
+          </div>
+        </section>
+
+        <section class="manual-section" id="audit" aria-labelledby="audit-title">
+          <p class="label">06 / Audit record</p>
+          <h2 id="audit-title">Two runs, twelve fixes, no clean bill of health.</h2>
+          <div class="prose mt-md">
+            <p>Two source-first audit runs were completed on 8 November 2026. The first covered the <code>v1.0.0</code> tree and fixed five confirmed findings in <code>v1.0.1</code>. The second covered the Phase 9 tree at <code>v1.1.0</code> and fixed seven confirmed findings in <code>v1.1.1</code>, plus additional hardening. Further validation leads were recorded with non-destructive reproduction plans; they were not confirmed vulnerabilities and were not assigned severity. The full report and evidence live outside the repository; the public summary is in the audit note.</p>
+          </div>
+
+          <p class="label mt-2xl">v1.0.1 / first run</p>
+          <div class="table-wrap mt-sm" tabindex="0" role="region" aria-label="Security fixes in v1.0.1">
+            <table class="table">
+              <thead>
+                <tr><th scope="col">Severity</th><th scope="col">Issue</th><th scope="col">Fix</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>High</td><td>Changing authentication method could reinterpret a stored private key as a password.</td><td>Method changes require a credential of the new type; stored secrets are never decrypted under a different method.</td></tr>
+                <tr><td>Medium</td><td>Terminal PTYs survived logout, revocation and session expiry.</td><td>Terminals are bound to the application session, closed on logout, and revalidated every 30 seconds.</td></tr>
+                <tr><td>Medium</td><td>IPv6 zone identifiers bypassed the egress deny policy.</td><td>Zone identifiers are rejected; loopback, link-local, multicast and unspecified checks are explicit.</td></tr>
+                <tr><td>Medium</td><td>Uploading over a <code>0600</code> file could widen it to the SFTP default mode.</td><td>Staging is private; the final mode is applied before an atomic rename, and a failed chmod aborts.</td></tr>
+                <tr><td>Medium</td><td>The journal parser ignored the requested line count.</td><td>Parsing stops at the requested count and marks the window truncated.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="label mt-2xl">v1.1.1 / second run</p>
+          <div class="table-wrap mt-sm" tabindex="0" role="region" aria-label="Security fixes in v1.1.1">
+            <table class="table">
+              <thead>
+                <tr><th scope="col">Severity</th><th scope="col">Issue</th><th scope="col">Fix</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Medium</td><td>Snippet substitution could expand one request into gigabytes before the 64 KiB check.</td><td>Bounded per-value limits, a running-budget builder and declaration validation.</td></tr>
+                <tr><td>Medium</td><td>Two administrators deactivating each other concurrently could leave zero active administrators.</td><td>A statement-level post-state guard and explicit last-administrator conflict mapping.</td></tr>
+                <tr><td>Low</td><td>Collector section assembly was quadratic in the remote line count.</td><td>Linear builders with a per-section line cap.</td></tr>
+                <tr><td>Low</td><td>A failed post-signal state read was reported as “not running” with a success audit.</td><td>Explicit <code>OUTCOME_UNKNOWN</code> and an unknown audit outcome.</td></tr>
+                <tr><td>Low</td><td>A delivered signal could lose its audit row when the request was canceled.</td><td>A detached, bounded audit context.</td></tr>
+                <tr><td>Low</td><td>Non-finite host load or uptime could be persisted and turn APIs into empty 200 responses.</td><td>Finiteness checks, storage guards and marshal-before-write JSON.</td></tr>
+                <tr><td>Low</td><td>Concurrent overview requests persisted duplicate metric samples.</td><td>A unique <code>(server_id, collected_at)</code> index with <code>ON CONFLICT DO NOTHING</code>.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="prose mt-lg">
+            <p>The second run also bounded alert-rule cardinality and identifier length, sanitized Docker inspect labels, added <code>no-store</code> to advanced responses, and pinned container base images by digest. The dependency review upgraded <code>golang.org/x/crypto</code> past GO-2026-5932 and reduced workflow token permissions.</p>
+            <p>The second run covered the Phase 9 tree; it was another source-first review, not an independent external audit. The advanced-management surfaces have their own threat-model decisions in ADR 0013 and are covered by tests. Report suspected issues privately; do not test them against systems you do not own.</p>
+            <p><a href="https://github.com/awbuilds/drovik/blob/main/docs/security/audit-2026-11-08.md" target="_blank" rel="noopener noreferrer">Read the public audit summary</a></p>
+          </div>
+        </section>
+
+        <section class="manual-section" id="reporting" aria-labelledby="reporting-title">
+          <p class="label">07 / Reporting</p>
+          <h2 id="reporting-title">Report privately. Do not open a public issue.</h2>
+          <div class="prose mt-md">
+            <p>Use GitHub's private vulnerability reporting from the repository's <strong>Security</strong> tab. Include the affected version or commit, impact, reproduction steps and any suggested fix. Do not include real credentials, private keys, customer data or production hostnames in a report; use synthetic examples.</p>
+            <p>Expect acknowledgement within 7 days and an initial assessment within 14 days where feasible. This is a volunteer-maintained project: these are targets, not contractual SLAs. Coordinated disclosure follows a fix and a reasonable upgrade window.</p>
+            <h3>In scope</h3>
+            <ul>
+              <li>Authentication, session, CSRF and authorization weaknesses.</li>
+              <li>Host-key verification bypass, credential exposure and secret leakage.</li>
+              <li>Command injection in structured operations; path traversal or symlink escape.</li>
+              <li>SSRF or egress-policy bypass; WebSocket origin or authentication bypass.</li>
+              <li>XSS through filenames, hostnames, process names, logs or terminal output.</li>
+              <li>Resource exhaustion that affects other users or the host.</li>
+            </ul>
+            <h3>Out of scope</h3>
+            <p>Compromised administrator accounts, physical access, unsupported browsers, social engineering, single-user self-DoS that stays within documented limits, and automated scanner output without demonstrated impact.</p>
+            <p><a href="https://github.com/awbuilds/drovik/security/advisories/new" target="_blank" rel="noopener noreferrer">Open a private security advisory</a> · <a href="https://github.com/awbuilds/drovik/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">Read SECURITY.md</a></p>
+          </div>
+        </section>
+
+        <section class="manual-section" id="versions" aria-labelledby="versions-title">
+          <p class="label">08 / Versions</p>
+          <h2 id="versions-title">Supported releases.</h2>
+          <div class="table-wrap mt-lg" tabindex="0" role="region" aria-label="Supported versions">
+            <table class="table">
+              <thead><tr><th scope="col">Version</th><th scope="col">Supported</th></tr></thead>
+              <tbody>
+                <tr><td>Latest stable <code>v1.x</code></td><td><span class="yes">Yes</span> — security fixes</td></tr>
+                <tr><td>Current beta <code>v0.1.x-beta</code></td><td><span class="yes">Yes</span> — until the next stable release</td></tr>
+                <tr><td>Older tags and commits</td><td><span class="no">No</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="fine-print muted mt-sm">Only the latest stable minor and the current beta line receive security fixes. Upgrade with the documented backup and restore procedure.</p>
+
+          <div class="hero__actions">
+            <a class="btn btn--outline" href="https://github.com/awbuilds/drovik/blob/main/docs/security/security-architecture.md" target="_blank" rel="noopener noreferrer">Security architecture</a>
+            <a class="btn btn--ghost" href="https://github.com/awbuilds/drovik/blob/main/docs/security/threat-model.md" target="_blank" rel="noopener noreferrer">Threat model</a>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" aria-labelledby="security-cta-title">
+    <div class="container">
+      <div class="cta__inner">
+        <div class="cta__copy">
+          <p class="label">Deploy carefully</p>
+          <h2 id="security-cta-title">Put it behind TLS. Finish setup before you expose it.</h2>
+          <p>The install guide includes the reverse-proxy examples, the key-handling rules and the backup boundary.</p>
+        </div>
+        <div class="cta__actions">
+          <a class="btn btn--primary" href="install.html">Read the install guide</a>
+          <a class="btn btn--outline" href="docs.html">Browse the docs</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+
+  <footer class="site-footer">
+    <div class="container footer__grid">
+      <div class="footer__brand">
+        <a class="logo" href="index.html" aria-label="Drovik home">
+          <svg class="logo__mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+            <rect class="logo__bg" width="64" height="64" rx="14" />
+            <rect class="logo__cell" x="14" y="14" width="15" height="15" rx="3" />
+            <rect class="logo__cell logo__cell--muted" x="35" y="14" width="15" height="15" rx="3" />
+            <rect class="logo__cell logo__cell--muted" x="14" y="35" width="15" height="15" rx="3" />
+            <rect class="logo__cell" x="35" y="35" width="15" height="15" rx="3" />
+            <path class="logo__slash" d="M14 46 L50 18" />
+          </svg>
+          <span class="logo__word">Drovik</span>
+        </a>
+        <p class="footer__desc">A self-hosted, agentless workspace for the Linux servers you actually run.</p>
+        <p class="footer__status"><span class="status-dot status-dot--ok"></span> v1.1.1 stable <span aria-hidden="true">/</span> AGPL-3.0-only</p>
+      </div>
+
+      <nav class="footer__col" aria-label="Product">
+        <h2>Product</h2>
+        <ul>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="security.html">Security</a></li>
+          <li><a href="install.html">Install</a></li>
+          <li><a href="docs.html">Documentation</a></li>
+          <li><a href="changelog.html">Changelog</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer__col" aria-label="Project">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/awbuilds/drovik" target="_blank" rel="noopener noreferrer">Source code</a></li>
+          <li><a href="https://github.com/awbuilds/drovik/releases" target="_blank" rel="noopener noreferrer">Releases</a></li>
+          <li><a href="https://github.com/awbuilds/drovik/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/awbuilds/drovik/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contributing</a></li>
+          <li><a href="https://github.com/awbuilds/drovik/security/advisories/new" target="_blank" rel="noopener noreferrer">Report a vulnerability</a></li>
+          <li><a href="https://github.com/awbuilds/drovik/blob/main/docs/security/audit-2026-11-08.md" target="_blank" rel="noopener noreferrer">Security audit</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer__col" aria-label="Legal">
+        <h2>Legal</h2>
+        <ul>
+          <li><a href="privacy.html">Privacy policy</a></li>
+          <li><a href="terms.html">Terms of service</a></li>
+          <li><a href="accessibility.html">Accessibility</a></li>
+          <li><a href="https://github.com/awbuilds/drovik/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+
+    <div class="container footer__bottom">
+      <p>© 2026 Abhijith Warrier. Drovik is licensed AGPL-3.0-only.</p>
+      <p>This site sets no cookies, no analytics, and no third-party requests.</p>
+      <p>Drovik is a working name pending trademark clearance.</p>
+    </div>
+  </footer>
+</body>
+</html>

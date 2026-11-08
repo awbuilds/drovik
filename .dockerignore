@@ -25,6 +25,7 @@ data
 *.log
 
 docs
+site
 *.md
 LICENSE
 CHANGELOG.md

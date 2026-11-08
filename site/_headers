@@ -1,0 +1,14 @@
+# Static-host headers for the Drovik project website.
+#
+# GitHub Pages ignores this file; Netlify, Cloudflare Pages and compatible
+# hosts apply it. The policy is strict because every asset is same-origin and
+# the site uses no inline scripts or styles. If a host cannot set headers,
+# configure the equivalent policy at the reverse proxy.
+
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
