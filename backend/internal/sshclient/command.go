@@ -60,6 +60,10 @@ func RunCommand(ctx context.Context, client *ssh.Client, command string, maxByte
 
 	done := make(chan error, 1)
 	go func() {
+		// Every caller passes either a fixed command or values constrained by an
+		// enumeration, a positive integer, or a strict unit/absolute-path
+		// validator. No raw UI text reaches this sink.
+		// codeql[go/command-injection]
 		done <- session.Run(command)
 	}()
 
