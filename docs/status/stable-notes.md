@@ -1,9 +1,9 @@
 # Stable release notes
 
-**Release line:** `v1.2.0`
+**Release line:** `v1.3.0`
 
-Drovik 1.0 was the first stable MVP for self-hosted, agentless Linux server management. `v1.1.0`
-adds the Phase 9 advanced-management scope. It includes:
+Drovik 1.0 was the first stable MVP for self-hosted, agentless Linux server management. `v1.3.0`
+completes the Phase 9 scope. It includes:
 
 - setup, Argon2id authentication, sessions and CSRF;
 - encrypted SSH credentials with strict host-key approval;
@@ -14,7 +14,12 @@ adds the Phase 9 advanced-management scope. It includes:
 - Docker inspection and enumerated container actions, read-only storage/network/package/scheduled-task
   diagnostics, command snippets with preview and confirmation;
 - local users with roles and per-server `read`/`write` assignments;
-- optional bounded metric history and in-app threshold alerts.
+- optional bounded metric history, in-app threshold alerts and encrypted webhooks;
+- package install/upgrade/remove and Drovik-managed cron tasks;
+- local TOTP MFA with recovery codes and optional OIDC single sign-on with explicit account linking;
+- optional HashiCorp Vault KV v2 SSH credentials;
+- read-only macOS/BSD monitoring;
+- feature-flagged destructive storage/network operations (disabled by default).
 
 ## Compatibility
 
@@ -28,7 +33,8 @@ Only the latest stable minor release and the current beta line receive security 
 
 ## Security patches
 
-`v1.2.0` adds package lifecycle, managed cron tasks, local TOTP MFA and encrypted alert webhooks.
+`v1.3.0` completes Phase 9 and fixes six issues found by the final source-first audit, including
+OIDC link step-up, MFA re-enrollment, OIDC browser binding and webhook URL logging.
 
 `v1.1.1` fixed seven issues found by the second source-first audit of the Phase 9 tree and pins
 container base images by digest. See [`docs/security/audit-2026-11-08.md`](../security/audit-2026-11-08.md).

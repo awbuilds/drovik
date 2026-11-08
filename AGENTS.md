@@ -369,14 +369,15 @@ covered.
   compatibility/troubleshooting/backup/security-testing docs and the release workflow are in place.
 - Phase 8: complete. Tag-driven release pipeline, stable release notes, versioned support policy,
   release runbook and parser benchmarks are in place.
-- Phase 9: expanded beyond the read-first scope. Docker inspection/actions, storage/network/
-  package/schedule inspection, package lifecycle, managed cron tasks, snippets, local users/server
-  assignments, metric history, local TOTP MFA, in-app alerts and encrypted webhooks are implemented
-  and tested. Destructive storage/network changes, OIDC/SSO and non-Linux targets remain out of
-  scope pending separate design and threat models.
-- Security audit 2026-11-08 complete in two runs: five confirmed findings fixed in `v1.0.1`; seven
-  Phase 9 findings fixed in `v1.1.1`. Remaining leads and validation plans are summarized in
-  `docs/security/audit-2026-11-08.md`.
+- Phase 9: complete on the v1.3.0 line. Docker inspection/actions, storage/network/package/schedule
+  inspection, package lifecycle, managed cron tasks, snippets, local users/server assignments,
+  metric history, local TOTP MFA, OIDC single sign-on, Vault KV v2 credentials, encrypted webhooks,
+  feature-flagged destructive storage/network operations and read-only macOS/BSD monitoring are
+  implemented and tested. External secret-manager backends beyond Vault and Windows targets remain
+  out of scope.
+- Security audit 2026-11-08 complete in three runs: five confirmed findings fixed in `v1.0.1`,
+  seven in `v1.1.1`/`v1.2.0`, and six in `v1.3.0`. Fourteen source-grounded leads and their
+  non-destructive validation plans are summarized in `docs/security/audit-2026-11-08.md`.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
 - Read the latest handoff in `docs/handoffs/` before starting any post-MVP work.
