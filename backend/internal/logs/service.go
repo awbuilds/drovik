@@ -74,8 +74,10 @@ func (s *Service) Read(
 	ownerID, serverID, unit, since string,
 	lines int,
 ) (*Result, error) {
-	if unit != "" && !unitPattern.MatchString(unit) {
-		return nil, ErrInvalidUnit
+	if unit != "" {
+		if !unitPattern.MatchString(unit) {
+			return nil, ErrInvalidUnit
+		}
 	}
 	sinceValue, ok := ranges[since]
 	if !ok {
