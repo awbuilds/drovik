@@ -1403,6 +1403,79 @@ paths:
         "200": {description: Execution result}
         "403": {$ref: "#/components/responses/Forbidden"}
 
+  /api/v1/servers/{id}/packages/action:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: runPackageAction
+      summary: Install, upgrade or remove a package
+      description: |
+        Runs one enumerated package-manager action as the connected SSH user.
+        Package names are validated, confirmation is required and no privilege
+        escalation is attempted.
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [package, action, confirm]
+              properties:
+                package: {type: string}
+                action: {type: string, enum: [install, upgrade, remove]}
+                confirm: {type: boolean}
+      responses:
+        "200": {description: Action result with bounded remote output}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/ValidationError"}
+
+  /api/v1/servers/{id}/tasks:
+    parameters: [{$ref: "#/components/parameters/ServerID"}]
+    post:
+      tags: [Advanced]
+      operationId: createScheduledTask
+      summary: Create a Drovik-managed cron entry
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [schedule, command, confirm]
+              properties:
+                schedule: {type: string}
+                command: {type: string}
+                confirm: {type: boolean}
+      responses:
+        "201": {description: Task created}
+        "422": {$ref: "#/components/responses/ValidationError"}
+
+  /api/v1/servers/{id}/tasks/{taskID}:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+      - name: taskID
+        in: path
+        required: true
+        schema: {type: string}
+    delete:
+      tags: [Advanced]
+      operationId: deleteScheduledTask
+      summary: Delete a Drovik-managed cron entry
+      security: [{cookieAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+        - name: confirm
+          in: query
+          required: true
+          schema: {type: boolean}
+      responses:
+        "204": {description: Deleted}
+        "422": {$ref: "#/components/responses/ValidationError"}
+
 components:
   securitySchemes:
     cookieAuth:

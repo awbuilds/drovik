@@ -38,6 +38,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- Phase 9 expansion: enumerated package install/upgrade/remove for apt, dnf, apk and pacman with
+  confirmation and audit; Drovik-managed crontab task creation/deletion with validation, SFTP
+  staging and audit.
 - Phase 9 advanced management: Docker inspection and enumerated actions, read-only storage/network/
   package/scheduled-task diagnostics, command snippets, local users with roles and per-server
   assignments, retained metric history/charts and in-app threshold alerts.

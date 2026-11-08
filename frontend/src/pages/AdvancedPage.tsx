@@ -8,6 +8,7 @@ import {
   Network,
   PackageSearch,
   Play,
+  Plus,
   RefreshCw,
   Server as ServerIcon,
   Square,
@@ -21,6 +22,10 @@ import {
   getNetwork,
   getPackages,
   getSchedules,
+  createTask,
+  deleteTask,
+  packageAction,
+  type PackageAction,
   getStorage,
   type DockerAction,
   type DockerContainer,
@@ -35,6 +40,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Dialog } from '@/components/ui/Dialog'
+import { Field } from '@/components/ui/Field'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { StatusDot } from '@/components/ui/StatusDot'
@@ -64,6 +70,19 @@ export function AdvancedPage() {
   const [logsTarget, setLogsTarget] = useState<DockerContainer | null>(null)
   const [busy, setBusy] = useState(false)
   const [packageFilter, setPackageFilter] = useState('')
+  const [packageTarget, setPackageTarget] = useState<{ name: string; action: PackageAction } | null>(null)
+  const [packageName, setPackageName] = useState('')
+  const [packageConfirm, setPackageConfirm] = useState(false)
+  const [packageBusy, setPackageBusy] = useState(false)
+  const [packageOutput, setPackageOutput] = useState('')
+  const [packageError, setPackageError] = useState<string | null>(null)
+  const [taskOpen, setTaskOpen] = useState(false)
+  const [taskSchedule, setTaskSchedule] = useState('*/5 * * * *')
+  const [taskCommand, setTaskCommand] = useState('')
+  const [taskConfirm, setTaskConfirm] = useState(false)
+  const [taskBusy, setTaskBusy] = useState(false)
+  const [taskError, setTaskError] = useState<string | null>(null)
+  const [taskDelete, setTaskDelete] = useState<{ id: string; command: string } | null>(null)
 
   const serversQuery = useQuery({
     queryKey: ['servers'],
@@ -139,6 +158,73 @@ export function AdvancedPage() {
       toast({ title: 'Docker action failed', description: userFacingError(caught), variant: 'error' })
     } finally {
       setBusy(false)
+    }
+  }
+
+  const openPackageDialog = (name: string, action: PackageAction) => {
+    setPackageTarget({ name, action })
+    setPackageName(name)
+    setPackageConfirm(false)
+    setPackageOutput('')
+    setPackageError(null)
+  }
+
+  const runPackageAction = async () => {
+    if (!serverId || !packageTarget || !packageConfirm) return
+    const name = packageName.trim()
+    if (!name) {
+      setPackageError('Enter a package name.')
+      return
+    }
+    setPackageBusy(true)
+    setPackageError(null)
+    setPackageOutput('')
+    try {
+      const result = await packageAction(serverId, name, packageTarget.action, csrfToken)
+      setPackageOutput(result.output || '(no output)')
+      if (!result.success) {
+        setPackageError(`The package manager reported a failure. Review the output below.`)
+      } else {
+        toast({ title: `Package ${packageTarget.action} completed`, description: name, variant: 'success' })
+        await queryClient.invalidateQueries({ queryKey: ['packages', serverId] })
+      }
+    } catch (caught) {
+      setPackageError(userFacingError(caught))
+    } finally {
+      setPackageBusy(false)
+    }
+  }
+
+  const runCreateTask = async () => {
+    if (!serverId || !taskConfirm) return
+    setTaskBusy(true)
+    setTaskError(null)
+    try {
+      await createTask(serverId, { schedule: taskSchedule.trim(), command: taskCommand.trim() }, csrfToken)
+      toast({ title: 'Scheduled task created', description: taskSchedule.trim(), variant: 'success' })
+      setTaskOpen(false)
+      setTaskConfirm(false)
+      setTaskCommand('')
+      await queryClient.invalidateQueries({ queryKey: ['schedules', serverId] })
+    } catch (caught) {
+      setTaskError(userFacingError(caught))
+    } finally {
+      setTaskBusy(false)
+    }
+  }
+
+  const runDeleteTask = async () => {
+    if (!serverId || !taskDelete) return
+    setTaskBusy(true)
+    try {
+      await deleteTask(serverId, taskDelete.id, csrfToken)
+      toast({ title: 'Scheduled task deleted', description: taskDelete.command, variant: 'success' })
+      setTaskDelete(null)
+      await queryClient.invalidateQueries({ queryKey: ['schedules', serverId] })
+    } catch (caught) {
+      toast({ title: 'Delete failed', description: userFacingError(caught), variant: 'error' })
+    } finally {
+      setTaskBusy(false)
     }
   }
 
@@ -427,18 +513,34 @@ export function AdvancedPage() {
         packagesQuery.data ? (
           <Card>
             <CardHeader className="flex-row items-start justify-between gap-3">
-              <div><CardTitle>Installed packages</CardTitle><CardDescription>Read-only list from {packagesQuery.data.manager}. Install, remove and upgrade are not exposed.</CardDescription></div>
-              <Badge variant="outline">{packagesQuery.data.packages.length} installed</Badge>
+              <div><CardTitle>Installed packages</CardTitle><CardDescription>Enumerated install, upgrade and remove actions run as the connected SSH account. No privilege escalation is attempted.</CardDescription></div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{packagesQuery.data.packages.length} installed</Badge>
+                {canWrite ? <Button size="sm" variant="outline" onClick={() => openPackageDialog('', 'install')}><Plus className="h-3.5 w-3.5" aria-hidden="true" />Install package</Button> : null}
+              </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-4">
               <Input value={packageFilter} onChange={(event) => setPackageFilter(event.target.value)} placeholder="Filter installed packages" className="h-9 max-w-md text-xs" aria-label="Filter packages" />
               <div className="max-h-[60vh] overflow-y-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="text-ink-500 bg-ink-900 border-ink-700 sticky top-0 border-y font-mono text-[10px] uppercase"><tr><th className="px-4 py-2 font-medium">Package</th><th className="px-4 py-2 font-medium">Version</th></tr></thead>
-                  <tbody>{packages.map((pkg) => (<tr key={pkg.name} className="border-ink-800 border-b last:border-0"><td className="text-ink-200 px-4 py-2 font-mono text-[10px]">{pkg.name}</td><td className="text-ink-500 px-4 py-2 font-mono text-[10px]">{pkg.version}</td></tr>))}</tbody>
+                  <thead className="text-ink-500 bg-ink-900 border-ink-700 sticky top-0 border-y font-mono text-[10px] uppercase"><tr><th className="px-4 py-2 font-medium">Package</th><th className="px-4 py-2 font-medium">Version</th><th className="px-4 py-2 text-right font-medium">Actions</th></tr></thead>
+                  <tbody>{packages.map((pkg) => (
+                    <tr key={pkg.name} className="border-ink-800 border-b last:border-0">
+                      <td className="text-ink-200 px-4 py-2 font-mono text-[10px]">{pkg.name}</td>
+                      <td className="text-ink-500 px-4 py-2 font-mono text-[10px]">{pkg.version}</td>
+                      <td className="px-4 py-2 text-right">
+                        {canWrite ? (
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => openPackageDialog(pkg.name, 'upgrade')}>Upgrade</Button>
+                            <Button size="sm" variant="ghost" className="hover:text-rose-400 h-7 text-[10px]" onClick={() => openPackageDialog(pkg.name, 'remove')}>Remove</Button>
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}</tbody>
                 </table>
               </div>
-              <p className="text-ink-500 text-[10px]">Showing at most 500 filtered packages. Update availability is intentionally not queried to avoid contacting package repositories.</p>
+              <p className="text-ink-500 text-[10px]">Showing at most 500 filtered packages. Update availability is not queried to avoid contacting package repositories; manager commands use the host's configured repositories.</p>
             </CardContent>
           </Card>
         ) : null
@@ -449,6 +551,31 @@ export function AdvancedPage() {
         schedulesQuery.isLoading ? <Skeleton className="h-64 w-full" /> :
         schedulesQuery.data ? (
           <div className="space-y-4">
+            <Card>
+              <CardHeader className="flex-row items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Drovik-managed tasks</CardTitle>
+                  <CardDescription>Entries created here are marked in the SSH user's crontab and can be removed safely.</CardDescription>
+                </div>
+                {canWrite ? <Button size="sm" variant="outline" onClick={() => { setTaskError(null); setTaskOpen(true) }}><Plus className="h-3.5 w-3.5" aria-hidden="true" />Add task</Button> : null}
+              </CardHeader>
+              <CardContent className="px-0 pt-2">
+                {schedulesQuery.data.managed_tasks.length === 0 ? (
+                  <p className="text-ink-500 px-5 py-4 text-xs">No Drovik-managed tasks.</p>
+                ) : (
+                  <table className="w-full text-left text-sm">
+                    <thead className="text-ink-500 border-ink-700 border-y font-mono text-[10px] uppercase"><tr><th className="px-4 py-2 font-medium">Schedule</th><th className="px-4 py-2 font-medium">Command</th><th className="px-4 py-2 text-right font-medium">Action</th></tr></thead>
+                    <tbody>{schedulesQuery.data.managed_tasks.map((task) => (
+                      <tr key={task.id} className="border-ink-800 border-b last:border-0">
+                        <td className="text-ink-200 px-4 py-2 font-mono text-[10px]">{task.schedule}</td>
+                        <td className="text-ink-300 px-4 py-2 font-mono text-[10px] break-all">{task.command}</td>
+                        <td className="px-4 py-2 text-right">{canWrite ? <Button size="sm" variant="ghost" className="hover:text-rose-400 h-7 text-[10px]" onClick={() => setTaskDelete({ id: task.id, command: task.command })}>Remove</Button> : null}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
             <Card>
               <CardHeader><CardTitle>Cron entries</CardTitle><CardDescription>Read-only view of user and system cron. Editing is intentionally not exposed yet.</CardDescription></CardHeader>
               <CardContent className="px-0 pt-2">
@@ -468,6 +595,94 @@ export function AdvancedPage() {
           </div>
         ) : null
       ) : null}
+
+      <Dialog
+        open={taskOpen}
+        onOpenChange={setTaskOpen}
+        title="Add scheduled task"
+        description="Creates one five-field cron entry in the SSH user's crontab."
+        size="md"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setTaskOpen(false)} disabled={taskBusy}>Cancel</Button>
+            <Button onClick={() => void runCreateTask()} loading={taskBusy} disabled={!taskConfirm || !taskCommand.trim() || !taskSchedule.trim()}>Create task</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {taskError ? <Alert variant="error">{taskError}</Alert> : null}
+          <Alert variant="warning" title="Cron changes run on the managed host">
+            The task runs as the connected SSH account on its schedule. Drovik writes only its own
+            marked block and preserves the existing crontab.
+          </Alert>
+          <Field label="Schedule" htmlFor="task-schedule" hint="Five cron fields: minute hour day month weekday.">
+            <Input id="task-schedule" value={taskSchedule} onChange={(event) => setTaskSchedule(event.target.value)} className="font-mono" autoComplete="off" />
+          </Field>
+          <Field label="Command" htmlFor="task-command" hint="No newlines or percent signs; maximum 500 bytes.">
+            <Input id="task-command" value={taskCommand} onChange={(event) => setTaskCommand(event.target.value)} className="font-mono" autoComplete="off" placeholder="/usr/local/bin/backup" />
+          </Field>
+          <label className="text-ink-300 flex items-start gap-2 text-xs">
+            <input type="checkbox" checked={taskConfirm} onChange={(event) => setTaskConfirm(event.target.checked)} className="accent-signal-400 mt-0.5 h-4 w-4" />
+            I confirm this recurring command should run on the selected server.
+          </label>
+        </div>
+      </Dialog>
+
+      <ConfirmDialog
+        open={taskDelete !== null}
+        onOpenChange={(open) => { if (!open) setTaskDelete(null) }}
+        title="Delete scheduled task?"
+        description={taskDelete ? `Remove the Drovik-managed cron entry: ${taskDelete.command}` : ''}
+        confirmLabel="Delete task"
+        destructive
+        busy={taskBusy}
+        onConfirm={() => void runDeleteTask()}
+      />
+
+      <Dialog
+        open={packageTarget !== null}
+        onOpenChange={(open) => { if (!open) setPackageTarget(null) }}
+        title={packageTarget ? `${packageTarget.action} package` : 'Package action'}
+        description="Runs one enumerated package-manager command as the connected SSH account."
+        size="md"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPackageTarget(null)} disabled={packageBusy}>Close</Button>
+            <Button
+              onClick={() => void runPackageAction()}
+              loading={packageBusy}
+              disabled={!packageConfirm || !packageName.trim()}
+            >
+              {packageTarget?.action === 'remove' ? 'Remove package' : packageTarget?.action === 'upgrade' ? 'Upgrade package' : 'Install package'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {packageError ? <Alert variant="error">{packageError}</Alert> : null}
+          <Alert variant={packageTarget?.action === 'remove' ? 'warning' : 'info'} title="Package changes affect the managed host">
+            Installing, upgrading or removing packages changes software on the server and can restart
+            or break services. Drovik does not use sudo; the remote account's permissions decide the outcome.
+          </Alert>
+          <Field label="Package name" htmlFor="package-name">
+            <Input
+              id="package-name"
+              value={packageName}
+              onChange={(event) => setPackageName(event.target.value)}
+              disabled={packageTarget?.action !== 'install'}
+              placeholder="nginx"
+              autoComplete="off"
+            />
+          </Field>
+          <label className="text-ink-300 flex items-start gap-2 text-xs">
+            <input type="checkbox" checked={packageConfirm} onChange={(event) => setPackageConfirm(event.target.checked)} className="accent-signal-400 mt-0.5 h-4 w-4" />
+            I confirm the {packageTarget?.action ?? 'package'} action for {packageName || 'this package'} on this server.
+          </label>
+          {packageOutput ? (
+            <pre className="bg-ink-950 text-ink-200 max-h-64 overflow-auto rounded-md p-3 font-mono text-[10px] whitespace-pre-wrap">{packageOutput}</pre>
+          ) : null}
+        </div>
+      </Dialog>
 
       <ConfirmDialog
         open={dockerTarget !== null}

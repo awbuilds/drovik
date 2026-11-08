@@ -27,6 +27,18 @@ type snippetRunRequest struct {
 	Confirm bool              `json:"confirm"`
 }
 
+type packageActionRequest struct {
+	Package string `json:"package"`
+	Action  string `json:"action"`
+	Confirm bool   `json:"confirm"`
+}
+
+type taskRequest struct {
+	Schedule string `json:"schedule"`
+	Command  string `json:"command"`
+	Confirm  bool   `json:"confirm"`
+}
+
 type alertRuleRequest struct {
 	Metric     string  `json:"metric"`
 	Comparator string  `json:"comparator"`
@@ -130,6 +142,25 @@ func (s *Server) handlePackages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+func (s *Server) handlePackageAction(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request packageActionRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.PackageAction(
+		r.Context(), user.ID, chi.URLParam(r, "id"),
+		request.Package, request.Action, request.Confirm,
+	)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) handleSchedules(w http.ResponseWriter, r *http.Request) {
 	user := CurrentUser(r.Context())
 	result, err := s.advanced.Schedules(r.Context(), user.ID, chi.URLParam(r, "id"))
@@ -139,6 +170,41 @@ func (s *Server) handleSchedules(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	var request taskRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	result, err := s.advanced.CreateTask(
+		r.Context(), user.ID, chi.URLParam(r, "id"),
+		advanced.TaskInput{Schedule: request.Schedule, Command: request.Command},
+		request.Confirm,
+	)
+	if err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, result)
+}
+
+func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
+	user := CurrentUser(r.Context())
+	confirm := r.URL.Query().Get("confirm") == "true"
+	if !confirm {
+		writeError(w, r, NewAPIError(http.StatusUnprocessableEntity, CodeValidation, "Task confirmation is required."))
+		return
+	}
+	if err := s.advanced.DeleteTask(
+		r.Context(), user.ID, chi.URLParam(r, "id"), chi.URLParam(r, "taskID"), confirm,
+	); err != nil {
+		s.writeAdvancedError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleServerHistory(w http.ResponseWriter, r *http.Request) {

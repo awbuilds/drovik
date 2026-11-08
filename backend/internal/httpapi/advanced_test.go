@@ -34,6 +34,10 @@ func TestAdvancedHTTPFlow(t *testing.T) {
 			return "log line\n", "", 0, true
 		case strings.Contains(command, "docker restart "):
 			return "", "", 0, true
+		case strings.Contains(command, "command -v apt-get"):
+			return "apt\n", "", 0, true
+		case strings.HasPrefix(command, "apt-get "):
+			return "package output\n", "", 0, true
 		case strings.Contains(command, "echo"):
 			return "ran\n", "", 0, true
 		}
@@ -116,6 +120,22 @@ func TestAdvancedHTTPFlow(t *testing.T) {
 	if history.status != http.StatusOK {
 		t.Fatalf("history: %d %s", history.status, history.body)
 	}
+	packageUnconfirmed := app.request(t, http.MethodPost, base+"/packages/action",
+		packageActionRequest{Package: "curl", Action: "install"}, csrf)
+	if packageUnconfirmed.status != http.StatusUnprocessableEntity {
+		t.Fatalf("expected package confirmation rejection, got %d %s", packageUnconfirmed.status, packageUnconfirmed.body)
+	}
+	packageRun := app.request(t, http.MethodPost, base+"/packages/action",
+		packageActionRequest{Package: "curl", Action: "install", Confirm: true}, csrf)
+	if packageRun.status != http.StatusOK || !strings.Contains(string(packageRun.body), "package output") {
+		t.Fatalf("package action: %d %s", packageRun.status, packageRun.body)
+	}
+	invalidPackage := app.request(t, http.MethodPost, base+"/packages/action",
+		packageActionRequest{Package: "curl; reboot", Action: "install", Confirm: true}, csrf)
+	if invalidPackage.status != http.StatusUnprocessableEntity {
+		t.Fatalf("expected invalid package rejection, got %d %s", invalidPackage.status, invalidPackage.body)
+	}
+
 	rule := app.request(t, http.MethodPut, base+"/alerts/new", alertRuleRequest{
 		Metric: "cpu_percent", Comparator: "gt", Threshold: 80, Enabled: true,
 	}, csrf)

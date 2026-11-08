@@ -143,6 +143,17 @@ export function getNetwork(serverId: string, signal?: AbortSignal): Promise<Netw
   return apiRequest<NetworkOverview>(`/api/v1/servers/${serverId}/network-tools`, { signal })
 }
 
+export type PackageAction = 'install' | 'upgrade' | 'remove'
+
+export interface PackageActionResult {
+  manager: string
+  package: string
+  action: PackageAction
+  output: string
+  success: boolean
+  truncated: boolean
+}
+
 export interface PackageInfo {
   name: string
   version: string
@@ -161,6 +172,19 @@ export function getPackages(serverId: string, signal?: AbortSignal): Promise<Pac
   return apiRequest<PackageOverview>(`/api/v1/servers/${serverId}/packages`, { signal })
 }
 
+export function packageAction(
+  serverId: string,
+  pkg: string,
+  action: PackageAction,
+  csrf: string,
+): Promise<PackageActionResult> {
+  return apiRequest<PackageActionResult>(`/api/v1/servers/${serverId}/packages/action`, {
+    method: 'POST',
+    csrf,
+    body: { package: pkg, action, confirm: true },
+  })
+}
+
 export interface CronEntry {
   source: string
   line: string
@@ -175,11 +199,37 @@ export interface TimerEntry {
   activates: string
 }
 
+export interface ManagedTask {
+  id: string
+  schedule: string
+  command: string
+}
+
 export interface ScheduleOverview {
   available: boolean
   cron: CronEntry[]
   timers: TimerEntry[]
+  managed_tasks: ManagedTask[]
   collected_at: string
+}
+
+export function createTask(
+  serverId: string,
+  input: { schedule: string; command: string },
+  csrf: string,
+): Promise<{ task: ManagedTask }> {
+  return apiRequest<{ task: ManagedTask }>(`/api/v1/servers/${serverId}/tasks`, {
+    method: 'POST',
+    csrf,
+    body: { ...input, confirm: true },
+  })
+}
+
+export function deleteTask(serverId: string, taskId: string, csrf: string): Promise<void> {
+  return apiRequest<void>(`/api/v1/servers/${serverId}/tasks/${taskId}?confirm=true`, {
+    method: 'DELETE',
+    csrf,
+  })
 }
 
 export function getSchedules(serverId: string, signal?: AbortSignal): Promise<ScheduleOverview> {
