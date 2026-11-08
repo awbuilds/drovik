@@ -167,7 +167,7 @@ func (s *Service) Action(
 	ctx context.Context,
 	ownerID, serverID, unitName, action string,
 ) (*ActionResult, error) {
-	if !unitPattern.MatchString(unitName) {
+	if len(unitName) > 256 || !unitPattern.MatchString(unitName) {
 		return nil, ErrInvalidUnit
 	}
 	if !validAction(action) {

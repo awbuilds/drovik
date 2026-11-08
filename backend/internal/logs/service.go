@@ -74,6 +74,9 @@ func (s *Service) Read(
 	ownerID, serverID, unit, since string,
 	lines int,
 ) (*Result, error) {
+	if len(unit) > 256 {
+		return nil, ErrInvalidUnit
+	}
 	if unit != "" {
 		if !unitPattern.MatchString(unit) {
 			return nil, ErrInvalidUnit
