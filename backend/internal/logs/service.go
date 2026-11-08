@@ -30,7 +30,7 @@ const (
 	maxOutputBytes  = 1 << 20
 )
 
-var unitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@:\\-]{0,254}\.service$`)
+var unitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@:-]*\.service$`)
 
 var ranges = map[string]string{
 	"":    "",

@@ -41,7 +41,7 @@ const listCommand = `systemctl list-units --type=service --all --no-legend --no-
 printf '@@drovik-unit-files@@\n'
 systemctl list-unit-files --type=service --no-legend --no-pager`
 
-var unitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@:\\-]{0,254}\.service$`)
+var unitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@:-]*\.service$`)
 
 type Unit struct {
 	Name        string `json:"name"`
