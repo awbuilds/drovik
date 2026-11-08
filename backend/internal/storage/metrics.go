@@ -232,15 +232,24 @@ func (r *AlertRepository) Delete(ctx context.Context, serverID, id string) error
 	return nil
 }
 
-func (r *AlertRepository) MarkNotified(ctx context.Context, serverID, id string, at time.Time) error {
-	if _, err := r.db.ExecContext(ctx, `
+// MarkNotified claims the notification slot for a rule. It returns false when
+// another request already claimed a slot at or after notBefore, which prevents
+// overlapping collections from delivering the same alert twice.
+func (r *AlertRepository) MarkNotified(ctx context.Context, serverID, id string, at, notBefore time.Time) (bool, error) {
+	result, err := r.db.ExecContext(ctx, `
 		UPDATE alert_rules SET last_notified_at = ?
-		WHERE id = ? AND server_id = ?`,
-		formatTime(at), id, serverID,
-	); err != nil {
-		return fmt.Errorf("mark alert notified: %w", err)
+		WHERE id = ? AND server_id = ?
+		  AND (last_notified_at IS NULL OR julianday(last_notified_at) <= julianday(?))`,
+		formatTime(at), id, serverID, formatTime(notBefore),
+	)
+	if err != nil {
+		return false, fmt.Errorf("mark alert notified: %w", err)
 	}
-	return nil
+	claimed, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("count alert notifications: %w", err)
+	}
+	return claimed == 1, nil
 }
 
 func nullableFloat(value sql.NullFloat64) *float64 {

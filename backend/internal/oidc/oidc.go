@@ -49,15 +49,17 @@ type pendingState struct {
 	verifier  string
 	mode      string
 	userID    string
+	sessionID string
 	expiresAt time.Time
 }
 
 // Result is the outcome of a completed authorization. Mode is "login" or
 // "link"; UserID is set for a link flow.
 type Result struct {
-	Identity *Identity
-	Mode     string
-	UserID   string
+	Identity  *Identity
+	Mode      string
+	UserID    string
+	SessionID string
 }
 
 type Provider struct {
@@ -118,34 +120,17 @@ func New(cfg *config.Config, logger *slog.Logger) (*Provider, error) {
 
 func (p *Provider) Enabled() bool { return p != nil && p.cfg.OIDCEnabled }
 
-func (p *Provider) Begin(mode, userID string) (string, error) {
+func (p *Provider) Begin(mode, userID, sessionID string) (string, string, error) {
 	if !p.Enabled() {
-		return "", ErrDisabled
+		return "", "", ErrDisabled
 	}
-	state, err := randomToken(32)
+	state, verifier, err := p.begin(mode, userID, sessionID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	verifier, err := randomToken(48)
-	if err != nil {
-		return "", err
-	}
-	challenge := pkceChallenge(verifier)
-	p.mu.Lock()
-	p.pruneLocked()
-	if len(p.pending) >= 1000 {
-		p.mu.Unlock()
-		return "", errors.New("too many pending OIDC authorizations")
-	}
-	p.pending[state] = pendingState{
-		verifier: verifier, mode: mode, userID: userID,
-		expiresAt: time.Now().Add(5 * time.Minute),
-	}
-	p.mu.Unlock()
-
 	parsed, err := url.Parse(p.meta.AuthorizationEndpoint)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	query := parsed.Query()
 	query.Set("response_type", "code")
@@ -153,10 +138,36 @@ func (p *Provider) Begin(mode, userID string) (string, error) {
 	query.Set("redirect_uri", p.cfg.OIDCRedirectURL)
 	query.Set("scope", "openid profile email")
 	query.Set("state", state)
-	query.Set("code_challenge", challenge)
+	query.Set("code_challenge", pkceChallenge(verifier))
 	query.Set("code_challenge_method", "S256")
 	parsed.RawQuery = query.Encode()
-	return parsed.String(), nil
+	return parsed.String(), state, nil
+}
+
+func (p *Provider) begin(mode, userID, sessionID string) (string, string, error) {
+	if !p.Enabled() {
+		return "", "", ErrDisabled
+	}
+	state, err := randomToken(32)
+	if err != nil {
+		return "", "", err
+	}
+	verifier, err := randomToken(48)
+	if err != nil {
+		return "", "", err
+	}
+	p.mu.Lock()
+	p.pruneLocked()
+	if len(p.pending) >= 1000 {
+		p.mu.Unlock()
+		return "", "", errors.New("too many pending OIDC authorizations")
+	}
+	p.pending[state] = pendingState{
+		verifier: verifier, mode: mode, userID: userID, sessionID: sessionID,
+		expiresAt: time.Now().Add(5 * time.Minute),
+	}
+	p.mu.Unlock()
+	return state, verifier, nil
 }
 
 func (p *Provider) Complete(ctx context.Context, state, code string) (*Result, error) {
@@ -241,7 +252,7 @@ func (p *Provider) Complete(ctx context.Context, state, code string) (*Result, e
 			Subject: claims.Subject, Username: username, Email: claims.Email,
 			EmailVerified: claims.EmailVerified, PreferredUsername: claims.PreferredUsername,
 		},
-		Mode: pending.mode, UserID: pending.userID,
+		Mode: pending.mode, UserID: pending.userID, SessionID: pending.sessionID,
 	}, nil
 }
 

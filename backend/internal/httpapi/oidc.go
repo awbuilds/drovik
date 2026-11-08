@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"crypto/subtle"
 	"errors"
 	"net/http"
 	"strconv"
@@ -12,8 +13,15 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/storage"
 )
 
+const oidcStateCookie = "drovik_oidc_state"
+
 type oidcLinkResponse struct {
 	Linked bool `json:"linked"`
+}
+
+type oidcLinkStartRequest struct {
+	Password string `json:"password"`
+	Code     string `json:"code,omitempty"`
 }
 
 type oidcUnlinkRequest struct {
@@ -34,15 +42,20 @@ func (s *Server) handleOIDCStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusTooManyRequests, CodeRateLimited, "Too many sign-in attempts. Try again later."))
 		return
 	}
-	target, err := s.oidc.Begin("login", "")
+	target, state, err := s.oidc.Begin("login", "", "")
 	if err != nil {
 		s.logger.Error("OIDC start failed", "error", err, "request_id", RequestID(r.Context()))
 		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "The identity provider could not be reached."))
 		return
 	}
+	s.setOIDCStateCookie(w, state)
+	w.Header().Set("Cache-Control", "no-store")
 	http.Redirect(w, r, target, http.StatusFound)
 }
 
+// handleOIDCLinkStart requires fresh proof of the local account before adding a
+// new federated login. A stolen session alone must not become a passwordless
+// login for that account.
 func (s *Server) handleOIDCLinkStart(w http.ResponseWriter, r *http.Request) {
 	if s.oidc == nil {
 		writeError(w, r, NewAPIError(http.StatusNotFound, CodeNotFound, "OIDC is not enabled."))
@@ -54,12 +67,40 @@ func (s *Server) handleOIDCLinkStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusTooManyRequests, CodeRateLimited, "Too many linking attempts. Try again later."))
 		return
 	}
-	target, err := s.oidc.Begin("link", user.ID)
+	var request oidcLinkStartRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	valid, err := auth.VerifyPassword(request.Password, user.PasswordHash)
+	if err != nil || !valid {
+		s.record(r, user.ID, "auth.oidc_link_failed", user.Username, "denied", CodeAuthInvalidCredentials)
+		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthInvalidCredentials, "The password is invalid."))
+		return
+	}
+	mfaSecret, mfaEnabled, err := s.mfa.Get(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("OIDC link MFA lookup failed", "error", err, "request_id", RequestID(r.Context()))
+		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
+		return
+	}
+	if mfaEnabled && !s.verifyMFACode(r.Context(), mfaSecret, user.ID, request.Code) {
+		s.record(r, user.ID, "auth.oidc_link_failed", user.Username, "denied", CodeAuthMFAInvalid)
+		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthMFAInvalid, "The authenticator code is invalid."))
+		return
+	}
+	session := CurrentSession(r.Context())
+	if session == nil {
+		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthRequired, "Authentication required."))
+		return
+	}
+	target, state, err := s.oidc.Begin("link", user.ID, session.ID)
 	if err != nil {
 		s.logger.Error("OIDC link start failed", "error", err, "request_id", RequestID(r.Context()))
 		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "The identity provider could not be reached."))
 		return
 	}
+	s.setOIDCStateCookie(w, state)
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]string{"url": target})
 }
@@ -92,6 +133,7 @@ func (s *Server) handleOIDCUnlink(w http.ResponseWriter, r *http.Request) {
 	}
 	valid, err := auth.VerifyPassword(request.Password, user.PasswordHash)
 	if err != nil || !valid {
+		s.record(r, user.ID, "auth.oidc_unlink_failed", user.Username, "denied", CodeAuthInvalidCredentials)
 		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthInvalidCredentials, "The password is invalid."))
 		return
 	}
@@ -111,10 +153,14 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	state := r.URL.Query().Get("state")
 	code := r.URL.Query().Get("code")
-	if state == "" || code == "" {
+	cookie, err := r.Cookie(oidcStateCookie)
+	if state == "" || code == "" || err != nil ||
+		subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(state)) != 1 {
+		s.clearOIDCStateCookie(w)
 		http.Redirect(w, r, "/login?oidc_error=invalid", http.StatusFound)
 		return
 	}
+	s.clearOIDCStateCookie(w)
 	result, err := s.oidc.Complete(r.Context(), state, code)
 	if err != nil {
 		s.logger.Warn("OIDC callback failed", "error", err, "request_id", RequestID(r.Context()))
@@ -141,10 +187,18 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 // completeOIDCLink binds the provider subject to the local user who started the
-// flow. Accounts are never created or bound implicitly during login.
+// flow. The callback must arrive on the same server-side session that started
+// it, so a leaked callback URL cannot bind an identity from another browser.
 func (s *Server) completeOIDCLink(w http.ResponseWriter, r *http.Request, result *oidc.Result) {
-	if result.UserID == "" {
-		http.Redirect(w, r, "/login?oidc_error=failed", http.StatusFound)
+	session, _, err := s.auth.Validate(r.Context(), s.auth.SessionToken(r))
+	if result.UserID == "" || result.SessionID == "" || err != nil || session == nil ||
+		session.ID != result.SessionID || session.UserID != result.UserID {
+		http.Redirect(w, r, "/settings?oidc_error=failed", http.StatusFound)
+		return
+	}
+	user, err := s.users.GetByID(r.Context(), result.UserID)
+	if err != nil || user == nil || !user.IsActive {
+		http.Redirect(w, r, "/settings?oidc_error=failed", http.StatusFound)
 		return
 	}
 	if err := s.users.BindOIDC(r.Context(), result.UserID, s.cfg.OIDCIssuer, result.Identity.Subject); err != nil {
@@ -156,7 +210,8 @@ func (s *Server) completeOIDCLink(w http.ResponseWriter, r *http.Request, result
 		http.Redirect(w, r, target, http.StatusFound)
 		return
 	}
-	s.record(r, result.UserID, "auth.oidc_linked", result.Identity.Username, "success", "")
+	s.record(r, result.UserID, "auth.oidc_linked",
+		s.cfg.OIDCIssuer+"|"+result.Identity.Subject, "success", "")
 	http.Redirect(w, r, "/settings?oidc_linked=1", http.StatusFound)
 }
 
@@ -173,4 +228,30 @@ func (s *Server) issueOIDCSession(w http.ResponseWriter, r *http.Request, user *
 	s.auth.SetSessionCookie(w, token)
 	s.record(r, user.ID, "auth.oidc_login", user.Username, "success", "")
 	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (s *Server) setOIDCStateCookie(w http.ResponseWriter, state string) {
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure follows the deployment cookie policy
+
+		Name:     oidcStateCookie,
+		Value:    state,
+		Path:     "/api/v1/auth/oidc/callback",
+		MaxAge:   300,
+		HttpOnly: true,
+		Secure:   s.cfg.CookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (s *Server) clearOIDCStateCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // Secure follows the deployment cookie policy
+
+		Name:     oidcStateCookie,
+		Value:    "",
+		Path:     "/api/v1/auth/oidc/callback",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   s.cfg.CookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
 }

@@ -80,7 +80,9 @@ func TestOIDCLoginFlow(t *testing.T) {
 	if linkStatus.status != http.StatusOK || !strings.Contains(string(linkStatus.body), `"linked":false`) {
 		t.Fatalf("link status: %d %s", linkStatus.status, linkStatus.body)
 	}
-	linkStart := app.request(t, http.MethodPost, "/api/v1/auth/oidc/link", nil, csrf)
+	linkStart := app.request(t, http.MethodPost, "/api/v1/auth/oidc/link", oidcLinkStartRequest{
+		Password: "correct horse battery staple",
+	}, csrf)
 	if linkStart.status != http.StatusOK {
 		t.Fatalf("link start: %d %s", linkStart.status, linkStart.body)
 	}
@@ -104,6 +106,17 @@ func TestOIDCLoginFlow(t *testing.T) {
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+	}
+	// A callback from a browser without the state cookie must be rejected.
+	crossBrowser := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	cross := requestAs(t, app, crossBrowser, http.MethodGet,
+		"/api/v1/auth/oidc/callback?state="+url.QueryEscape(linkState)+"&code=good-code", nil, "")
+	if cross.status != http.StatusFound || !strings.Contains(cross.header.Get("Location"), "oidc_error=invalid") {
+		t.Fatalf("expected cross-browser link rejection, got %d %s", cross.status, cross.header.Get("Location"))
 	}
 	linkCallback := requestAs(t, app, noRedirect, http.MethodGet,
 		"/api/v1/auth/oidc/callback?state="+url.QueryEscape(linkState)+"&code=good-code", nil, "")

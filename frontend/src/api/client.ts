@@ -110,10 +110,14 @@ export function getMFAStatus(signal?: AbortSignal): Promise<MFAStatus> {
   return apiRequest<MFAStatus>('/api/v1/auth/mfa', { signal })
 }
 
-export function setupMFA(csrf: string): Promise<{ secret: string; uri: string }> {
+export function setupMFA(
+  input: { password: string; code?: string },
+  csrf: string,
+): Promise<{ secret: string; uri: string }> {
   return apiRequest<{ secret: string; uri: string }>('/api/v1/auth/mfa/setup', {
     method: 'POST',
     csrf,
+    body: input,
   })
 }
 
@@ -133,10 +137,14 @@ export function getOIDCLinkStatus(signal?: AbortSignal): Promise<OIDCLinkStatus>
   return apiRequest<OIDCLinkStatus>('/api/v1/auth/oidc/link', { signal })
 }
 
-export function startOIDCLink(csrf: string): Promise<{ url: string }> {
+export function startOIDCLink(
+  input: { password: string; code?: string },
+  csrf: string,
+): Promise<{ url: string }> {
   return apiRequest<{ url: string }>('/api/v1/auth/oidc/link', {
     method: 'POST',
     csrf,
+    body: input,
   })
 }
 

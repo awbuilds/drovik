@@ -38,8 +38,9 @@ web session into unbounded root-equivalent authority by accident.
   server. Snippets execute as the SSH account, never with hidden elevation, and are audited. The UI
   warns against storing secrets.
 - **Local MFA:** users can enroll a TOTP authenticator with encrypted-at-rest secrets and eight
-  single-use recovery codes. Login requires the second factor when enabled; recovery codes are
-  hashed and consumed once. OIDC/SSO remains a separate identity decision.
+  single-use recovery codes. Enrollment and replacement require the local password; replacement
+  also requires a current authenticator/recovery code. Login requires the second factor when
+  enabled; recovery codes are hashed and consumed once.
 - **External secret managers:** optional HashiCorp Vault KV v2 support. A server records
   `secret_provider=vault` and a validated path; the password, private key or passphrase is fetched
   at connect time with a bounded timeout, no redirects and the shared egress policy. Credentials
@@ -48,8 +49,10 @@ web session into unbounded root-equivalent authority by accident.
 - **OIDC/SSO:** optional authorization-code flow with PKCE, discovery (issuer checked), no
   redirects, bounded responses and single-use five-minute state. Accounts are never auto-provisioned
   or matched by username: an authenticated user links their existing local account from Settings,
-  and login only succeeds for a stored `(issuer, subject)` pair. Link/unlink require a session and
-  password confirmation for unlink. The provider's policy is the SSO authentication boundary; local
+  and login only succeeds for a stored `(issuer, subject)` pair. Link start requires the local
+  password and, when MFA is enabled, a current authenticator or recovery code; the callback must
+  arrive on the same session that started it, and state is bound to a short-lived HttpOnly cookie.
+  Unlink also requires the password. The provider's policy is the SSO authentication boundary; local
   TOTP is not also required for an SSO sign-in. State is in-process, which matches the
   single-instance SQLite architecture.
 - **Users and assignments:** administrators manage local users and per-server `read`/`write`

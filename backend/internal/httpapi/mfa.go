@@ -23,6 +23,11 @@ type mfaSetupResponse struct {
 	URI    string `json:"uri"`
 }
 
+type mfaSetupRequest struct {
+	Password string `json:"password"`
+	Code     string `json:"code,omitempty"`
+}
+
 type mfaEnableRequest struct {
 	Code string `json:"code"`
 }
@@ -48,6 +53,28 @@ func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 	user := CurrentUser(r.Context())
+	var request mfaSetupRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	valid, err := auth.VerifyPassword(request.Password, user.PasswordHash)
+	if err != nil || !valid {
+		s.record(r, user.ID, "auth.mfa_setup_failed", user.Username, "denied", CodeAuthInvalidCredentials)
+		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthInvalidCredentials, "The password is invalid."))
+		return
+	}
+	currentSecret, enabled, err := s.mfa.Get(r.Context(), user.ID)
+	if err != nil {
+		s.logger.Error("MFA setup state lookup failed", "error", err, "request_id", RequestID(r.Context()))
+		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
+		return
+	}
+	if enabled && !s.verifyMFACode(r.Context(), currentSecret, user.ID, request.Code) {
+		s.record(r, user.ID, "auth.mfa_setup_failed", user.Username, "denied", CodeAuthMFAInvalid)
+		writeError(w, r, NewAPIError(http.StatusUnauthorized, CodeAuthMFAInvalid, "The authenticator code is invalid."))
+		return
+	}
 	secret, err := auth.GenerateTOTPSecret()
 	if err != nil {
 		s.logger.Error("MFA secret generation failed", "error", err, "request_id", RequestID(r.Context()))
@@ -65,6 +92,8 @@ func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
+	s.record(r, user.ID, "auth.mfa_setup_started", user.Username, "success", "")
 	writeJSON(w, http.StatusOK, mfaSetupResponse{
 		Secret: secret,
 		URI:    auth.TOTPURI("Drovik", user.Username, secret),
@@ -109,6 +138,7 @@ func (s *Server) handleMFAEnable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	s.record(r, user.ID, "auth.mfa_enabled", user.Username, "success", "")
 	writeJSON(w, http.StatusOK, mfaEnableResponse{RecoveryCodes: plain})
 }
@@ -131,6 +161,7 @@ func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.record(r, user.ID, "auth.mfa_disabled", user.Username, "success", "")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusNoContent)
 }
 

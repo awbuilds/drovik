@@ -1505,10 +1505,25 @@ paths:
       tags: [Authentication]
       operationId: setupMFA
       summary: Generate a pending TOTP secret and otpauth URI
+      description: |
+        Requires the local password. When MFA is already enabled, a current
+        authenticator or recovery code is also required before the factor can be
+        replaced.
       security: [{cookieAuth: []}]
       parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: {type: string, format: password}
+                code: {type: string, description: Current TOTP or recovery code when MFA is enabled.}
       responses:
         "200": {description: Pending secret and URI}
+        "401": {$ref: "#/components/responses/Unauthorized"}
   /api/v1/auth/mfa/enable:
     post:
       tags: [Authentication]
@@ -1680,8 +1695,22 @@ paths:
       tags: [Authentication]
       operationId: startOIDCLink
       summary: Begin linking the current account to an OIDC identity
+      description: |
+        Requires the local password and, when MFA is enabled, a current
+        authenticator or recovery code. The callback must arrive on the same
+        server-side session that started the link.
       security: [{cookieAuth: []}]
       parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: {type: string, format: password}
+                code: {type: string, description: Current TOTP or recovery code when MFA is enabled.}
       responses:
         "200":
           description: Authorization URL

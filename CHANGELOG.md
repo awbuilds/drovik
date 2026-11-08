@@ -7,6 +7,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Security
+
+- OIDC account linking now requires the local password and, when MFA is enabled, a current
+  authenticator/recovery code. Link state is bound to a short-lived HttpOnly cookie and to the
+  initiating session; a callback from another browser is rejected.
+- MFA enrollment and replacement now require the local password; replacing an active factor also
+  requires a current authenticator/recovery code. A session alone can no longer disable or replace
+  MFA.
+- OIDC/MFA responses that contain secrets or recovery codes are marked `Cache-Control: no-store`.
+- Alert webhook delivery errors no longer include the webhook URL (which is a bearer secret) in the
+  log. Notification claims are conditional, so overlapping collections cannot double-deliver.
+- A canceled or timed-out destructive host operation is audited as `OUTCOME_UNKNOWN` instead of a
+  definite failure.
+- `/api/v1/version` now reports the destructive-host-ops and Vault flags so the UI can gate them.
+
 ### Added
 
 - Phase 2 SSH connection manager: encrypted credentials (AES-256-GCM), strict host-key
