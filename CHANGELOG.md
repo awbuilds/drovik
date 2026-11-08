@@ -17,6 +17,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Phase 4 SFTP file manager: safe directory listing, streamed uploads/downloads, create/rename/
   delete, recursive-delete guards, symlink handling, stale-file detection and a bounded text
   editor.
+- Phase 5 host monitoring: agentless CPU, load, memory, filesystem, network and uptime snapshots
+  with two-sample rate calculation, per-host caching/coalescing, stale fallback and a live
+  monitoring page.
 - Project foundation: AGENTS.md contract, Hydra-style handoff notes, AGPL-3.0 licensing,
   contribution, security and governance documentation.
 - Architecture decision records and threat model.

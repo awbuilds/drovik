@@ -140,3 +140,39 @@ func TestLoadRejectsInvalidEgressCIDR(t *testing.T) {
 		t.Fatalf("expected CIDR error, got %v", err)
 	}
 }
+
+func TestLoadMonitoringConfiguration(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_MONITOR_REFRESH_INTERVAL"] = "3s"
+	env["DROVIK_MONITOR_STALE_AFTER"] = "30s"
+	env["DROVIK_MONITOR_TIMEOUT"] = "8s"
+	env["DROVIK_MONITOR_MAX_OUTPUT_BYTES"] = "131072"
+	env["DROVIK_MONITOR_MAX_FILESYSTEMS"] = "32"
+	env["DROVIK_MONITOR_MAX_INTERFACES"] = "16"
+
+	cfg, err := load(lookupFrom(env))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.MonitorRefreshInterval != 3*time.Second || cfg.MonitorStaleAfter != 30*time.Second || cfg.MonitorTimeout != 8*time.Second {
+		t.Fatalf("unexpected monitoring durations: %s %s %s", cfg.MonitorRefreshInterval, cfg.MonitorStaleAfter, cfg.MonitorTimeout)
+	}
+	if cfg.MonitorMaxOutputBytes != 131072 || cfg.MonitorMaxFilesystems != 32 || cfg.MonitorMaxInterfaces != 16 {
+		t.Fatalf("unexpected monitoring limits: %d %d %d", cfg.MonitorMaxOutputBytes, cfg.MonitorMaxFilesystems, cfg.MonitorMaxInterfaces)
+	}
+}
+
+func TestLoadRejectsInvalidMonitoringConfiguration(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_MONITOR_REFRESH_INTERVAL"] = "500ms"
+	if _, err := load(lookupFrom(env)); err == nil {
+		t.Fatal("expected a too-short refresh interval to be rejected")
+	}
+
+	env = validEnv()
+	env["DROVIK_MONITOR_REFRESH_INTERVAL"] = "10s"
+	env["DROVIK_MONITOR_STALE_AFTER"] = "5s"
+	if _, err := load(lookupFrom(env)); err == nil {
+		t.Fatal("expected a stale window shorter than the refresh interval to be rejected")
+	}
+}

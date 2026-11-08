@@ -164,6 +164,38 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
 - Download progress is delegated to the browser's download manager; no in-app transfer job is
   implemented.
 
+
+## Phase 5 — System overview and monitoring
+
+| ID | Requirement | Status | Implementation / evidence |
+|---|---|---|---|
+| MON-001 | Server overview | Tested | `/servers/{id}/overview`; HTTP test |
+| MON-002 | Host identity | Tested | hostname, OS/distribution, kernel, architecture, uptime; parser tests |
+| MON-003 | CPU | Tested | `/proc/stat` deltas; first-sample and reset tests |
+| MON-004 | Memory | Tested | `/proc/meminfo`; total, available, used, free, buffers, cached, swap |
+| MON-005 | Storage | Tested | `df -Pk` plus `/proc/mounts`; usage tests |
+| MON-006 | Network | Tested | `/proc/net/dev` counters and rate deltas; reset test |
+| MON-007 | Load | Tested | `/proc/loadavg`; parser tests |
+| MON-008 | Refresh | Implemented | 5s UI auto-refresh and configurable minimum interval |
+| MON-009 | Missing data | Tested | `available` flags; partial-metrics test |
+| MON-010 | Polling limits | Tested | singleflight per host + cache; concurrency test |
+| MON-011 | Timeout | Implemented | `DROVIK_MONITOR_TIMEOUT` and context deadline |
+| MON-012 | Failure isolation | Tested | Missing sections are marked unavailable; partial-metrics test |
+| MON-013 | No agent | Implemented | Short-lived SSH command over existing connection |
+| MON-014 | Data freshness | Implemented | Collected timestamp, cached badge, stale warning |
+| MON-015 | Capability detection | Tested | Missing `/proc` sections; unavailable-state tests |
+| MON-016 | No invented precision | Implemented | CPU/rate values are `null` until measured; unavailable shown as such |
+
+### Phase 5 notes
+
+- One fixed, enumerated collector command reads `/proc` and `df`; no caller input is interpolated.
+- CPU usage and network rates require two samples. The first snapshot reports `null`, never zero.
+- Snapshots are cached for `DROVIK_MONITOR_REFRESH_INTERVAL`; concurrent requests are coalesced
+  with a per-host singleflight group.
+- A failed refresh inside `DROVIK_MONITOR_STALE_AFTER` returns the last successful snapshot marked
+  `stale` with a warning; older failures surface as an error.
+- Metrics are not persisted as historical time series.
+
 ## Later phases
 
 The remaining requirement groups are tracked in the PRD and will be added here when their phase

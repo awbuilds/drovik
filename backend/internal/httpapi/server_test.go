@@ -95,6 +95,12 @@ func newTestApp(t *testing.T) *testApp {
 		SFTPMaxListEntries:      100,
 		SFTPMaxRecursiveEntries: 100,
 		SFTPOperationTimeout:    10 * time.Second,
+		MonitorRefreshInterval:  10 * time.Millisecond,
+		MonitorStaleAfter:       time.Second,
+		MonitorTimeout:          5 * time.Second,
+		MonitorMaxOutputBytes:   256 * 1024,
+		MonitorMaxFilesystems:   64,
+		MonitorMaxInterfaces:    64,
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	auditService := audit.New(storage.NewAuditRepository(db), logger)

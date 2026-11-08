@@ -2,7 +2,7 @@
 
 The versioned contract lives in [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1).
 
-Phase 1 endpoints:
+Current endpoints:
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -20,6 +20,13 @@ Phase 1 endpoints:
 | `POST` | `/api/v1/servers/{id}/test` | Test SSH and host-key trust |
 | `POST` | `/api/v1/servers/{id}/trust-host-key` | Approve/replace a host key |
 | `GET` | `/api/v1/servers/{id}/capabilities` | Last detected capabilities |
+| `GET` | `/api/v1/servers/{id}/overview` | Cached host metrics snapshot |
+| `GET` | `/api/v1/servers/{id}/files` | List a remote directory over SFTP |
+| `POST` | `/api/v1/servers/{id}/files/upload` | Upload a file over SFTP |
+| `GET` | `/api/v1/servers/{id}/files/download` | Stream a remote file |
+| `GET`/`PUT` | `/api/v1/servers/{id}/files/content` | Read/save a bounded text file |
+| `POST`/`PATCH`/`DELETE` | `/api/v1/servers/{id}/files*` | Create, rename or delete remote items |
+| `GET` | `/api/v1/servers/{id}/terminal` | WebSocket SSH PTY (see `terminal-protocol.md`) |
 | `GET` | `/healthz` | Liveness |
 | `GET` | `/readyz` | Readiness |
 
@@ -28,4 +35,4 @@ or `/auth/me`. It is not stored in a readable cookie. Errors use the stable enve
 the specification.
 
 The document is the intended source of truth for generated Go and TypeScript types. Generation
-and contract tests land with the Phase 2 API expansion.
+and contract tests land with a later API hardening pass.

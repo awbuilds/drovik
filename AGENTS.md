@@ -359,11 +359,14 @@ covered.
   and the xterm.js workspace panel are implemented and tested.
 - Phase 4: complete. SFTP file manager, streamed transfers, bounded text editor, path/symlink
   protections, stale detection and the file browser/editor UI are implemented and tested.
-- Phase 5: next. System overview and metrics.
-- Monitoring, process, service and log features are not implemented yet.
+- Phase 5: complete. Bounded agentless host metrics (CPU, load, memory, filesystems, network,
+  uptime), per-host caching/coalescing, stale fallback and the monitoring UI are implemented and
+  tested.
+- Phase 6: next. Process manager, systemd services and bounded logs.
+- Process, service and log features are not implemented yet.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
-- Read the latest handoff in `docs/handoffs/` before starting Phase 5.
+- Read the latest handoff in `docs/handoffs/` before starting Phase 6.
 
 ## Decision inheritance
 

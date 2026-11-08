@@ -23,6 +23,7 @@ tags:
   - name: Authentication
   - name: Servers
   - name: Files
+  - name: Monitoring
   - name: Terminal
   - name: System
 
@@ -764,6 +765,63 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /api/v1/servers/{id}/overview:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Monitoring]
+      operationId: getServerOverview
+      summary: Collect a bounded host metrics snapshot
+      description: |
+        Reads `/proc`, `df` and `uname` over a short-lived SSH connection. The
+        snapshot is cached per server for the configured minimum interval and
+        concurrent requests are coalesced. The first sample reports CPU usage
+        and network rates as `null`; they require two counter samples.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Metrics snapshot
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverviewSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Host-key approval is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: The host does not expose readable metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: SSH connection or collection failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "504":
+          description: Metrics collection timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   securitySchemes:
     cookieAuth:
@@ -1229,3 +1287,188 @@ components:
         expected_size:
           type: integer
           format: int64
+
+    OverviewSnapshot:
+      type: object
+      required: [server_id, collected_at, cached, stale, host, cpu, load, memory, uptime, filesystems, filesystems_available, network, network_available, filesystems_truncated, network_truncated]
+      properties:
+        server_id:
+          type: string
+        collected_at:
+          type: string
+          format: date-time
+        cached:
+          type: boolean
+          description: Served from the minimum-interval cache.
+        stale:
+          type: boolean
+          description: The live refresh failed and this is the last successful sample.
+        warning:
+          type: string
+        host:
+          $ref: "#/components/schemas/HostInfo"
+        cpu:
+          $ref: "#/components/schemas/CPUMetrics"
+        load:
+          $ref: "#/components/schemas/LoadAverage"
+        memory:
+          $ref: "#/components/schemas/MemoryMetrics"
+        uptime:
+          $ref: "#/components/schemas/UptimeMetrics"
+        filesystems:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilesystemUsage"
+        filesystems_available:
+          type: boolean
+        network:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkUsage"
+        network_available:
+          type: boolean
+        filesystems_truncated:
+          type: boolean
+        network_truncated:
+          type: boolean
+
+    HostInfo:
+      type: object
+      properties:
+        hostname:
+          type: string
+        os:
+          type: string
+        distribution:
+          type: string
+        kernel:
+          type: string
+        architecture:
+          type: string
+
+    CPUMetrics:
+      type: object
+      required: [available, model, cores]
+      properties:
+        available:
+          type: boolean
+        usage_percent:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 100
+        model:
+          type: string
+        cores:
+          type: array
+          items:
+            type: object
+            required: [index]
+            properties:
+              index:
+                type: integer
+              usage_percent:
+                type: [number, "null"]
+
+    LoadAverage:
+      type: object
+      required: [available, one, five, fifteen, runnable, total]
+      properties:
+        available:
+          type: boolean
+        one:
+          type: number
+        five:
+          type: number
+        fifteen:
+          type: number
+        runnable:
+          type: integer
+        total:
+          type: integer
+
+    MemoryMetrics:
+      type: object
+      required: [available, total_bytes, available_bytes, used_bytes, free_bytes, buffers_bytes, cached_bytes, swap_total_bytes, swap_used_bytes]
+      properties:
+        available:
+          type: boolean
+        total_bytes:
+          type: integer
+          format: int64
+        available_bytes:
+          type: integer
+          format: int64
+        used_bytes:
+          type: integer
+          format: int64
+        free_bytes:
+          type: integer
+          format: int64
+        buffers_bytes:
+          type: integer
+          format: int64
+        cached_bytes:
+          type: integer
+          format: int64
+        swap_total_bytes:
+          type: integer
+          format: int64
+        swap_used_bytes:
+          type: integer
+          format: int64
+        used_percent:
+          type: [number, "null"]
+
+    UptimeMetrics:
+      type: object
+      required: [available, seconds, boot_time]
+      properties:
+        available:
+          type: boolean
+        seconds:
+          type: number
+        boot_time:
+          type: string
+          format: date-time
+
+    FilesystemUsage:
+      type: object
+      required: [device, mountpoint, fstype, total_bytes, used_bytes, free_bytes, read_only]
+      properties:
+        device:
+          type: string
+        mountpoint:
+          type: string
+        fstype:
+          type: string
+        total_bytes:
+          type: integer
+          format: int64
+        used_bytes:
+          type: integer
+          format: int64
+        free_bytes:
+          type: integer
+          format: int64
+        used_percent:
+          type: [number, "null"]
+        read_only:
+          type: boolean
+
+    NetworkUsage:
+      type: object
+      required: [name, received_bytes, transmitted_bytes]
+      properties:
+        name:
+          type: string
+        received_bytes:
+          type: integer
+          format: int64
+        transmitted_bytes:
+          type: integer
+          format: int64
+        receive_rate_bps:
+          type: [number, "null"]
+          description: Bytes per second; null until two samples exist.
+        transmit_rate_bps:
+          type: [number, "null"]
