@@ -32,6 +32,9 @@ web session into unbounded root-equivalent authority by accident.
   shell-quotes every value and the client must render a substituted preview and confirm a target
   server. Snippets execute as the SSH account, never with hidden elevation, and are audited. The UI
   warns against storing secrets.
+- **Local MFA:** users can enroll a TOTP authenticator with encrypted-at-rest secrets and eight
+  single-use recovery codes. Login requires the second factor when enabled; recovery codes are
+  hashed and consumed once. OIDC/SSO remains a separate identity decision.
 - **Users and assignments:** administrators manage local users and per-server `read`/`write`
   assignments. Owners and administrators always have write access. The account role `read_only` and
   a `read` assignment both block terminal, process/service actions, file mutations, Docker actions,
@@ -52,7 +55,7 @@ The following Phase 9 candidates were reviewed and are not planned for the 1.x s
 - Firewall, interface, route or other network changes.
 - Repository configuration changes and automatic update scheduling.
 - systemd timer or unit-file editing.
-- OIDC/SSO, MFA, external secret managers or other federated identity.
+- OIDC/SSO, external secret managers or other federated identity (local TOTP MFA is implemented).
 - External notification channels (email, webhook, chat, paging).
 - macOS, BSD or Windows managed-host support.
 

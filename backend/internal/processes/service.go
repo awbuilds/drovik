@@ -228,8 +228,10 @@ func (s *Service) Signal(
 	case stateErr == nil:
 		// ps succeeded with no state: the process is gone.
 		result.Running = false
-	case state == "" && strings.TrimSpace(stateStderr) == "":
+	case state == "" && strings.TrimSpace(stateStderr) == "" && isRemoteExit(stateErr):
 		// ps commonly exits non-zero with no diagnostic when the PID is gone.
+		// Only an actual remote exit proves absence; a timeout, cancellation or
+		// transport failure with empty buffers is unobservable.
 		result.Running = false
 	case state != "":
 		// The command produced a state but also a diagnostic; report the state.
@@ -277,6 +279,14 @@ func (s *Service) verifyIdentity(ctx context.Context, client *ssh.Client, pid in
 		return ErrPIDReused
 	}
 	return nil
+}
+
+// isRemoteExit reports whether the remote command ran and exited non-zero. A
+// missing exit status, canceled context or transport failure is not evidence
+// that a process is absent.
+func isRemoteExit(err error) bool {
+	var exit *ssh.ExitError
+	return errors.As(err, &exit)
 }
 
 func classifyError(stderr string, err error) error {

@@ -15,6 +15,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [totp, setTotp] = useState('')
+  const [mfaRequired, setMfaRequired] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [correlationId, setCorrelationId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -27,14 +29,31 @@ export function LoginPage() {
       setError('Enter your username and password.')
       return
     }
+    if (mfaRequired && !totp.trim()) {
+      setError('Enter your authenticator code.')
+      return
+    }
 
     setSubmitting(true)
     try {
-      await login(username.trim(), password)
+      const code = totp.trim()
+      if (code) {
+        await login(username.trim(), password, code)
+      } else {
+        await login(username.trim(), password)
+      }
       navigate('/', { replace: true })
     } catch (caught) {
       if (caught instanceof ApiError) {
         setCorrelationId(caught.correlationId ?? null)
+        if (caught.code === 'AUTH_MFA_REQUIRED') {
+          setMfaRequired(true)
+          setError(null)
+          return
+        }
+        if (caught.code === 'AUTH_MFA_INVALID') {
+          setMfaRequired(true)
+        }
       }
       setError(userFacingError(caught))
     } finally {
@@ -109,6 +128,21 @@ export function LoginPage() {
             />
           </div>
         </Field>
+
+        {mfaRequired ? (
+          <Field label="Authenticator code" htmlFor="login-totp" hint="Six digits, or a recovery code.">
+            <Input
+              id="login-totp"
+              name="totp"
+              value={totp}
+              onChange={(event) => setTotp(event.target.value)}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              placeholder="123456"
+              className="font-mono"
+            />
+          </Field>
+        ) : null}
 
         <Button type="submit" className="w-full" size="lg" loading={submitting}>
           Sign in

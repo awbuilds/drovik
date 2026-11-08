@@ -10,7 +10,7 @@ export interface AuthContextValue {
   csrfToken: string
   error: string | null
   setup: (username: string, password: string) => Promise<void>
-  login: (username: string, password: string) => Promise<void>
+  login: (username: string, password: string, totp?: string) => Promise<void>
   logout: () => Promise<void>
   refresh: () => Promise<void>
 }

@@ -132,6 +132,10 @@ func (s *Service) DockerAction(ctx context.Context, ownerID, serverID, container
 	defer func() { _ = client.Close() }()
 	_, stderr, err := s.run(ctx, client, command)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			s.record(ctx, ownerID, serverID, "docker.action", action+" "+containerID, "unknown", "OUTCOME_UNKNOWN")
+			return fmt.Errorf("%w: the action outcome could not be confirmed", ErrActionFailed)
+		}
 		code := "DOCKER_ACTION_FAILED"
 		if errors.Is(classify(stderr, err), ErrPermission) {
 			code = "DOCKER_PERMISSION_DENIED"

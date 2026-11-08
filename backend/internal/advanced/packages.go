@@ -2,6 +2,7 @@ package advanced
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -143,6 +144,10 @@ func (s *Service) PackageAction(
 		Truncated: strings.Contains(output, "[output truncated]"),
 	}
 	if actionErr != nil {
+		if errors.Is(actionErr, context.Canceled) || errors.Is(actionErr, context.DeadlineExceeded) {
+			s.record(ctx, ownerID, serverID, "package.action", action+" "+name, "unknown", "OUTCOME_UNKNOWN")
+			return result, nil
+		}
 		s.record(ctx, ownerID, serverID, "package.action", action+" "+name, "failure", "PACKAGE_ACTION_FAILED")
 		return result, nil
 	}

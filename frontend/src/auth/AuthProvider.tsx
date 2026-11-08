@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ApiError,
   getSetupStatus,
@@ -12,6 +13,7 @@ import { reportClientError, userFacingError } from '@/lib/errors'
 import { AuthContext, type AuthContextValue, type AuthStatus } from './context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient()
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [user, setUser] = useState<User | null>(null)
   const [csrfToken, setCSRFToken] = useState('')
@@ -61,29 +63,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null)
   }, [])
 
-  const login = useCallback(async (username: string, password: string) => {
-    const response = await apiLogin(username, password)
+  const login = useCallback(async (username: string, password: string, totp?: string) => {
+    const response = await apiLogin(username, password, totp)
+    // A different principal must never see data cached for the previous one.
+    queryClient.clear()
     setUser(response.user)
     setCSRFToken(response.csrf_token)
     setStatus('authenticated')
     setError(null)
-  }, [])
+  }, [queryClient])
 
   const logout = useCallback(async () => {
-    try {
-      if (csrfToken) {
-        await apiLogout(csrfToken)
-      }
-    } catch (caught) {
-      // The local session is cleared regardless; the server-side session expires
-      // on its own if the revocation request could not be delivered.
-      reportClientError(caught, { operation: 'auth.logout' })
-    } finally {
-      setUser(null)
-      setCSRFToken('')
-      setStatus('unauthenticated')
+    if (!csrfToken) {
+      throw new Error('The session is not ready; try again.')
     }
-  }, [csrfToken])
+    // Only report a revoked session after the server confirms it. A failed
+    // request leaves the HttpOnly cookie valid, so the UI must stay authenticated.
+    try {
+      await apiLogout(csrfToken)
+    } catch (caught) {
+      reportClientError(caught, { operation: 'auth.logout' })
+      throw caught
+    }
+    queryClient.clear()
+    setUser(null)
+    setCSRFToken('')
+    setStatus('unauthenticated')
+    setError(null)
+  }, [csrfToken, queryClient])
 
   const refresh = useCallback(async () => {
     setError(null)

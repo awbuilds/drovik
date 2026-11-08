@@ -1,19 +1,26 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Check, ExternalLink, LogOut, Moon, Sun } from 'lucide-react'
-import { getVersion } from '@/api/client'
+import { Check, ExternalLink, LogOut, Moon, ShieldCheck, Sun } from 'lucide-react'
+import { disableMFA, enableMFA, getMFAStatus, getVersion, setupMFA } from '@/api/client'
 import { useAuth } from '@/auth/useAuth'
 import { PageHeader } from '@/components/PageHeader'
+import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Dialog } from '@/components/ui/Dialog'
+import { Field } from '@/components/ui/Field'
+import { Input } from '@/components/ui/Input'
 import { Separator } from '@/components/ui/Separator'
 import { useToast } from '@/components/ui/useToast'
+import { userFacingError } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
 import { useThemeStore } from '@/lib/theme'
+import { ApiError } from '@/api/client'
 
 export function SettingsPage() {
-  const { user, logout } = useAuth()
+  const { user, logout, csrfToken } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
   const { theme, setTheme } = useThemeStore()
@@ -22,11 +29,79 @@ export function SettingsPage() {
     queryFn: ({ signal }) => getVersion(signal),
     staleTime: 60_000,
   })
+  const mfaQuery = useQuery({
+    queryKey: ['mfa-status'],
+    queryFn: ({ signal }) => getMFAStatus(signal),
+    staleTime: 10_000,
+  })
+  const [enrollment, setEnrollment] = useState<{ secret: string; uri: string } | null>(null)
+  const [enrollmentCode, setEnrollmentCode] = useState('')
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
+  const [mfaBusy, setMfaBusy] = useState(false)
+  const [mfaError, setMfaError] = useState<string | null>(null)
+  const [disableOpen, setDisableOpen] = useState(false)
+  const [disablePassword, setDisablePassword] = useState('')
+
+  const beginMFA = async () => {
+    setMfaBusy(true)
+    setMfaError(null)
+    try {
+      const result = await setupMFA(csrfToken)
+      setEnrollment(result)
+      setEnrollmentCode('')
+      setRecoveryCodes([])
+    } catch (caught) {
+      setMfaError(userFacingError(caught))
+    } finally {
+      setMfaBusy(false)
+    }
+  }
+
+  const confirmMFA = async () => {
+    setMfaBusy(true)
+    setMfaError(null)
+    try {
+      const result = await enableMFA(enrollmentCode.trim(), csrfToken)
+      setRecoveryCodes(result.recovery_codes)
+      setEnrollment(null)
+      toast({ title: 'Two-factor authentication enabled', description: 'Store the recovery codes now.', variant: 'success' })
+      await mfaQuery.refetch()
+    } catch (caught) {
+      setMfaError(caught instanceof ApiError ? caught.message : userFacingError(caught))
+    } finally {
+      setMfaBusy(false)
+    }
+  }
+
+  const confirmDisableMFA = async () => {
+    setMfaBusy(true)
+    setMfaError(null)
+    try {
+      await disableMFA(disablePassword, csrfToken)
+      setDisableOpen(false)
+      setDisablePassword('')
+      setRecoveryCodes([])
+      toast({ title: 'Two-factor authentication disabled', variant: 'success' })
+      await mfaQuery.refetch()
+    } catch (caught) {
+      setMfaError(userFacingError(caught))
+    } finally {
+      setMfaBusy(false)
+    }
+  }
 
   const handleLogout = async () => {
-    await logout()
-    toast({ title: 'Signed out', description: 'This session was revoked.', variant: 'success' })
-    navigate('/login', { replace: true })
+    try {
+      await logout()
+      toast({ title: 'Signed out', description: 'This session was revoked.', variant: 'success' })
+      navigate('/login', { replace: true })
+    } catch (caught) {
+      toast({
+        title: 'Sign out failed',
+        description: `${userFacingError(caught)} The session is still active.`,
+        variant: 'error',
+      })
+    }
   }
 
   return (
@@ -99,6 +174,48 @@ export function SettingsPage() {
               <LogOut className="h-4 w-4" aria-hidden="true" />
               Sign out of this session
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><ShieldCheck className="text-signal-400 h-4 w-4" aria-hidden="true" />Two-factor authentication</CardTitle>
+            <CardDescription>TOTP authenticator codes plus single-use recovery codes.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-5">
+            {mfaError ? <Alert variant="error">{mfaError}</Alert> : null}
+            {recoveryCodes.length > 0 ? (
+              <Alert variant="warning" title="Store these recovery codes now">
+                <div className="mt-2 grid grid-cols-2 gap-1 font-mono text-[11px]">
+                  {recoveryCodes.map((code) => <span key={code}>{code}</span>)}
+                </div>
+                <p className="mt-2 text-[11px]">Each code works once and cannot be shown again.</p>
+              </Alert>
+            ) : null}
+            {enrollment ? (
+              <div className="space-y-3">
+                <p className="text-ink-400 text-xs">Add this secret to your authenticator, then confirm a code.</p>
+                <pre className="bg-ink-950 text-ink-200 overflow-auto rounded-md p-3 font-mono text-[11px] whitespace-pre-wrap">{enrollment.secret}</pre>
+                <p className="text-ink-500 font-mono text-[10px] break-all">{enrollment.uri}</p>
+                <Field label="Authenticator code" htmlFor="mfa-enroll-code">
+                  <Input id="mfa-enroll-code" value={enrollmentCode} onChange={(event) => setEnrollmentCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" className="max-w-40 font-mono" />
+                </Field>
+                <div className="flex gap-2">
+                  <Button onClick={() => void confirmMFA()} loading={mfaBusy} disabled={!enrollmentCode.trim()}>Confirm and enable</Button>
+                  <Button variant="ghost" onClick={() => { setEnrollment(null); setMfaError(null) }} disabled={mfaBusy}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant={mfaQuery.data?.enabled ? 'mint' : 'outline'}>{mfaQuery.data?.enabled ? 'enabled' : 'disabled'}</Badge>
+                {mfaQuery.data?.enabled ? (
+                  <Button variant="outline" size="sm" onClick={() => { setDisableOpen(true); setMfaError(null) }}>Disable MFA</Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => void beginMFA()} loading={mfaBusy}>Enable MFA</Button>
+                )}
+              </div>
+            )}
+            <p className="text-ink-500 text-[11px] leading-5">If you lose the authenticator and recovery codes, the account cannot sign in. There is no email recovery.</p>
           </CardContent>
         </Card>
 
@@ -189,6 +306,27 @@ export function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={disableOpen}
+        onOpenChange={setDisableOpen}
+        title="Disable two-factor authentication"
+        description="Confirm your password to remove the authenticator and recovery codes."
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDisableOpen(false)} disabled={mfaBusy}>Cancel</Button>
+            <Button variant="danger" onClick={() => void confirmDisableMFA()} loading={mfaBusy} disabled={!disablePassword}>Disable MFA</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {mfaError ? <Alert variant="error">{mfaError}</Alert> : null}
+          <Field label="Password" htmlFor="mfa-disable-password">
+            <Input id="mfa-disable-password" type="password" value={disablePassword} onChange={(event) => setDisablePassword(event.target.value)} autoComplete="current-password" />
+          </Field>
+        </div>
+      </Dialog>
     </div>
   )
 }

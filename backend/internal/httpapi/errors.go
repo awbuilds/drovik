@@ -11,6 +11,8 @@ const (
 	CodeAuthInvalidCredentials = "AUTH_INVALID_CREDENTIALS"
 	CodeAuthSessionExpired     = "AUTH_SESSION_EXPIRED"
 	CodeAuthForbidden          = "AUTH_FORBIDDEN"
+	CodeAuthMFARequired        = "AUTH_MFA_REQUIRED"
+	CodeAuthMFAInvalid         = "AUTH_MFA_INVALID"
 	CodeCSRFInvalid            = "CSRF_INVALID"
 	CodeValidation             = "VALIDATION_ERROR"
 	CodeSetupAlreadyComplete   = "SETUP_ALREADY_COMPLETE"

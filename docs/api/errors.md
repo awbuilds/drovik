@@ -24,6 +24,8 @@ output and log contents are never included.
 | `AUTH_INVALID_CREDENTIALS` | 401 | Username or password rejected |
 | `AUTH_SESSION_EXPIRED` | 401 | Session expired or revoked |
 | `AUTH_FORBIDDEN` | 403 | Authenticated but not allowed for this resource |
+| `AUTH_MFA_REQUIRED` | 401 | A second factor is required; resubmit with `totp` |
+| `AUTH_MFA_INVALID` | 401 | The authenticator or recovery code was rejected |
 | `CSRF_INVALID` | 403 | Missing or invalid `X-CSRF-Token` |
 | `VALIDATION_ERROR` | 422 | Request failed validation; `details.field` may be present |
 | `SETUP_ALREADY_COMPLETE` | 409 | First-run setup already performed |

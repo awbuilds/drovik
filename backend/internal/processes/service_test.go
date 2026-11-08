@@ -250,3 +250,52 @@ func TestSignalUnobservableIdentityIsNotReportedAsMissing(t *testing.T) {
 		t.Fatalf("an unobservable identity must not be reported as a missing process: %v", err)
 	}
 }
+
+func TestSignalStateTimeoutIsUnknown(t *testing.T) {
+	env, service := newProcessEnv(t, func(command string) (string, string, int, bool) {
+		switch command {
+		case listCommand:
+			return processFixture, "", 0, true
+		case "LC_ALL=C ps -p 4242 -o etimes=":
+			return "5000\n", "", 0, true
+		case "kill -s TERM 4242":
+			return "", "", 0, true
+		case "ps -p 4242 -o stat=":
+			time.Sleep(600 * time.Millisecond)
+			return "", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	list, err := service.List(context.Background(), env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(400 * time.Millisecond)
+		cancel()
+	}()
+	result, err := service.Signal(ctx, env.User.ID, env.Server.ID, 4242, SignalTerm, list.Processes[0].StartedAt)
+	if err != nil {
+		t.Fatalf("Signal: %v", err)
+	}
+	if !result.Delivered || !result.OutcomeUnknown {
+		t.Fatalf("a canceled state read must be an unknown outcome: %+v", result)
+	}
+	events, err := storage.NewAuditRepository(env.DB).ListRecent(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("ListRecent: %v", err)
+	}
+	found := false
+	for _, event := range events {
+		if event.EventType == "process.signal" {
+			found = true
+			if event.Outcome != "unknown" {
+				t.Fatalf("unexpected outcome: %+v", event)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected a process.signal audit row")
+	}
+}
