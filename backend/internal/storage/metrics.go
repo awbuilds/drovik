@@ -124,14 +124,16 @@ func (r *MetricRepository) Count(ctx context.Context, serverID string) (int, err
 }
 
 type AlertRule struct {
-	ID         string
-	ServerID   string
-	Metric     string
-	Comparator string
-	Threshold  float64
-	Enabled    bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID               string
+	ServerID         string
+	Metric           string
+	Comparator       string
+	Threshold        float64
+	Enabled          bool
+	WebhookEncrypted string
+	LastNotifiedAt   *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type AlertRepository struct {
@@ -144,15 +146,20 @@ func NewAlertRepository(db *sql.DB) *AlertRepository {
 
 func (r *AlertRepository) Upsert(ctx context.Context, rule AlertRule) error {
 	result, err := r.db.ExecContext(ctx, `
-		INSERT INTO alert_rules (id, server_id, metric, comparator, threshold, enabled, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO alert_rules (
+			id, server_id, metric, comparator, threshold, enabled,
+			webhook_encrypted, created_at, updated_at
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			metric = excluded.metric, comparator = excluded.comparator,
 			threshold = excluded.threshold, enabled = excluded.enabled,
+			webhook_encrypted = COALESCE(excluded.webhook_encrypted, alert_rules.webhook_encrypted),
 			updated_at = excluded.updated_at
 		WHERE alert_rules.server_id = excluded.server_id`,
 		rule.ID, rule.ServerID, rule.Metric, rule.Comparator, rule.Threshold,
-		boolToInt(rule.Enabled), formatTime(rule.CreatedAt), formatTime(rule.UpdatedAt),
+		boolToInt(rule.Enabled), nullableText(rule.WebhookEncrypted),
+		formatTime(rule.CreatedAt), formatTime(rule.UpdatedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("upsert alert rule: %w", err)
@@ -169,7 +176,8 @@ func (r *AlertRepository) Upsert(ctx context.Context, rule AlertRule) error {
 
 func (r *AlertRepository) List(ctx context.Context, serverID string) ([]AlertRule, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, server_id, metric, comparator, threshold, enabled, created_at, updated_at
+		SELECT id, server_id, metric, comparator, threshold, enabled,
+		       webhook_encrypted, last_notified_at, created_at, updated_at
 		FROM alert_rules WHERE server_id = ? ORDER BY created_at`, serverID)
 	if err != nil {
 		return nil, fmt.Errorf("list alert rules: %w", err)
@@ -179,18 +187,25 @@ func (r *AlertRepository) List(ctx context.Context, serverID string) ([]AlertRul
 	rules := make([]AlertRule, 0, 8)
 	for rows.Next() {
 		var (
-			rule      AlertRule
-			enabled   int
-			createdAt string
-			updatedAt string
+			rule       AlertRule
+			enabled    int
+			webhook    sql.NullString
+			notifiedAt sql.NullString
+			createdAt  string
+			updatedAt  string
 		)
 		if err := rows.Scan(
 			&rule.ID, &rule.ServerID, &rule.Metric, &rule.Comparator, &rule.Threshold,
-			&enabled, &createdAt, &updatedAt,
+			&enabled, &webhook, &notifiedAt, &createdAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan alert rule: %w", err)
 		}
 		rule.Enabled = enabled == 1
+		rule.WebhookEncrypted = webhook.String
+		if notifiedAt.Valid {
+			value := parseTime(notifiedAt.String)
+			rule.LastNotifiedAt = &value
+		}
 		rule.CreatedAt = parseTime(createdAt)
 		rule.UpdatedAt = parseTime(updatedAt)
 		rules = append(rules, rule)
@@ -213,6 +228,17 @@ func (r *AlertRepository) Delete(ctx context.Context, serverID, id string) error
 	}
 	if deleted == 0 {
 		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *AlertRepository) MarkNotified(ctx context.Context, serverID, id string, at time.Time) error {
+	if _, err := r.db.ExecContext(ctx, `
+		UPDATE alert_rules SET last_notified_at = ?
+		WHERE id = ? AND server_id = ?`,
+		formatTime(at), id, serverID,
+	); err != nil {
+		return fmt.Errorf("mark alert notified: %w", err)
 	}
 	return nil
 }
