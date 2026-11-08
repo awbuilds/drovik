@@ -143,8 +143,12 @@ func (s *Service) notifyAlerts(ctx context.Context, serverID string, sample stor
 		// Claim the cooldown before delivery so overlapping snapshots cannot
 		// double-notify the same rule. A failed delivery is logged and retried
 		// after the cooldown instead of storming the endpoint.
-		if err := s.alerts.MarkNotified(ctx, serverID, rule.ID, now); err != nil {
+		claimed, err := s.alerts.MarkNotified(ctx, serverID, rule.ID, now, now.Add(-webhookCooldown))
+		if err != nil {
 			s.logger.Warn("alert notification mark failed", "error", err, "rule_id", rule.ID)
+			continue
+		}
+		if !claimed {
 			continue
 		}
 		if err := s.postWebhook(ctx, client, endpoint, payload); err != nil {
@@ -156,17 +160,19 @@ func (s *Service) notifyAlerts(ctx context.Context, serverID string, sample stor
 func (s *Service) postWebhook(ctx context.Context, client *http.Client, endpoint string, payload webhookPayload) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("webhook payload could not be encoded")
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return err
+		// Do not wrap the URL error: it contains the full webhook URL, which is
+		// itself a bearer secret and must never reach the logs.
+		return fmt.Errorf("webhook request could not be built")
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("User-Agent", "Drovik-Alert/1")
 	response, err := client.Do(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("webhook request failed")
 	}
 	defer func() { _ = response.Body.Close() }()
 	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, webhookMaxResponse))

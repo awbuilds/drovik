@@ -12,6 +12,59 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/auth"
 )
 
+func TestMFASetupRequiresStepUp(t *testing.T) {
+	app := newTestApp(t)
+	setup := app.request(t, http.MethodPost, "/api/v1/setup", setupRequest{
+		Username: "admin", Password: "correct horse battery staple",
+	}, "")
+	if setup.status != http.StatusCreated {
+		t.Fatalf("setup: %d %s", setup.status, setup.body)
+	}
+	csrf := decodeAuth(t, setup.body).CSRFToken
+	enrollment := app.request(t, http.MethodPost, "/api/v1/auth/mfa/setup", mfaSetupRequest{
+		Password: "correct horse battery staple",
+	}, csrf)
+	if enrollment.status != http.StatusOK {
+		t.Fatalf("MFA setup: %d %s", enrollment.status, enrollment.body)
+	}
+	var enrollmentBody mfaSetupResponse
+	if err := json.Unmarshal(enrollment.body, &enrollmentBody); err != nil {
+		t.Fatalf("decode setup: %v", err)
+	}
+	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(enrollmentBody.Secret)
+	if err != nil {
+		t.Fatalf("decode secret: %v", err)
+	}
+	enabled := app.request(t, http.MethodPost, "/api/v1/auth/mfa/enable", mfaEnableRequest{
+		Code: auth.TOTPCode(key, time.Now().Unix()/30),
+	}, csrf)
+	if enabled.status != http.StatusOK {
+		t.Fatalf("MFA enable: %d %s", enabled.status, enabled.body)
+	}
+
+	missing := app.request(t, http.MethodPost, "/api/v1/auth/mfa/setup", mfaSetupRequest{}, csrf)
+	if missing.status != http.StatusUnauthorized {
+		t.Fatalf("expected missing-password rejection, got %d %s", missing.status, missing.body)
+	}
+	noCode := app.request(t, http.MethodPost, "/api/v1/auth/mfa/setup", mfaSetupRequest{
+		Password: "correct horse battery staple",
+	}, csrf)
+	if noCode.status != http.StatusUnauthorized {
+		t.Fatalf("expected current-factor rejection, got %d %s", noCode.status, noCode.body)
+	}
+	status := app.request(t, http.MethodGet, "/api/v1/auth/mfa", nil, "")
+	if !bytes.Contains(status.body, []byte(`"enabled":true`)) {
+		t.Fatalf("a rejected re-enrollment must keep MFA enabled: %s", status.body)
+	}
+	reset := app.request(t, http.MethodPost, "/api/v1/auth/mfa/setup", mfaSetupRequest{
+		Password: "correct horse battery staple",
+		Code:     auth.TOTPCode(key, time.Now().Unix()/30),
+	}, csrf)
+	if reset.status != http.StatusOK {
+		t.Fatalf("step-up re-enrollment: %d %s", reset.status, reset.body)
+	}
+}
+
 func TestMFAEnrollmentAndLogin(t *testing.T) {
 	app := newTestApp(t)
 	setup := app.request(t, http.MethodPost, "/api/v1/setup", setupRequest{
@@ -26,7 +79,13 @@ func TestMFAEnrollmentAndLogin(t *testing.T) {
 	if status.status != http.StatusOK || !bytes.Contains(status.body, []byte(`"enabled":false`)) {
 		t.Fatalf("initial MFA status: %d %s", status.status, status.body)
 	}
-	setupResponse := app.request(t, http.MethodPost, "/api/v1/auth/mfa/setup", nil, csrf)
+	noPassword := app.request(t, http.MethodPost, "/api/v1/auth/mfa/setup", mfaSetupRequest{}, csrf)
+	if noPassword.status != http.StatusUnauthorized {
+		t.Fatalf("expected MFA setup password requirement, got %d %s", noPassword.status, noPassword.body)
+	}
+	setupResponse := app.request(t, http.MethodPost, "/api/v1/auth/mfa/setup", mfaSetupRequest{
+		Password: "correct horse battery staple",
+	}, csrf)
 	if setupResponse.status != http.StatusOK {
 		t.Fatalf("MFA setup: %d %s", setupResponse.status, setupResponse.body)
 	}

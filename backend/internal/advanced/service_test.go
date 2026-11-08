@@ -735,3 +735,73 @@ func TestDestructiveNetworkCommands(t *testing.T) {
 		t.Fatalf("expected port rejection, got %v", err)
 	}
 }
+
+func TestWebhookErrorsDoNotLeakURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	url := server.URL + "/hooks/super-secret-token"
+	server.Close()
+	service := &Service{}
+	err := service.postWebhook(context.Background(), &http.Client{Timeout: time.Second}, url, webhookPayload{})
+	if err == nil {
+		t.Fatal("expected a delivery failure")
+	}
+	if strings.Contains(err.Error(), "super-secret-token") || strings.Contains(err.Error(), server.URL) {
+		t.Fatalf("webhook error leaked its URL: %v", err)
+	}
+}
+
+func TestAlertNotificationClaimIsAtomic(t *testing.T) {
+	env, service := newAdvancedEnv(t, nil)
+	rule, err := service.SaveAlertRule(context.Background(), env.User.ID, env.Server.ID, "", AlertRuleInput{
+		Metric: "cpu_percent", Comparator: "gt", Threshold: 80, Enabled: true,
+	})
+	if err != nil {
+		t.Fatalf("SaveAlertRule: %v", err)
+	}
+	now := time.Now().UTC()
+	first, err := service.alerts.MarkNotified(context.Background(), env.Server.ID, rule.ID, now, now.Add(-webhookCooldown))
+	if err != nil || !first {
+		t.Fatalf("first claim: %v %v", first, err)
+	}
+	second, err := service.alerts.MarkNotified(context.Background(), env.Server.ID, rule.ID, now.Add(time.Second), now.Add(-webhookCooldown))
+	if err != nil || second {
+		t.Fatalf("second claim must lose the cooldown race: %v %v", second, err)
+	}
+}
+
+func TestDestructiveCancellationAuditsUnknown(t *testing.T) {
+	entered := make(chan struct{})
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		if strings.HasPrefix(command, "lsblk -no MOUNTPOINT") {
+			return "", "", 0, true
+		}
+		if strings.HasPrefix(command, "mkfs.ext4") {
+			close(entered)
+			time.Sleep(300 * time.Millisecond)
+			return "", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	service.cfg.EnableDestructiveHostOps = true
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-entered
+		cancel()
+	}()
+	if _, err := service.Format(ctx, env.User.ID, env.Server.ID, "/dev/sdb1", "ext4", "/dev/sdb1", true); err != nil {
+		t.Fatalf("Format: %v", err)
+	}
+	events, err := storage.NewAuditRepository(env.DB).ListRecent(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("ListRecent: %v", err)
+	}
+	for _, event := range events {
+		if event.EventType == "storage.format" {
+			if event.Outcome != "unknown" || event.SafeErrorCode == nil || *event.SafeErrorCode != "OUTCOME_UNKNOWN" {
+				t.Fatalf("unexpected cancellation audit: %+v", event)
+			}
+			return
+		}
+	}
+	t.Fatal("expected a storage.format audit row")
+}

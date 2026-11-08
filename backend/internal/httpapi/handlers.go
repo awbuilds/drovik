@@ -74,11 +74,13 @@ func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
 		schemaVersion = 0
 	}
 	writeJSON(w, http.StatusOK, versionResponse{
-		Version:       s.version.Version,
-		Commit:        s.version.Commit,
-		BuildDate:     s.version.BuildDate,
-		GoVersion:     s.version.GoVersion,
-		SchemaVersion: schemaVersion,
+		Version:            s.version.Version,
+		Commit:             s.version.Commit,
+		BuildDate:          s.version.BuildDate,
+		GoVersion:          s.version.GoVersion,
+		SchemaVersion:      schemaVersion,
+		DestructiveHostOps: s.cfg.EnableDestructiveHostOps,
+		VaultEnabled:       s.cfg.VaultEnabled,
 	})
 }
 

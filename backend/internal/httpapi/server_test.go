@@ -424,6 +424,9 @@ func TestVersionAndSecurityHeaders(t *testing.T) {
 	if err := json.Unmarshal(result.body, &version); err != nil || version.SchemaVersion < 1 {
 		t.Fatalf("unexpected version response: %s (%v)", result.body, err)
 	}
+	if version.DestructiveHostOps || version.VaultEnabled {
+		t.Fatalf("optional features must default to disabled: %+v", version)
+	}
 	if got := result.header.Get("X-Content-Type-Options"); got != "nosniff" {
 		t.Fatalf("missing nosniff header: %q", got)
 	}

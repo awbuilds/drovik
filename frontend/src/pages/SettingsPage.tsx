@@ -69,15 +69,37 @@ export function SettingsPage() {
   const [mfaError, setMfaError] = useState<string | null>(null)
   const [disableOpen, setDisableOpen] = useState(false)
   const [disablePassword, setDisablePassword] = useState('')
+  const [mfaSetupOpen, setMfaSetupOpen] = useState(false)
+  const [mfaSetupPassword, setMfaSetupPassword] = useState('')
+  const [mfaSetupCode, setMfaSetupCode] = useState('')
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkPassword, setLinkPassword] = useState('')
+  const [linkCode, setLinkCode] = useState('')
 
-  const beginMFA = async () => {
+  const beginMFA = () => {
+    setMfaSetupPassword('')
+    setMfaSetupCode('')
+    setMfaError(null)
+    setMfaSetupOpen(true)
+  }
+
+  const submitMFASetup = async () => {
     setMfaBusy(true)
     setMfaError(null)
     try {
-      const result = await setupMFA(csrfToken)
+      const result = await setupMFA(
+        {
+          password: mfaSetupPassword,
+          ...(mfaQuery.data?.enabled && mfaSetupCode.trim() ? { code: mfaSetupCode.trim() } : {}),
+        },
+        csrfToken,
+      )
       setEnrollment(result)
       setEnrollmentCode('')
       setRecoveryCodes([])
+      setMfaSetupOpen(false)
+      setMfaSetupPassword('')
+      setMfaSetupCode('')
     } catch (caught) {
       setMfaError(userFacingError(caught))
     } finally {
@@ -118,11 +140,24 @@ export function SettingsPage() {
     }
   }
 
-  const beginOIDCLink = async () => {
+  const beginOIDCLink = () => {
+    setLinkPassword('')
+    setLinkCode('')
+    setSsoError(null)
+    setLinkOpen(true)
+  }
+
+  const submitOIDCLink = async () => {
     setSsoBusy(true)
     setSsoError(null)
     try {
-      const result = await startOIDCLink(csrfToken)
+      const result = await startOIDCLink(
+        {
+          password: linkPassword,
+          ...(mfaQuery.data?.enabled && linkCode.trim() ? { code: linkCode.trim() } : {}),
+        },
+        csrfToken,
+      )
       window.location.assign(result.url)
     } catch (caught) {
       setSsoError(userFacingError(caught))
@@ -275,7 +310,7 @@ export function SettingsPage() {
                 {mfaQuery.data?.enabled ? (
                   <Button variant="outline" size="sm" onClick={() => { setDisableOpen(true); setMfaError(null) }}>Disable MFA</Button>
                 ) : (
-                  <Button variant="outline" size="sm" onClick={() => void beginMFA()} loading={mfaBusy}>Enable MFA</Button>
+                  <Button variant="outline" size="sm" onClick={beginMFA} loading={mfaBusy}>{mfaQuery.data?.enabled ? 'Replace MFA' : 'Enable MFA'}</Button>
                 )}
               </div>
             )}
@@ -307,7 +342,7 @@ export function SettingsPage() {
                       Unlink identity
                     </Button>
                   ) : (
-                    <Button variant="outline" size="sm" onClick={() => void beginOIDCLink()} loading={ssoBusy}>
+                    <Button variant="outline" size="sm" onClick={beginOIDCLink} loading={ssoBusy}>
                       Link identity
                     </Button>
                   )}
@@ -409,6 +444,58 @@ export function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={mfaSetupOpen}
+        onOpenChange={setMfaSetupOpen}
+        title={mfaQuery.data?.enabled ? 'Replace two-factor authentication' : 'Enable two-factor authentication'}
+        description="Confirm your password before generating a new authenticator secret."
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setMfaSetupOpen(false)} disabled={mfaBusy}>Cancel</Button>
+            <Button onClick={() => void submitMFASetup()} loading={mfaBusy} disabled={!mfaSetupPassword}>Continue</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {mfaError ? <Alert variant="error">{mfaError}</Alert> : null}
+          <Field label="Password" htmlFor="mfa-setup-password">
+            <Input id="mfa-setup-password" type="password" value={mfaSetupPassword} onChange={(event) => setMfaSetupPassword(event.target.value)} autoComplete="current-password" />
+          </Field>
+          {mfaQuery.data?.enabled ? (
+            <Field label="Current authenticator code" htmlFor="mfa-setup-code" hint="Required to replace an active factor.">
+              <Input id="mfa-setup-code" value={mfaSetupCode} onChange={(event) => setMfaSetupCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" className="font-mono" />
+            </Field>
+          ) : null}
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={linkOpen}
+        onOpenChange={setLinkOpen}
+        title="Link single sign-on"
+        description="Confirm your local password before adding a federated login to this account."
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setLinkOpen(false)} disabled={ssoBusy}>Cancel</Button>
+            <Button onClick={() => void submitOIDCLink()} loading={ssoBusy} disabled={!linkPassword}>Continue to provider</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {ssoError ? <Alert variant="error">{ssoError}</Alert> : null}
+          <Field label="Password" htmlFor="oidc-link-password">
+            <Input id="oidc-link-password" type="password" value={linkPassword} onChange={(event) => setLinkPassword(event.target.value)} autoComplete="current-password" />
+          </Field>
+          {mfaQuery.data?.enabled ? (
+            <Field label="Authenticator code" htmlFor="oidc-link-code" hint="Required because MFA is enabled.">
+              <Input id="oidc-link-code" value={linkCode} onChange={(event) => setLinkCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" className="font-mono" />
+            </Field>
+          ) : null}
+        </div>
+      </Dialog>
 
       <Dialog
         open={unlinkOpen}

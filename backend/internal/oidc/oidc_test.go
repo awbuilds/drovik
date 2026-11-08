@@ -51,7 +51,7 @@ func TestAuthorizationCodeFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	authURL, err := provider.Begin("login", "")
+	authURL, state, err := provider.Begin("login", "", "")
 	if err != nil {
 		t.Fatalf("Begin: %v", err)
 	}
@@ -59,8 +59,7 @@ func TestAuthorizationCodeFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	state := parsed.Query().Get("state")
-	if state == "" || parsed.Query().Get("code_challenge") == "" || parsed.Query().Get("code_challenge_method") != "S256" {
+	if parsed.Query().Get("state") != state || state == "" || parsed.Query().Get("code_challenge") == "" || parsed.Query().Get("code_challenge_method") != "S256" {
 		t.Fatalf("unexpected authorization URL: %s", authURL)
 	}
 	result, err := provider.Complete(context.Background(), state, "good-code")

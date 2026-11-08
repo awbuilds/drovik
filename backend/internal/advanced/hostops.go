@@ -203,6 +203,10 @@ func (s *Service) runDestructiveWithClient(
 		Truncated: strings.Contains(output, "[output truncated]"),
 	}
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			s.record(ctx, ownerID, serverID, eventType, target, "unknown", "OUTCOME_UNKNOWN")
+			return result, nil
+		}
 		s.record(ctx, ownerID, serverID, eventType, target, "failure", "HOST_OPERATION_FAILED")
 		return result, nil
 	}
