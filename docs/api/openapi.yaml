@@ -1630,6 +1630,88 @@ paths:
       responses:
         "200": {description: Command result}
 
+  /api/v1/auth/oidc/status:
+    get:
+      tags: [Authentication]
+      operationId: getOIDCStatus
+      summary: Report whether OpenID Connect sign-in is enabled
+      security: []
+      responses:
+        "200": {description: OIDC status}
+  /api/v1/auth/oidc/start:
+    get:
+      tags: [Authentication]
+      operationId: startOIDCLogin
+      summary: Begin the authorization-code + PKCE sign-in flow
+      security: []
+      responses:
+        "302": {description: Redirect to the identity provider}
+        "404": {description: OIDC is not enabled}
+  /api/v1/auth/oidc/callback:
+    get:
+      tags: [Authentication]
+      operationId: completeOIDCLogin
+      summary: Complete the OIDC flow and create a session for a linked account
+      description: |
+        Only an existing local account with a stored issuer/subject pair can
+        sign in. Unknown identities are denied; Drovik never auto-provisions or
+        matches an account by username.
+      security: []
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema: {type: string}
+        - name: code
+          in: query
+          required: true
+          schema: {type: string}
+      responses:
+        "302": {description: Redirect to the workspace, settings, or the login error page}
+  /api/v1/auth/oidc/link:
+    get:
+      tags: [Authentication]
+      operationId: getOIDCLinkStatus
+      summary: Report whether the current account has a linked OIDC identity
+      security: [{cookieAuth: []}]
+      responses:
+        "200": {description: Link status}
+    post:
+      tags: [Authentication]
+      operationId: startOIDCLink
+      summary: Begin linking the current account to an OIDC identity
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      responses:
+        "200":
+          description: Authorization URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: {type: string, format: uri}
+  /api/v1/auth/oidc/unlink:
+    post:
+      tags: [Authentication]
+      operationId: unlinkOIDC
+      summary: Remove the linked OIDC identity after password confirmation
+      security: [{cookieAuth: []}]
+      parameters: [{$ref: "#/components/parameters/CsrfToken"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: {type: string, format: password}
+      responses:
+        "204": {description: Unlinked}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+
 components:
   securitySchemes:
     cookieAuth:
@@ -1721,11 +1803,14 @@ components:
   schemas:
     SetupStatus:
       type: object
-      required: [required]
+      required: [required, oidc_enabled]
       properties:
         required:
           type: boolean
           description: True until the first administrator exists.
+        oidc_enabled:
+          type: boolean
+          description: True when the operator enabled OpenID Connect sign-in.
 
     SetupRequest:
       type: object

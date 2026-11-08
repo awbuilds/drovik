@@ -84,6 +84,10 @@ export function getSetupStatus(signal?: AbortSignal): Promise<SetupStatus> {
   return apiRequest<SetupStatus>('/api/v1/setup/status', { signal })
 }
 
+export function oidcStartURL(): string {
+  return `${API_BASE}/api/v1/auth/oidc/start`
+}
+
 export function setup(username: string, password: string): Promise<AuthResponse> {
   return apiRequest<AuthResponse>('/api/v1/setup', {
     method: 'POST',
@@ -118,6 +122,29 @@ export function enableMFA(code: string, csrf: string): Promise<{ recovery_codes:
     method: 'POST',
     csrf,
     body: { code },
+  })
+}
+
+export interface OIDCLinkStatus {
+  linked: boolean
+}
+
+export function getOIDCLinkStatus(signal?: AbortSignal): Promise<OIDCLinkStatus> {
+  return apiRequest<OIDCLinkStatus>('/api/v1/auth/oidc/link', { signal })
+}
+
+export function startOIDCLink(csrf: string): Promise<{ url: string }> {
+  return apiRequest<{ url: string }>('/api/v1/auth/oidc/link', {
+    method: 'POST',
+    csrf,
+  })
+}
+
+export function unlinkOIDC(password: string, csrf: string): Promise<void> {
+  return apiRequest<void>('/api/v1/auth/oidc/unlink', {
+    method: 'POST',
+    csrf,
+    body: { password },
   })
 }
 

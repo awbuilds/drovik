@@ -38,6 +38,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- OpenID Connect single sign-on: authorization-code + PKCE, discovery issuer check, single-use
+  state, explicit Settings-based account linking, no auto-provisioning, and password-confirmed
+  unlinking.
 - Destructive host operations behind `DROVIK_ENABLE_DESTRUCTIVE_HOST_OPS` (default false):
   mount/unmount, format, partition, link state, address/route changes and ufw/firewalld rules, with
   admin-only access, typed device confirmation, mount/root guards and audit.

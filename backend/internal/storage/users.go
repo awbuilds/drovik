@@ -216,3 +216,60 @@ func (r *UserRepository) CountAdmins(ctx context.Context) (int, error) {
 	}
 	return count, nil
 }
+
+func (r *UserRepository) FindByOIDC(ctx context.Context, issuer, subject string) (*User, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, username, password_hash, role, is_active, created_at, updated_at, last_login_at
+		FROM users WHERE oidc_issuer = ? AND oidc_subject = ?`, issuer, subject)
+	return scanUser(row)
+}
+
+func (r *UserRepository) BindOIDC(ctx context.Context, id, issuer, subject string) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE users SET oidc_issuer = ?, oidc_subject = ?, updated_at = ?
+		WHERE id = ? AND oidc_subject IS NULL`,
+		issuer, subject, formatTime(time.Now().UTC()), id,
+	)
+	if err != nil {
+		return fmt.Errorf("bind OIDC identity: %w", err)
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count bound OIDC identities: %w", err)
+	}
+	if updated == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *UserRepository) OIDCLinked(ctx context.Context, userID string) (bool, error) {
+	var linked int
+	err := r.db.QueryRowContext(ctx, `
+		SELECT CASE WHEN oidc_subject IS NULL THEN 0 ELSE 1 END
+		FROM users WHERE id = ?`, userID).Scan(&linked)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	if err != nil {
+		return false, fmt.Errorf("read OIDC link: %w", err)
+	}
+	return linked == 1, nil
+}
+
+func (r *UserRepository) ClearOIDC(ctx context.Context, userID string) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE users SET oidc_issuer = NULL, oidc_subject = NULL, updated_at = ?
+		WHERE id = ?`, formatTime(time.Now().UTC()), userID)
+	if err != nil {
+		return fmt.Errorf("clear OIDC identity: %w", err)
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count cleared OIDC identities: %w", err)
+	}
+	if updated == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

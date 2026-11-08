@@ -43,6 +43,11 @@ type testResponse struct {
 
 func newTestApp(t *testing.T) *testApp {
 	t.Helper()
+	return newTestAppWith(t, nil)
+}
+
+func newTestAppWith(t *testing.T, configure func(*config.Config)) *testApp {
+	t.Helper()
 	dir := t.TempDir()
 	db, err := storage.Open(filepath.Join(dir, "test.db"))
 	if err != nil {
@@ -113,6 +118,9 @@ func newTestApp(t *testing.T) *testApp {
 		SnippetMaxCommandBytes:  8192,
 		MetricsRetention:        time.Hour,
 		MetricsMaxSamples:       1000,
+	}
+	if configure != nil {
+		configure(cfg)
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	auditService := audit.New(storage.NewAuditRepository(db), logger)

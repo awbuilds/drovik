@@ -15,6 +15,7 @@ export interface AuthResponse {
 
 export interface SetupStatus {
   required: boolean
+  oidc_enabled: boolean
 }
 
 export interface VersionInfo {
