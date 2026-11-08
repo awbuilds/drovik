@@ -39,6 +39,50 @@ Status values: **Not started**, **In progress**, **Implemented**, **Tested**, **
 | AUTH-013 | Password change revokes other sessions | Deferred | Phase 1+ follow-up | — |
 | AUTH-014 | No user enumeration | Tested | Generic errors + dummy verification | `TestLoginAndRateLimit` (generic 401) |
 
+
+## Phase 2 — SSH connections and host-key trust
+
+| ID | Requirement | Status | Implementation / evidence |
+|---|---|---|---|
+| SSH-001 | Multiple servers | Tested | `servers.Service`, `ServerRepository`; HTTP and service tests |
+| SSH-002 | Connection fields | Tested | `servers.CreateInput`, `servers.Server`; form and API |
+| SSH-003 | Default port 22 | Implemented | `validateCreate` defaults port |
+| SSH-004 | Password and private-key auth | Tested | `sshclient.authMethods`; password and private-key tests |
+| SSH-005 | Key formats and useful errors | Implemented | OpenSSH/PEM via `ssh.ParsePrivateKey`; generic safe error |
+| SSH-006 | Strict host-key verification | Tested | `sshclient.Dialer` callback; `TestDialPasswordAuthenticatedHost` |
+| SSH-007 | Unknown host key flow | Tested | `HostKeyUnknownError`; HTTP 409 + approval test |
+| SSH-008 | Changed host key blocks | Tested | `HostKeyChangedError`; `TestDialChangedHostKey` |
+| SSH-009 | Persistent known-hosts store | Tested | `known_hosts` migration/repository; service test |
+| SSH-010 | Connection test | Tested | `/servers/{id}/test`; HTTP and service tests |
+| SSH-011 | Bounded timeouts | Implemented | dial/handshake/operation config; connection deadline |
+| SSH-012 | Session limits | Partial | config limits; enforced with the Phase 3 session pool |
+| SSH-013 | Resource cleanup | Tested | clients/sessions closed in tests and defer paths |
+| SSH-014 | Reconnect policy | Deferred | Phase 3 terminal/session lifecycle |
+| SSH-015 | Connection states | Partial | saved/untested/verified in UI; live states Phase 3 |
+| SSH-016 | No silent credential fallback | Implemented | single selected auth method; no retry alternatives |
+| SSH-017 | No agent forwarding | Implemented | not requested or exposed |
+| SSH-018 | No port forwarding | Implemented | not exposed |
+| SSH-019 | Remote identity display | Tested | UI shows `user@host:port`; manual browser review |
+| SSH-020 | Delete removes credentials | Tested | cascade delete; `TestDeleteServer` |
+| SSH-021 | Edit revalidates trust | Tested | host/port change revokes known host; `TestUpdateHostRevokesTrust` |
+| SSH-022 | Tags/groups | Implemented | tags stored and displayed; groups deferred |
+| SSH-023 | Encrypted import/export | Deferred | post-MVP |
+| SSH-024 | Egress policy | Tested | `security.EgressPolicy`; unit and HTTP tests |
+| MON-015 | Capability detection | Tested | `DetectCapabilities`; SSH and HTTP tests |
+| DESK-003 | Switch saved servers | Implemented | server list and workspace preview |
+| DESK-006 | Every server window shows identity | Implemented | server cards and test dialog |
+
+### Phase 2 notes
+
+- Host-key approval is explicit TOFU: the untrusted key details are returned in the 409 response,
+  and the operator must submit the same fingerprint to approve it.
+- A changed key is never accepted automatically; `replace: true` is required after re-verification.
+- Credentials are encrypted with AES-256-GCM and associated data binding the server ID and field.
+- The egress policy resolves once, blocks loopback/link-local/metadata by default, and allows
+  explicit operator overrides. Loopback is allowed in tests only via an explicit test configuration.
+- Live connection-state transitions, reconnect policy and the bounded session pool land with the
+  Phase 3 terminal work.
+
 ## Later phases
 
 The remaining requirement groups are tracked in the PRD and will be added here when their phase

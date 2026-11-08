@@ -13,7 +13,10 @@ Thumbs.db
 .env
 .env.*
 !.env.example
-secrets/
+/secrets/
+/backend/secrets/
+/deploy/compose/secrets/
+.secrets/
 *.pem
 *.key
 *.p12

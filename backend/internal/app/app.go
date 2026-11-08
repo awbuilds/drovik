@@ -37,7 +37,10 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 	}
 
 	auditService := audit.New(storage.NewAuditRepository(db), logger)
-	api := httpapi.New(cfg, logger, db, auditService)
+	api, err := httpapi.New(cfg, logger, db, auditService)
+	if err != nil {
+		return fmt.Errorf("initialize HTTP API: %w", err)
+	}
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

@@ -22,6 +22,12 @@ const (
 	CodeInternal               = "INTERNAL_ERROR"
 	CodeServiceUnavailable     = "SERVICE_UNAVAILABLE"
 	CodeConflict               = "CONFLICT"
+	CodeServerNotFound         = "SERVER_NOT_FOUND"
+	CodeSSHConnectionFailed    = "SSH_CONNECTION_FAILED"
+	CodeSSHHostKeyUnknown      = "SSH_HOST_KEY_UNKNOWN"
+	CodeSSHHostKeyChanged      = "SSH_HOST_KEY_CHANGED"
+	CodeSSHAuthFailed          = "SSH_AUTH_FAILED"
+	CodeSSHTimeout             = "SSH_OPERATION_TIMEOUT"
 )
 
 type APIError struct {

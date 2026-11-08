@@ -21,6 +21,7 @@ servers:
 tags:
   - name: Setup
   - name: Authentication
+  - name: Servers
   - name: System
 
 paths:
@@ -198,6 +199,227 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  /api/v1/servers:
+    get:
+      tags: [Servers]
+      operationId: listServers
+      summary: List saved SSH servers
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Authorized servers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [servers]
+                properties:
+                  servers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Server"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Servers]
+      operationId: createServer
+      summary: Save an SSH connection
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServerRequest"
+      responses:
+        "201":
+          description: Server created; the credential is encrypted and never returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/servers/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Servers]
+      operationId: getServer
+      summary: Get a saved server
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Server metadata without credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Servers]
+      operationId: updateServer
+      summary: Update metadata or replace the credential
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServerRequest"
+      responses:
+        "200":
+          description: Updated server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Servers]
+      operationId: deleteServer
+      summary: Delete a saved connection and its credential
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "204":
+          description: Server deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/servers/{id}/test:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    post:
+      tags: [Servers]
+      operationId: testServerConnection
+      summary: Test SSH reachability, host key and capabilities
+      description: |
+        Returns `409 SSH_HOST_KEY_UNKNOWN` or `409 SSH_HOST_KEY_CHANGED` with the
+        presented key details when explicit host-key approval is required.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "200":
+          description: Connection verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Host key approval required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "502":
+          description: SSH connection failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "504":
+          description: SSH operation timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/servers/{id}/trust-host-key:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    post:
+      tags: [Servers]
+      operationId: trustServerHostKey
+      summary: Approve or replace a presented host key
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrustHostKeyRequest"
+      responses:
+        "204":
+          description: Host key trusted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A different host key is already approved and `replace` was false
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/servers/{id}/capabilities:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Servers]
+      operationId: getServerCapabilities
+      summary: Get the last detected host capabilities
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Cached capabilities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capabilities"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
     cookieAuth:
@@ -207,6 +429,14 @@ components:
       description: Opaque server-side session cookie (HttpOnly).
 
   parameters:
+    ServerID:
+      name: id
+      in: path
+      required: true
+      description: Saved server identifier.
+      schema:
+        type: string
+
     CsrfToken:
       name: X-CSRF-Token
       in: header
@@ -243,6 +473,12 @@ components:
           schema:
             type: integer
             minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: The requested resource was not found
       content:
         application/json:
           schema:
@@ -371,3 +607,188 @@ components:
               type: string
             details:
               description: Optional safe structured details.
+
+    CreateServerRequest:
+      type: object
+      additionalProperties: false
+      required: [display_name, host, username, auth_method]
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        host:
+          type: string
+          minLength: 1
+          maxLength: 253
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          default: 22
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        auth_method:
+          type: string
+          enum: [password, private_key]
+        password:
+          type: string
+          maxLength: 1024
+          format: password
+        private_key:
+          type: string
+          maxLength: 65536
+          description: OpenSSH or PEM private key; encrypted before storage.
+        passphrase:
+          type: string
+          maxLength: 1024
+          format: password
+        tags:
+          type: string
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 2000
+
+    UpdateServerRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        host:
+          type: string
+          minLength: 1
+          maxLength: 253
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        auth_method:
+          type: string
+          enum: [password, private_key]
+        password:
+          type: string
+          maxLength: 1024
+          format: password
+        private_key:
+          type: string
+          maxLength: 65536
+        passphrase:
+          type: string
+          maxLength: 1024
+          format: password
+        tags:
+          type: string
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 2000
+
+    Server:
+      type: object
+      required: [id, display_name, host, port, username, auth_method, created_at, updated_at, is_active]
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+        auth_method:
+          type: string
+          enum: [password, private_key]
+        tags:
+          type: string
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_connected_at:
+          type: [string, "null"]
+          format: date-time
+        is_active:
+          type: boolean
+
+    HostKeyInfo:
+      type: object
+      required: [key_type, fingerprint, public_key]
+      properties:
+        key_type:
+          type: string
+        fingerprint:
+          type: string
+          description: SHA-256 fingerprint shown to the operator.
+        public_key:
+          type: string
+          description: Base64 SSH wire-format public key. Not secret.
+
+    Capabilities:
+      type: object
+      properties:
+        os:
+          type: string
+        kernel:
+          type: string
+        architecture:
+          type: string
+        distribution:
+          type: string
+        systemd:
+          type: boolean
+        journalctl:
+          type: boolean
+        proc:
+          type: boolean
+        process_tools:
+          type: boolean
+        disk_tools:
+          type: boolean
+        sftp:
+          type: boolean
+        detected_at:
+          type: string
+          format: date-time
+
+    ConnectionTest:
+      type: object
+      required: [server, host_key, capabilities]
+      properties:
+        server:
+          $ref: "#/components/schemas/Server"
+        host_key:
+          $ref: "#/components/schemas/HostKeyInfo"
+        capabilities:
+          $ref: "#/components/schemas/Capabilities"
+
+    TrustHostKeyRequest:
+      type: object
+      additionalProperties: false
+      required: [fingerprint, key_type, public_key]
+      properties:
+        fingerprint:
+          type: string
+        key_type:
+          type: string
+        public_key:
+          type: string
+        replace:
+          type: boolean
+          default: false
+          description: Replace an existing approved key after deliberate re-verification.

@@ -353,11 +353,13 @@ covered.
 - Phase 1: complete and merged. It adds the Go service foundation, SQLite migrations,
   first-run setup, Argon2id authentication, server-side sessions, session-bound CSRF, rate
   limiting, the React design system/workspace shell, deployment assets and tests.
-- Phase 2: next. Encrypted SSH credentials, host-key trust, server CRUD and capability detection.
-- No SSH, SFTP, terminal, monitoring, process, service or log features are implemented yet.
+- Phase 2: complete. Encrypted SSH credentials, strict host-key trust, server CRUD, connection
+  tests, egress policy and capability detection are implemented and tested.
+- Phase 3: next. Workspace/terminal session pool and interactive terminal.
+- SFTP, terminal, monitoring, process, service and log features are not implemented yet.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
-- Read the latest handoff in `docs/handoffs/` before starting Phase 2.
+- Read the latest handoff in `docs/handoffs/` before starting Phase 3.
 
 ## Decision inheritance
 

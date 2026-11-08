@@ -18,17 +18,23 @@ short, human-readable summary.
 - React application shell and design system.
 - Docker Compose deployment assets and OpenAPI contract.
 
-## Now — Phase 2: SSH connections
+## Complete — Phase 2: SSH connections
 
 - Encrypted credentials and strict host-key trust.
 - Saved server CRUD, connection tests and capability detection.
-- Bounded SSH session management and audit events.
+- Egress policy, password/private-key authentication and audit events.
+
+## Now — Phase 3: workspace and interactive terminal
+
+- Authenticated WebSocket terminal with PTY and resize.
+- Bounded session pool and cleanup.
+- Terminal UI with server context and reconnect states.
 
 ## Then
 
 | Phase | Focus |
 |---|---|
-| 3 | Workspace and interactive terminal |
+| 4 | SFTP file manager and editor |
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

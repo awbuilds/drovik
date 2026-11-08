@@ -12,6 +12,14 @@ Phase 1 endpoints:
 | `GET` | `/api/v1/auth/me` | Current user and CSRF token |
 | `POST` | `/api/v1/auth/logout` | Revoke the current session |
 | `GET` | `/api/v1/version` | Version and schema metadata |
+| `GET` | `/api/v1/servers` | List saved SSH servers |
+| `POST` | `/api/v1/servers` | Save an SSH connection |
+| `GET` | `/api/v1/servers/{id}` | Server metadata |
+| `PATCH` | `/api/v1/servers/{id}` | Update metadata/credential |
+| `DELETE` | `/api/v1/servers/{id}` | Delete the saved connection |
+| `POST` | `/api/v1/servers/{id}/test` | Test SSH and host-key trust |
+| `POST` | `/api/v1/servers/{id}/trust-host-key` | Approve/replace a host key |
+| `GET` | `/api/v1/servers/{id}/capabilities` | Last detected capabilities |
 | `GET` | `/healthz` | Liveness |
 | `GET` | `/readyz` | Readiness |
 

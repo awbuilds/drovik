@@ -33,7 +33,7 @@ fi
 
 # Reject accidentally staged private material. Example env files are allowed.
 staged_secret_like=$(git diff --cached --name-only \
-    | grep -Ev '(^|/)\.env\.(example|sample|template)$' \
+    | grep -Ev '(^|/)\.env\.(example|sample|template)$|(^|/)internal/secrets/' \
     | grep -E '(^|/)(\.env($|\.)|secrets?/|.*\.(pem|key|p12|pfx)|id_(rsa|ed25519|ecdsa))' || true)
 if [[ -n "$staged_secret_like" ]]; then
     echo "Refusing to commit a secret-like file. Unstage it and use .env.example:" >&2

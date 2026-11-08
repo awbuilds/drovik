@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -44,6 +45,17 @@ type Config struct {
 
 	ShutdownTimeout  time.Duration
 	ReadinessTimeout time.Duration
+
+	SSHDialTimeout      time.Duration
+	SSHHandshakeTimeout time.Duration
+	SSHOperationTimeout time.Duration
+
+	EgressAllowPrivate    bool
+	EgressAllowedPrefixes []netip.Prefix
+	EgressDeniedPrefixes  []netip.Prefix
+
+	SSHMaxSessionsPerUser int
+	SSHMaxSessionsGlobal  int
 }
 
 func Load() (*Config, error) {
@@ -169,6 +181,50 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		return nil, err
 	}
 
+	sshDialTimeout, err := parseDuration(lookup, "DROVIK_SSH_DIAL_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	sshHandshakeTimeout, err := parseDuration(lookup, "DROVIK_SSH_HANDSHAKE_TIMEOUT", 15*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	sshOperationTimeout, err := parseDuration(lookup, "DROVIK_SSH_OPERATION_TIMEOUT", 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if sshDialTimeout <= 0 || sshHandshakeTimeout <= 0 || sshOperationTimeout <= 0 {
+		return nil, errors.New("SSH timeouts must be greater than zero")
+	}
+
+	egressAllowPrivate, err := parseBool(lookup, "DROVIK_EGRESS_ALLOW_PRIVATE", true)
+	if err != nil {
+		return nil, err
+	}
+	egressAllowed, err := parsePrefixes(lookup, "DROVIK_EGRESS_ALLOWED_CIDRS")
+	if err != nil {
+		return nil, err
+	}
+	egressDenied, err := parsePrefixes(lookup, "DROVIK_EGRESS_DENIED_CIDRS")
+	if err != nil {
+		return nil, err
+	}
+
+	maxSessionsPerUser, err := parseInt(lookup, "DROVIK_SSH_MAX_SESSIONS_PER_USER", 2)
+	if err != nil {
+		return nil, err
+	}
+	maxSessionsGlobal, err := parseInt(lookup, "DROVIK_SSH_MAX_SESSIONS_GLOBAL", 10)
+	if err != nil {
+		return nil, err
+	}
+	if maxSessionsPerUser <= 0 || maxSessionsGlobal <= 0 {
+		return nil, errors.New("SSH session limits must be greater than zero")
+	}
+	if maxSessionsPerUser > maxSessionsGlobal {
+		maxSessionsPerUser = maxSessionsGlobal
+	}
+
 	dataDir, err := parseString(lookup, "DROVIK_DATA_DIR", "./data")
 	if err != nil {
 		return nil, err
@@ -188,23 +244,31 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 
 	return &Config{
-		Env:                env,
-		HTTPAddr:           httpAddr,
-		PublicURL:          publicURL,
-		TrustedOrigins:     origins,
-		LogLevel:           logLevel,
-		LogFormat:          logFormat,
-		DataDir:            filepath.Clean(dataDir),
-		DBPath:             filepath.Clean(dbPath),
-		StaticDir:          filepath.Clean(staticDir),
-		EncryptionKey:      key,
-		SessionIdleTTL:     idleTTL,
-		SessionAbsoluteTTL: absoluteTTL,
-		CookieSecure:       cookieSecure,
-		LoginRateLimit:     loginLimit,
-		LoginRateWindow:    loginWindow,
-		ShutdownTimeout:    shutdownTimeout,
-		ReadinessTimeout:   readinessTimeout,
+		Env:                   env,
+		HTTPAddr:              httpAddr,
+		PublicURL:             publicURL,
+		TrustedOrigins:        origins,
+		LogLevel:              logLevel,
+		LogFormat:             logFormat,
+		DataDir:               filepath.Clean(dataDir),
+		DBPath:                filepath.Clean(dbPath),
+		StaticDir:             filepath.Clean(staticDir),
+		EncryptionKey:         key,
+		SessionIdleTTL:        idleTTL,
+		SessionAbsoluteTTL:    absoluteTTL,
+		CookieSecure:          cookieSecure,
+		LoginRateLimit:        loginLimit,
+		LoginRateWindow:       loginWindow,
+		ShutdownTimeout:       shutdownTimeout,
+		ReadinessTimeout:      readinessTimeout,
+		SSHDialTimeout:        sshDialTimeout,
+		SSHHandshakeTimeout:   sshHandshakeTimeout,
+		SSHOperationTimeout:   sshOperationTimeout,
+		EgressAllowPrivate:    egressAllowPrivate,
+		EgressAllowedPrefixes: egressAllowed,
+		EgressDeniedPrefixes:  egressDenied,
+		SSHMaxSessionsPerUser: maxSessionsPerUser,
+		SSHMaxSessionsGlobal:  maxSessionsGlobal,
 	}, nil
 }
 
@@ -328,6 +392,29 @@ func parseInt(lookup func(string) (string, bool), key string, fallback int) (int
 		return 0, fmt.Errorf("%s must be an integer", key)
 	}
 	return parsed, nil
+}
+
+func parsePrefixes(lookup func(string) (string, bool), key string) ([]netip.Prefix, error) {
+	raw, err := parseString(lookup, key, "")
+	if err != nil {
+		return nil, err
+	}
+	if raw == "" {
+		return nil, nil
+	}
+	prefixes := make([]netip.Prefix, 0, 4)
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(part)
+		if err != nil {
+			return nil, fmt.Errorf("%s contains an invalid CIDR %q", key, part)
+		}
+		prefixes = append(prefixes, prefix.Masked())
+	}
+	return prefixes, nil
 }
 
 func parseDuration(lookup func(string) (string, bool), key string, fallback time.Duration) (time.Duration, error) {

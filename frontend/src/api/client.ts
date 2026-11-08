@@ -6,13 +6,21 @@ export class ApiError extends Error {
   readonly code: string
   readonly status: number
   readonly correlationId?: string
+  readonly details?: unknown
 
-  constructor(code: string, status: number, message: string, correlationId?: string) {
+  constructor(
+    code: string,
+    status: number,
+    message: string,
+    correlationId?: string,
+    details?: unknown,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.code = code
     this.status = status
     this.correlationId = correlationId
+    this.details = details
   }
 }
 
@@ -23,7 +31,7 @@ interface RequestOptions {
   signal?: AbortSignal
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET'
   const headers = new Headers({ Accept: 'application/json' })
   if (options.body !== undefined) {
@@ -65,6 +73,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       response.status,
       apiError?.message ?? 'The request could not be completed.',
       apiError?.correlation_id,
+      apiError?.details,
     )
   }
 
@@ -72,31 +81,31 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export function getSetupStatus(signal?: AbortSignal): Promise<SetupStatus> {
-  return request<SetupStatus>('/api/v1/setup/status', { signal })
+  return apiRequest<SetupStatus>('/api/v1/setup/status', { signal })
 }
 
 export function setup(username: string, password: string): Promise<AuthResponse> {
-  return request<AuthResponse>('/api/v1/setup', {
+  return apiRequest<AuthResponse>('/api/v1/setup', {
     method: 'POST',
     body: { username, password },
   })
 }
 
 export function login(username: string, password: string): Promise<AuthResponse> {
-  return request<AuthResponse>('/api/v1/auth/login', {
+  return apiRequest<AuthResponse>('/api/v1/auth/login', {
     method: 'POST',
     body: { username, password },
   })
 }
 
 export function logout(csrf: string): Promise<void> {
-  return request<void>('/api/v1/auth/logout', { method: 'POST', csrf })
+  return apiRequest<void>('/api/v1/auth/logout', { method: 'POST', csrf })
 }
 
 export function me(signal?: AbortSignal): Promise<AuthResponse> {
-  return request<AuthResponse>('/api/v1/auth/me', { signal })
+  return apiRequest<AuthResponse>('/api/v1/auth/me', { signal })
 }
 
 export function getVersion(signal?: AbortSignal): Promise<VersionInfo> {
-  return request<VersionInfo>('/api/v1/version', { signal })
+  return apiRequest<VersionInfo>('/api/v1/version', { signal })
 }

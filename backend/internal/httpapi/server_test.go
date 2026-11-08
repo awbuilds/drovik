@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +25,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/audit"
 	"github.com/awbuilds/drovik/backend/internal/config"
 	"github.com/awbuilds/drovik/backend/internal/storage"
+	"github.com/awbuilds/drovik/backend/internal/testssh"
 )
 
 type testApp struct {
@@ -62,27 +66,35 @@ func newTestApp(t *testing.T) *testApp {
 
 	publicURL, _ := url.Parse("http://example.com")
 	cfg := &config.Config{
-		Env:                config.EnvTest,
-		HTTPAddr:           "127.0.0.1:0",
-		PublicURL:          publicURL,
-		TrustedOrigins:     []string{"http://example.com"},
-		LogLevel:           "error",
-		LogFormat:          "text",
-		DataDir:            dir,
-		DBPath:             filepath.Join(dir, "test.db"),
-		StaticDir:          staticDir,
-		EncryptionKey:      []byte("0123456789abcdef0123456789abcdef"),
-		SessionIdleTTL:     time.Hour,
-		SessionAbsoluteTTL: 24 * time.Hour,
-		CookieSecure:       false,
-		LoginRateLimit:     5,
-		LoginRateWindow:    time.Minute,
-		ShutdownTimeout:    time.Second,
-		ReadinessTimeout:   time.Second,
+		Env:                   config.EnvTest,
+		HTTPAddr:              "127.0.0.1:0",
+		PublicURL:             publicURL,
+		TrustedOrigins:        []string{"http://example.com"},
+		LogLevel:              "error",
+		LogFormat:             "text",
+		DataDir:               dir,
+		DBPath:                filepath.Join(dir, "test.db"),
+		StaticDir:             staticDir,
+		EncryptionKey:         []byte("0123456789abcdef0123456789abcdef"),
+		SessionIdleTTL:        time.Hour,
+		SessionAbsoluteTTL:    24 * time.Hour,
+		CookieSecure:          false,
+		LoginRateLimit:        5,
+		LoginRateWindow:       time.Minute,
+		ShutdownTimeout:       time.Second,
+		ReadinessTimeout:      time.Second,
+		SSHDialTimeout:        5 * time.Second,
+		SSHHandshakeTimeout:   5 * time.Second,
+		SSHOperationTimeout:   5 * time.Second,
+		EgressAllowPrivate:    true,
+		EgressAllowedPrefixes: []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")},
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	auditService := audit.New(storage.NewAuditRepository(db), logger)
-	api := New(cfg, logger, db, auditService)
+	api, err := New(cfg, logger, db, auditService)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
 
 	server := httptest.NewServer(api.Handler())
 	t.Cleanup(server.Close)
@@ -375,8 +387,9 @@ func TestVersionAndSecurityHeaders(t *testing.T) {
 	if result.status != http.StatusOK {
 		t.Fatalf("version: %d %s", result.status, result.body)
 	}
-	if !strings.Contains(string(result.body), `"schema_version":1`) {
-		t.Fatalf("unexpected version response: %s", result.body)
+	var version versionResponse
+	if err := json.Unmarshal(result.body, &version); err != nil || version.SchemaVersion < 1 {
+		t.Fatalf("unexpected version response: %s (%v)", result.body, err)
 	}
 	if got := result.header.Get("X-Content-Type-Options"); got != "nosniff" {
 		t.Fatalf("missing nosniff header: %q", got)
@@ -447,5 +460,121 @@ func TestSetupRateLimit(t *testing.T) {
 	}, "")
 	if result.status != http.StatusTooManyRequests {
 		t.Fatalf("expected setup rate limit, got %d %s", result.status, result.body)
+	}
+}
+
+func TestServerRoutesWithSSHServer(t *testing.T) {
+	sshServer, err := testssh.Start(t.TempDir())
+	if err != nil {
+		t.Fatalf("testssh.Start: %v", err)
+	}
+	defer sshServer.Close()
+
+	app := newTestApp(t)
+	setup := app.request(t, http.MethodPost, "/api/v1/setup", setupRequest{
+		Username: "admin",
+		Password: "correct horse battery staple",
+	}, "")
+	if setup.status != http.StatusCreated {
+		t.Fatalf("setup: %d %s", setup.status, setup.body)
+	}
+	csrf := decodeAuth(t, setup.body).CSRFToken
+
+	host, portText, err := net.SplitHostPort(sshServer.Addr)
+	if err != nil {
+		t.Fatalf("SplitHostPort: %v", err)
+	}
+	port, _ := strconv.Atoi(portText)
+
+	result := app.request(t, http.MethodPost, "/api/v1/servers", createServerRequest{
+		DisplayName: "Test host",
+		Host:        host,
+		Port:        port,
+		Username:    "test",
+		AuthMethod:  "password",
+		Password:    sshServer.Password,
+	}, "")
+	if result.status != http.StatusForbidden {
+		t.Fatalf("expected CSRF rejection, got %d %s", result.status, result.body)
+	}
+
+	result = app.request(t, http.MethodPost, "/api/v1/servers", createServerRequest{
+		DisplayName: "Test host",
+		Host:        host,
+		Port:        port,
+		Username:    "test",
+		AuthMethod:  "password",
+		Password:    sshServer.Password,
+	}, csrf)
+	if result.status != http.StatusCreated {
+		t.Fatalf("create server: %d %s", result.status, result.body)
+	}
+	if strings.Contains(string(result.body), sshServer.Password) {
+		t.Fatal("server response contains the SSH password")
+	}
+	var created serverResponse
+	if err := json.Unmarshal(result.body, &created); err != nil {
+		t.Fatalf("decode server: %v", err)
+	}
+	if created.DisplayName != "Test host" || created.AuthMethod != "password" {
+		t.Fatalf("unexpected server: %+v", created)
+	}
+
+	result = app.request(t, http.MethodPost, "/api/v1/servers/"+created.ID+"/test", nil, csrf)
+	if result.status != http.StatusConflict {
+		t.Fatalf("expected unknown host key, got %d %s", result.status, result.body)
+	}
+	hostKeyError := decodeError(t, result.body)
+	if hostKeyError.Error.Code != CodeSSHHostKeyUnknown {
+		t.Fatalf("unexpected host key error: %s", result.body)
+	}
+	details, ok := hostKeyError.Error.Details.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected host key details: %s", result.body)
+	}
+	fingerprint, _ := details["fingerprint"].(string)
+	keyType, _ := details["key_type"].(string)
+	publicKey, _ := details["public_key"].(string)
+	if fingerprint == "" || keyType == "" || publicKey == "" {
+		t.Fatalf("incomplete host key details: %s", result.body)
+	}
+
+	result = app.request(t, http.MethodPost, "/api/v1/servers/"+created.ID+"/trust-host-key", trustHostKeyRequest{
+		Fingerprint: fingerprint,
+		KeyType:     keyType,
+		PublicKey:   publicKey,
+	}, csrf)
+	if result.status != http.StatusNoContent {
+		t.Fatalf("trust host key: %d %s", result.status, result.body)
+	}
+
+	result = app.request(t, http.MethodPost, "/api/v1/servers/"+created.ID+"/test", nil, csrf)
+	if result.status != http.StatusOK {
+		t.Fatalf("test connection: %d %s", result.status, result.body)
+	}
+	var tested connectionTestResponse
+	if err := json.Unmarshal(result.body, &tested); err != nil {
+		t.Fatalf("decode connection test: %v", err)
+	}
+	if tested.Capabilities.OS != "Linux" || !tested.Capabilities.SFTP {
+		t.Fatalf("unexpected capabilities: %+v", tested.Capabilities)
+	}
+	if tested.HostKey.Fingerprint != fingerprint {
+		t.Fatalf("unexpected tested host key: %+v", tested.HostKey)
+	}
+
+	result = app.request(t, http.MethodGet, "/api/v1/servers", nil, "")
+	if result.status != http.StatusOK {
+		t.Fatalf("list servers: %d %s", result.status, result.body)
+	}
+
+	result = app.request(t, http.MethodGet, "/api/v1/servers/"+created.ID+"/capabilities", nil, "")
+	if result.status != http.StatusOK {
+		t.Fatalf("capabilities: %d %s", result.status, result.body)
+	}
+
+	result = app.request(t, http.MethodDelete, "/api/v1/servers/"+created.ID, nil, csrf)
+	if result.status != http.StatusNoContent {
+		t.Fatalf("delete server: %d %s", result.status, result.body)
 	}
 }

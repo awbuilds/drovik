@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -200,5 +201,177 @@ func TestAuditAndSettings(t *testing.T) {
 	value, err := settings.Get(context.Background(), "setup.completed")
 	if err != nil || value != "true" {
 		t.Fatalf("Get: value=%q err=%v", value, err)
+	}
+}
+
+func newTestDatabase(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := Migrate(context.Background(), db); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	return db
+}
+
+func createTestUser(t *testing.T, db *sql.DB) User {
+	t.Helper()
+	users := NewUserRepository(db)
+	now := time.Now().UTC()
+	user := User{
+		ID: NewID(), Username: "admin", PasswordHash: "hash", Role: "admin",
+		IsActive: true, CreatedAt: now, UpdatedAt: now,
+	}
+	if _, err := users.CreateFirstAdmin(context.Background(), user); err != nil {
+		t.Fatalf("CreateFirstAdmin: %v", err)
+	}
+	return user
+}
+
+func TestServerRepository(t *testing.T) {
+	db := newTestDatabase(t)
+	user := createTestUser(t, db)
+	servers := NewServerRepository(db)
+	now := time.Now().UTC()
+	server := Server{
+		ID: NewID(), OwnerUserID: user.ID, DisplayName: "test host",
+		Host: "192.0.2.10", Port: 22, Username: "ops", AuthMethod: "password",
+		EncryptedSecret: "ciphertext", SecretNonce: "nonce", SecretVersion: 1,
+		Tags: "lab", Notes: "test", CreatedAt: now, UpdatedAt: now, IsActive: true,
+	}
+	if err := servers.Create(context.Background(), server); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	got, err := servers.GetByID(context.Background(), server.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.DisplayName != server.DisplayName || got.OwnerUserID != user.ID {
+		t.Fatalf("unexpected server: %+v", got)
+	}
+
+	list, err := servers.ListByOwner(context.Background(), user.ID)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("ListByOwner: %v %+v", err, list)
+	}
+
+	if err := servers.UpdateLastConnected(context.Background(), server.ID, now); err != nil {
+		t.Fatalf("UpdateLastConnected: %v", err)
+	}
+	got, _ = servers.GetByID(context.Background(), server.ID)
+	if got.LastConnectedAt == nil {
+		t.Fatal("expected last connected timestamp")
+	}
+
+	got.DisplayName = "renamed"
+	got.UpdatedAt = now.Add(time.Minute)
+	if err := servers.Update(context.Background(), *got); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	updated, _ := servers.GetByID(context.Background(), server.ID)
+	if updated.DisplayName != "renamed" {
+		t.Fatalf("update did not persist: %+v", updated)
+	}
+
+	if err := servers.Delete(context.Background(), server.ID, user.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := servers.GetByID(context.Background(), server.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+func TestKnownHostRepository(t *testing.T) {
+	db := newTestDatabase(t)
+	user := createTestUser(t, db)
+	servers := NewServerRepository(db)
+	hosts := NewKnownHostRepository(db)
+	now := time.Now().UTC()
+	server := Server{
+		ID: NewID(), OwnerUserID: user.ID, DisplayName: "test host",
+		Host: "192.0.2.10", Port: 22, Username: "ops", AuthMethod: "password",
+		EncryptedSecret: "ciphertext", SecretNonce: "nonce", SecretVersion: 1,
+		CreatedAt: now, UpdatedAt: now, IsActive: true,
+	}
+	if err := servers.Create(context.Background(), server); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := hosts.GetActive(context.Background(), server.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected no active host, got %v", err)
+	}
+
+	first := KnownHost{
+		ID: NewID(), ServerID: server.ID, Host: server.Host, Port: server.Port,
+		KeyType: "ssh-ed25519", Fingerprint: "SHA256:first", PublicKey: "first",
+		ApprovedAt: now, ApprovedBy: &user.ID,
+	}
+	if err := hosts.Approve(context.Background(), first, false); err != nil {
+		t.Fatalf("Approve: %v", err)
+	}
+	active, err := hosts.GetActive(context.Background(), server.ID)
+	if err != nil || active.Fingerprint != "SHA256:first" {
+		t.Fatalf("GetActive: %v %+v", err, active)
+	}
+	if err := hosts.Approve(context.Background(), first, false); err == nil {
+		t.Fatal("expected duplicate approval to fail")
+	}
+
+	second := first
+	second.ID = NewID()
+	second.Fingerprint = "SHA256:second"
+	second.ApprovedAt = now.Add(time.Minute)
+	if err := hosts.Approve(context.Background(), second, true); err != nil {
+		t.Fatalf("Approve replace: %v", err)
+	}
+	active, err = hosts.GetActive(context.Background(), server.ID)
+	if err != nil || active.Fingerprint != "SHA256:second" {
+		t.Fatalf("GetActive after replace: %v %+v", err, active)
+	}
+	if err := hosts.RevokeActive(context.Background(), server.ID, now.Add(2*time.Minute)); err != nil {
+		t.Fatalf("RevokeActive: %v", err)
+	}
+	if _, err := hosts.GetActive(context.Background(), server.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected no active host after revoke, got %v", err)
+	}
+}
+
+func TestCapabilitiesRepository(t *testing.T) {
+	db := newTestDatabase(t)
+	user := createTestUser(t, db)
+	servers := NewServerRepository(db)
+	caps := NewCapabilitiesRepository(db)
+	now := time.Now().UTC()
+	server := Server{
+		ID: NewID(), OwnerUserID: user.ID, DisplayName: "test host",
+		Host: "192.0.2.10", Port: 22, Username: "ops", AuthMethod: "password",
+		EncryptedSecret: "ciphertext", SecretNonce: "nonce", SecretVersion: 1,
+		CreatedAt: now, UpdatedAt: now, IsActive: true,
+	}
+	if err := servers.Create(context.Background(), server); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if err := caps.Upsert(context.Background(), server.ID, `{"os":"Linux"}`, now); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	record, err := caps.Get(context.Background(), server.ID)
+	if err != nil || record.Data != `{"os":"Linux"}` {
+		t.Fatalf("Get: %v %+v", err, record)
+	}
+	if err := caps.Upsert(context.Background(), server.ID, `{"os":"Linux","systemd":true}`, now.Add(time.Minute)); err != nil {
+		t.Fatalf("Upsert update: %v", err)
+	}
+	record, _ = caps.Get(context.Background(), server.ID)
+	if record.Data != `{"os":"Linux","systemd":true}` {
+		t.Fatalf("unexpected updated capabilities: %+v", record)
+	}
+	if err := caps.Delete(context.Background(), server.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := caps.Get(context.Background(), server.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
