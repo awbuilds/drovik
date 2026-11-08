@@ -134,3 +134,12 @@ func TestReadJournalPermissionAndUnavailable(t *testing.T) {
 		t.Fatalf("expected ErrUnavailable, got %v", err)
 	}
 }
+
+func BenchmarkParseJournalEntry(b *testing.B) {
+	line := `{"__REALTIME_TIMESTAMP":"1700000000123456","PRIORITY":"3","MESSAGE":"failed to start","_SYSTEMD_UNIT":"ssh.service","SYSLOG_IDENTIFIER":"systemd"}`
+	for index := 0; index < b.N; index++ {
+		if _, ok := parseEntry(line); !ok {
+			b.Fatal("expected a parsable entry")
+		}
+	}
+}

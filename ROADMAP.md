@@ -54,17 +54,16 @@ short, human-readable summary.
 - Audit history, accessibility and responsive polish.
 - Security test pass, dependency/static analysis and beta release assets.
 
-## Now — Phase 8: stable release and operational maturity
+## Complete — Phase 8: stable release and operational maturity
 
 - Versioned release pipeline, checksums and container publishing.
 - Migration, backup/restore and compatibility guidance.
-- Production load/performance validation and stable support policy.
+- Parser benchmarks, stable support policy and release runbook.
 
-## Then
+## Deferred — Phase 9: post-MVP advanced server management
 
-| Phase | Focus |
-|---|---|
-| 9 | Post-MVP advanced server management |
+Phase 9 features (Docker management, historical metrics, RBAC, file-based logs) are individually
+threat-modeled and intentionally outside the stable MVP scope.
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

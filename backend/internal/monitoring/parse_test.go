@@ -181,3 +181,11 @@ func TestPartialMetricsRemainAvailable(t *testing.T) {
 		t.Fatalf("missing sections must be marked unavailable: %+v", sample)
 	}
 }
+
+func BenchmarkParseSample(b *testing.B) {
+	for index := 0; index < b.N; index++ {
+		if _, err := parseSample(testssh.DefaultMetricsFixture, time.Unix(1_700_000_000, 0)); err != nil {
+			b.Fatalf("parseSample: %v", err)
+		}
+	}
+}

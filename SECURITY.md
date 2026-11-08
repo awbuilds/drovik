@@ -50,8 +50,14 @@ This is a volunteer-maintained project; these are targets, not contractual SLAs.
 
 ## Supported versions
 
-Until a stable release exists, only the latest commit on `main` is supported. Security fixes are
-released as soon as practical.
+| Version | Supported |
+|---|---|
+| Latest stable `v1.x` | Yes |
+| Current beta `v0.1.x-beta` | Security fixes until the next stable release |
+| Older tags/commits | No |
+
+Security fixes are released as soon as practical. Upgrade using the documented backup and restore
+procedure in [docs/development/backup-restore.md](docs/development/backup-restore.md).
 
 ## Security design
 

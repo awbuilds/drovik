@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help verify backend-test backend-lint backend-fmt frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-build security hooks
+.PHONY: help verify backend-test backend-bench backend-lint backend-fmt frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-build security hooks
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -11,6 +11,9 @@ verify: ## Run all available checks
 
 backend-test: ## Run Go tests with the race detector
 	cd backend && go test -race ./...
+
+backend-bench: ## Run parser benchmarks
+	cd backend && go test -run '^$$' -bench . -benchmem ./internal/monitoring ./internal/processes ./internal/logs ./internal/services
 
 backend-lint: ## Run Go vet and golangci-lint
 	cd backend && go vet ./...
