@@ -326,9 +326,9 @@ separate design and threat model before implementation.
 | 9.1 Logs/inspect | Tested | Bounded `docker logs`, JSON inspect |
 | 9.1 Compose/socket warning | Implemented | No socket mount; UI warns root-equivalent access; Compose deferred |
 | 9.2 Block devices/filesystems/inodes | Tested | `lsblk -J`, `df -Pk`, `df -Pki`, `/proc/mounts` parser tests |
-| 9.2 Mount/format/partition | Out of scope | Destructive storage needs a new ADR and independent risk review |
+| 9.2 Mount/unmount/format/partition | Tested | Feature-flagged, admin-only, typed device confirmation, mounted/root guards, audit; unit + Colima loop-disk tests |
 | 9.3 Interfaces/routes/listeners | Tested | `ip -j addr/route`, `ss -tulpn` parser tests |
-| 9.3 Network changes | Out of scope | Firewall/interface changes need a new ADR |
+| 9.3 Interface/address/route/firewall changes | Tested | Feature-flagged, admin-only, validated interface/CIDR/port, confirm, audit; unit + Colima network-namespace tests |
 | 9.4 Package manager detection/list | Tested | dpkg/rpm/apk/pacman detection and bounded list |
 | 9.4 Install/update/remove | Tested | Enumerated apt/dnf/apk/pacman actions, confirmation, validated names, audit; service and HTTP tests |
 | 9.5 Snippets CRUD/variables | Tested | Storage + service tests; variables and shell quoting |

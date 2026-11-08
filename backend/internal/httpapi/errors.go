@@ -39,6 +39,7 @@ const (
 	CodeIsDirectory            = "IS_DIRECTORY"
 	CodeSFTPPermissionDenied   = "SFTP_PERMISSION_DENIED"
 	CodeCapabilityUnavailable  = "CAPABILITY_UNAVAILABLE"
+	CodeFeatureDisabled        = "FEATURE_DISABLED"
 	CodeProcessUnavailable     = "PROCESS_UNAVAILABLE"
 	CodeProcessNotFound        = "PROCESS_NOT_FOUND"
 	CodeProcessPermission      = "PROCESS_PERMISSION_DENIED"

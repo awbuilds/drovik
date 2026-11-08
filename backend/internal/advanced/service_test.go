@@ -596,3 +596,142 @@ func TestAlertWebhookDelivery(t *testing.T) {
 	case <-time.After(300 * time.Millisecond):
 	}
 }
+
+func TestDestructiveHostOperationsGuarded(t *testing.T) {
+	env, service := newAdvancedEnv(t, nil)
+	ctx := context.Background()
+	if _, err := service.Mount(ctx, env.User.ID, env.Server.ID, "/dev/sdb1", "/mnt/data", "ext4", true); !errors.Is(err, ErrFeatureDisabled) {
+		t.Fatalf("expected feature-disabled error, got %v", err)
+	}
+	service.cfg.EnableDestructiveHostOps = true
+	if _, err := service.Mount(ctx, env.User.ID, env.Server.ID, "/dev/sdb1", "/mnt/data", "ext4", false); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected confirmation requirement, got %v", err)
+	}
+	for _, mount := range []string{"/", "/boot", "/var", "/mnt/../etc", "relative"} {
+		if _, err := service.Mount(ctx, env.User.ID, env.Server.ID, "/dev/sdb1", mount, "ext4", true); !errors.Is(err, ErrInvalidTarget) {
+			t.Fatalf("expected mountpoint %q rejection, got %v", mount, err)
+		}
+	}
+	if _, err := service.Format(ctx, env.User.ID, env.Server.ID, "/dev/sdb1", "ext4", "/dev/sdb2", true); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected typed-device mismatch, got %v", err)
+	}
+	for _, device := range []string{"/dev/../etc/passwd", "/dev/sdb1;reboot", "sdb1", "/dev/sdb1 extra"} {
+		if _, err := service.Format(ctx, env.User.ID, env.Server.ID, device, "ext4", device, true); !errors.Is(err, ErrInvalidTarget) {
+			t.Fatalf("expected device %q rejection, got %v", device, err)
+		}
+	}
+}
+
+func TestDestructiveStorageCommands(t *testing.T) {
+	var commands []string
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case strings.HasPrefix(command, "lsblk -no MOUNTPOINT"):
+			return "", "", 0, true
+		case strings.HasPrefix(command, "lsblk -ndo TYPE"):
+			return "disk\n", "", 0, true
+		case strings.HasPrefix(command, "mount "), strings.HasPrefix(command, "umount "),
+			strings.HasPrefix(command, "mkfs."), strings.HasPrefix(command, "parted "):
+			commands = append(commands, command)
+			return "ok\n", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	service.cfg.EnableDestructiveHostOps = true
+	ctx := context.Background()
+	if _, err := service.Mount(ctx, env.User.ID, env.Server.ID, "/dev/sdb1", "/mnt/data", "ext4", true); err != nil {
+		t.Fatalf("Mount: %v", err)
+	}
+	if _, err := service.Unmount(ctx, env.User.ID, env.Server.ID, "/mnt/data", true); err != nil {
+		t.Fatalf("Unmount: %v", err)
+	}
+	if _, err := service.Format(ctx, env.User.ID, env.Server.ID, "/dev/sdb1", "ext4", "/dev/sdb1", true); err != nil {
+		t.Fatalf("Format: %v", err)
+	}
+	if _, err := service.Partition(ctx, env.User.ID, env.Server.ID, "/dev/sdb", "ext4", "/dev/sdb", true); err != nil {
+		t.Fatalf("Partition: %v", err)
+	}
+	want := []string{
+		"mount -t ext4 /dev/sdb1 /mnt/data",
+		"umount /mnt/data",
+		"mkfs.ext4 -F /dev/sdb1",
+		"parted -s /dev/sdb mklabel gpt mkpart primary ext4 1MiB 100%",
+	}
+	if len(commands) != len(want) {
+		t.Fatalf("unexpected commands: %+v", commands)
+	}
+	for index := range want {
+		if commands[index] != want[index] {
+			t.Fatalf("command %d = %q, want %q", index, commands[index], want[index])
+		}
+	}
+}
+
+func TestFormatRefusesMountedDevice(t *testing.T) {
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		if strings.HasPrefix(command, "lsblk -no MOUNTPOINT") {
+			return "/mnt/data\n", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	service.cfg.EnableDestructiveHostOps = true
+	if _, err := service.Format(context.Background(), env.User.ID, env.Server.ID, "/dev/sdb1", "ext4", "/dev/sdb1", true); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected mounted-device rejection, got %v", err)
+	}
+}
+
+func TestDestructiveNetworkCommands(t *testing.T) {
+	var commands []string
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case strings.Contains(command, "command -v ufw"):
+			return "ufw\n", "", 0, true
+		case strings.HasPrefix(command, "ip "), strings.HasPrefix(command, "ufw "):
+			commands = append(commands, command)
+			return "ok\n", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	service.cfg.EnableDestructiveHostOps = true
+	ctx := context.Background()
+	if _, err := service.LinkState(ctx, env.User.ID, env.Server.ID, "eth0", "down", true); err != nil {
+		t.Fatalf("LinkState: %v", err)
+	}
+	if _, err := service.AddressChange(ctx, env.User.ID, env.Server.ID, "eth0", "192.0.2.10/24", "add", true); err != nil {
+		t.Fatalf("AddressChange: %v", err)
+	}
+	if _, err := service.RouteChange(ctx, env.User.ID, env.Server.ID, "eth0", "default", "192.0.2.1", "add", true); err != nil {
+		t.Fatalf("RouteChange: %v", err)
+	}
+	if _, err := service.FirewallChange(ctx, env.User.ID, env.Server.ID, 22, "tcp", "allow", true); err != nil {
+		t.Fatalf("FirewallChange: %v", err)
+	}
+	want := []string{
+		"ip link set eth0 down",
+		"ip addr add 192.0.2.10/24 dev eth0",
+		"ip route add default via 192.0.2.1 dev eth0",
+		"ufw allow 22/tcp",
+	}
+	if len(commands) != len(want) {
+		t.Fatalf("unexpected commands: %+v", commands)
+	}
+	for index := range want {
+		if commands[index] != want[index] {
+			t.Fatalf("command %d = %q, want %q", index, commands[index], want[index])
+		}
+	}
+	for _, iface := range []string{"", "eth0; reboot", "this-interface-is-too-long"} {
+		if _, err := service.LinkState(ctx, env.User.ID, env.Server.ID, iface, "up", true); !errors.Is(err, ErrInvalidTarget) {
+			t.Fatalf("expected interface %q rejection, got %v", iface, err)
+		}
+	}
+	if _, err := service.AddressChange(ctx, env.User.ID, env.Server.ID, "eth0", "not-a-cidr", "add", true); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected CIDR rejection, got %v", err)
+	}
+	if _, err := service.RouteChange(ctx, env.User.ID, env.Server.ID, "eth0", "default", "192.0.2.1;reboot", "add", true); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected gateway rejection, got %v", err)
+	}
+	if _, err := service.FirewallChange(ctx, env.User.ID, env.Server.ID, 0, "tcp", "allow", true); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected port rejection, got %v", err)
+	}
+}
