@@ -36,17 +36,23 @@ short, human-readable summary.
 - Create/rename/delete with traversal and symlink protections.
 - Bounded text editor with unsaved-change and stale-file handling.
 
-## Now — Phase 5: system overview and metrics
+## Complete — Phase 5: system overview and metrics
 
 - Bounded `/proc` and standard-command collectors.
 - CPU deltas, memory, disk, uptime, load and network rates.
 - Honest unavailable/stale states and per-host coalescing.
 
+## Now — Phase 6: processes, systemd services and logs
+
+- Bounded process discovery and enumerated signal actions.
+- systemd unit discovery, actions and status re-reads.
+- Bounded journal retrieval with safe filtering.
+
 ## Then
 
 | Phase | Focus |
 |---|---|
-| 6 | Processes, systemd services and logs |
+| 7 | MVP integration, security hardening and public beta |
 | 4 | SFTP file manager and text editor |
 | 5 | System overview and metrics |
 | 6 | Processes, systemd services and logs |

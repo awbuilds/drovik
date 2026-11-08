@@ -62,6 +62,13 @@ type Config struct {
 	SFTPMaxListEntries      int
 	SFTPMaxRecursiveEntries int
 	SFTPOperationTimeout    time.Duration
+
+	MonitorRefreshInterval time.Duration
+	MonitorStaleAfter      time.Duration
+	MonitorTimeout         time.Duration
+	MonitorMaxOutputBytes  int
+	MonitorMaxFilesystems  int
+	MonitorMaxInterfaces   int
 }
 
 func Load() (*Config, error) {
@@ -240,6 +247,37 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		return nil, errors.New("SFTP limits must be greater than zero")
 	}
 
+	monitorRefresh, err := parseDuration(lookup, "DROVIK_MONITOR_REFRESH_INTERVAL", 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	monitorStaleAfter, err := parseDuration(lookup, "DROVIK_MONITOR_STALE_AFTER", time.Minute)
+	if err != nil {
+		return nil, err
+	}
+	monitorTimeout, err := parseDuration(lookup, "DROVIK_MONITOR_TIMEOUT", 15*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	monitorMaxOutput, err := parseInt(lookup, "DROVIK_MONITOR_MAX_OUTPUT_BYTES", 256*1024)
+	if err != nil {
+		return nil, err
+	}
+	monitorMaxFilesystems, err := parseInt(lookup, "DROVIK_MONITOR_MAX_FILESYSTEMS", 64)
+	if err != nil {
+		return nil, err
+	}
+	monitorMaxInterfaces, err := parseInt(lookup, "DROVIK_MONITOR_MAX_INTERFACES", 64)
+	if err != nil {
+		return nil, err
+	}
+	if monitorRefresh < time.Second {
+		return nil, errors.New("DROVIK_MONITOR_REFRESH_INTERVAL must be at least 1s")
+	}
+	if monitorStaleAfter < monitorRefresh || monitorTimeout <= 0 || monitorMaxOutput <= 0 || monitorMaxFilesystems <= 0 || monitorMaxInterfaces <= 0 {
+		return nil, errors.New("monitoring limits must be positive and the stale window must not be shorter than the refresh interval")
+	}
+
 	maxSessionsPerUser, err := parseInt(lookup, "DROVIK_SSH_MAX_SESSIONS_PER_USER", 2)
 	if err != nil {
 		return nil, err
@@ -304,6 +342,12 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		SFTPMaxListEntries:      sftpMaxList,
 		SFTPMaxRecursiveEntries: sftpMaxRecursive,
 		SFTPOperationTimeout:    sftpTimeout,
+		MonitorRefreshInterval:  monitorRefresh,
+		MonitorStaleAfter:       monitorStaleAfter,
+		MonitorTimeout:          monitorTimeout,
+		MonitorMaxOutputBytes:   monitorMaxOutput,
+		MonitorMaxFilesystems:   monitorMaxFilesystems,
+		MonitorMaxInterfaces:    monitorMaxInterfaces,
 	}, nil
 }
 

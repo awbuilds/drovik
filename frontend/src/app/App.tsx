@@ -17,6 +17,10 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
 import { WorkspacePage } from '@/pages/WorkspacePage'
 
+const MonitoringPage = lazy(() =>
+  import('@/pages/MonitoringPage').then((module) => ({ default: module.MonitoringPage })),
+)
+
 const FilesPage = lazy(() =>
   import('@/pages/FilesPage').then((module) => ({ default: module.FilesPage })),
 )
@@ -108,6 +112,26 @@ function AppRoutes() {
         element={
           <AppShell>
             <ServersPage />
+          </AppShell>
+        }
+      />
+      <Route
+        path="/monitoring"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading overview" />}>
+              <MonitoringPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/monitoring/:serverId"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading overview" />}>
+              <MonitoringPage />
+            </Suspense>
           </AppShell>
         }
       />

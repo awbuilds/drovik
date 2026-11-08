@@ -14,6 +14,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/auth"
 	"github.com/awbuilds/drovik/backend/internal/config"
 	"github.com/awbuilds/drovik/backend/internal/files"
+	"github.com/awbuilds/drovik/backend/internal/monitoring"
 	"github.com/awbuilds/drovik/backend/internal/secrets"
 	"github.com/awbuilds/drovik/backend/internal/security"
 	"github.com/awbuilds/drovik/backend/internal/servers"
@@ -34,6 +35,7 @@ type Server struct {
 	auth         *auth.SessionManager
 	servers      *servers.Service
 	files        *files.Service
+	monitoring   *monitoring.Service
 	terminal     *terminal.Manager
 	limiter      *security.LoginLimiter
 	setupLimiter *security.LoginLimiter
@@ -66,6 +68,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		logger,
 	)
 	filesService := files.NewService(cfg, serverService, auditService, logger)
+	monitoringService := monitoring.NewService(cfg, serverService, logger)
 	terminalManager := terminal.NewManager(cfg, serverService, logger)
 
 	var staticHandler http.Handler
@@ -81,15 +84,16 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 	}
 
 	return &Server{
-		cfg:      cfg,
-		logger:   logger,
-		db:       db,
-		users:    users,
-		sessions: sessions,
-		audit:    auditService,
-		servers:  serverService,
-		files:    filesService,
-		terminal: terminalManager,
+		cfg:        cfg,
+		logger:     logger,
+		db:         db,
+		users:      users,
+		sessions:   sessions,
+		audit:      auditService,
+		servers:    serverService,
+		files:      filesService,
+		monitoring: monitoringService,
+		terminal:   terminalManager,
 		auth: auth.NewSessionManager(
 			sessions,
 			users,
@@ -144,6 +148,7 @@ func (s *Server) Handler() http.Handler {
 			r.Get("/servers/{id}/capabilities", s.handleCapabilities)
 			r.Get("/servers/{id}/terminal", s.handleTerminal)
 
+			r.Get("/servers/{id}/overview", s.handleServerOverview)
 			r.Get("/servers/{id}/files", s.handleListFiles)
 			r.Get("/servers/{id}/files/stat", s.handleStatFile)
 			r.Get("/servers/{id}/files/download", s.handleDownloadFile)

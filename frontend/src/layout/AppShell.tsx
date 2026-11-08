@@ -5,6 +5,7 @@ import {
   Activity,
   ChevronRight,
   FolderTree,
+  Gauge,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -47,6 +48,7 @@ const navigation: Array<{ label: string; items: NavItem[] }> = [
   {
     label: 'Observe',
     items: [
+      { to: '/monitoring', label: 'Monitoring', icon: Gauge, enabled: true },
       { to: '/activity', label: 'Activity', icon: Activity, enabled: false, phase: 'Phase 6' },
     ],
   },
@@ -274,7 +276,7 @@ function SidebarContent({
           </Tooltip>
         </div>
         <p className="text-ink-600 mt-2 px-1 font-mono text-[9px] tracking-wider uppercase">
-          Phase 4 · SFTP files
+          Phase 5 · Host monitoring
         </p>
       </div>
     </>

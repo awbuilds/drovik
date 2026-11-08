@@ -36,6 +36,7 @@ const (
 	CodeSymlinkNotAllowed      = "SYMLINK_NOT_ALLOWED"
 	CodeIsDirectory            = "IS_DIRECTORY"
 	CodeSFTPPermissionDenied   = "SFTP_PERMISSION_DENIED"
+	CodeCapabilityUnavailable  = "CAPABILITY_UNAVAILABLE"
 )
 
 type APIError struct {
