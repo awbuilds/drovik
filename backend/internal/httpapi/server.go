@@ -212,7 +212,10 @@ func (s *Server) Handler() http.Handler {
 			r.Get("/servers/{id}/storage-tools", s.handleStorageTools)
 			r.Get("/servers/{id}/network-tools", s.handleNetworkTools)
 			r.Get("/servers/{id}/packages", s.handlePackages)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/packages/action", s.handlePackageAction)
 			r.Get("/servers/{id}/schedules", s.handleSchedules)
+			r.With(s.requireServerWrite, s.requireCSRF).Post("/servers/{id}/tasks", s.handleCreateTask)
+			r.With(s.requireServerWrite, s.requireCSRF).Delete("/servers/{id}/tasks/{taskID}", s.handleDeleteTask)
 
 			r.Get("/snippets", s.handleListSnippets)
 			r.With(s.requireWriteAccess, s.requireCSRF).Post("/snippets", s.handleCreateSnippet)

@@ -27,10 +27,11 @@ const (
 )
 
 type ScheduleOverview struct {
-	Available   bool         `json:"available"`
-	Cron        []CronEntry  `json:"cron"`
-	Timers      []TimerEntry `json:"timers"`
-	CollectedAt time.Time    `json:"collected_at"`
+	Available    bool          `json:"available"`
+	Cron         []CronEntry   `json:"cron"`
+	Timers       []TimerEntry  `json:"timers"`
+	ManagedTasks []ManagedTask `json:"managed_tasks"`
+	CollectedAt  time.Time     `json:"collected_at"`
 }
 
 const scheduleCommand = `printf '@@crontab@@\n'
@@ -59,10 +60,11 @@ func (s *Service) Schedules(ctx context.Context, ownerID, serverID string) (*Sch
 	}
 	sections := splitSections(output)
 	result := &ScheduleOverview{
-		Available:   strings.TrimSpace(output) != "",
-		Cron:        make([]CronEntry, 0, 16),
-		Timers:      make([]TimerEntry, 0, 16),
-		CollectedAt: time.Now().UTC(),
+		Available:    strings.TrimSpace(output) != "",
+		Cron:         make([]CronEntry, 0, 16),
+		Timers:       make([]TimerEntry, 0, 16),
+		ManagedTasks: managedTasks(sections["crontab"]),
+		CollectedAt:  time.Now().UTC(),
 	}
 	result.Cron = appendCron(result.Cron, "user crontab", sections["crontab"])
 	result.Cron = appendCron(result.Cron, "/etc/crontab", sections["etc-crontab"])

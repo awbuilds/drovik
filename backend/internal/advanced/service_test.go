@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -353,5 +354,145 @@ func TestAlertRuleIDAndCardinalityBounds(t *testing.T) {
 		Metric: "cpu_percent", Comparator: "gt", Threshold: 80, Enabled: true,
 	}); !errors.Is(err, ErrInvalidTarget) {
 		t.Fatalf("expected rule cap rejection, got %v", err)
+	}
+}
+
+func TestPackageActionLifecycle(t *testing.T) {
+	var commands []string
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		if strings.Contains(command, "command -v apt-get") {
+			return "apt\n", "", 0, true
+		}
+		if strings.HasPrefix(command, "apt-get ") {
+			commands = append(commands, command)
+			return "Setting up package\n", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	ctx := context.Background()
+	if _, err := service.PackageAction(ctx, env.User.ID, env.Server.ID, "curl", PackageInstall, false); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected confirmation requirement, got %v", err)
+	}
+	for _, action := range []string{PackageInstall, PackageUpgrade, PackageRemove} {
+		result, err := service.PackageAction(ctx, env.User.ID, env.Server.ID, "curl", action, true)
+		if err != nil {
+			t.Fatalf("%s: %v", action, err)
+		}
+		if !result.Success || result.Manager != "apt" {
+			t.Fatalf("%s: unexpected result: %+v", action, result)
+		}
+	}
+	want := []string{
+		"apt-get install -y --no-install-recommends curl",
+		"apt-get install -y --only-upgrade curl",
+		"apt-get remove -y curl",
+	}
+	if len(commands) != len(want) {
+		t.Fatalf("unexpected commands: %+v", commands)
+	}
+	for index := range want {
+		if commands[index] != want[index] {
+			t.Fatalf("command %d = %q, want %q", index, commands[index], want[index])
+		}
+	}
+	for _, invalid := range []string{"curl; reboot", "../pkg", "pkg name", "-pkg", ""} {
+		if _, err := service.PackageAction(ctx, env.User.ID, env.Server.ID, invalid, PackageInstall, true); !errors.Is(err, ErrInvalidTarget) {
+			t.Fatalf("expected invalid package %q to be rejected, got %v", invalid, err)
+		}
+	}
+}
+
+func TestPackageActionReportsFailureOutput(t *testing.T) {
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case strings.Contains(command, "command -v apt-get"):
+			return "apt\n", "", 0, true
+		case strings.HasPrefix(command, "apt-get remove"):
+			return "", "E: Could not open lock file\n", 100, true
+		}
+		return "", "", 0, false
+	})
+	result, err := service.PackageAction(context.Background(), env.User.ID, env.Server.ID, "curl", PackageRemove, true)
+	if err != nil {
+		t.Fatalf("PackageAction: %v", err)
+	}
+	if result.Success || !strings.Contains(result.Output, "lock file") {
+		t.Fatalf("expected failed output, got %+v", result)
+	}
+}
+
+func TestManagedTaskLifecycle(t *testing.T) {
+	current := "0 3 * * * /usr/local/bin/backup\n"
+	lastStaged := ""
+	env, service := newAdvancedEnv(t, func(command string) (string, string, int, bool) {
+		switch {
+		case command == "crontab -l":
+			return current, "", 0, true
+		case strings.HasPrefix(command, "crontab /tmp/drovik-crontab-"):
+			path := strings.TrimPrefix(command, "crontab ")
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return "", "read staging file failed\n", 1, true
+			}
+			lastStaged = string(content)
+			current = lastStaged
+			return "", "", 0, true
+		case strings.Contains(command, "@@crontab@@"):
+			return "@@crontab@@\n" + current + "@@etc-crontab@@\n@@cron-d@@\n@@timers@@\n", "", 0, true
+		}
+		return "", "", 0, false
+	})
+	ctx := context.Background()
+
+	if _, err := service.CreateTask(ctx, env.User.ID, env.Server.ID, TaskInput{Schedule: "*/5 * * * *", Command: "echo hello"}, false); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected confirmation requirement, got %v", err)
+	}
+	result, err := service.CreateTask(ctx, env.User.ID, env.Server.ID, TaskInput{
+		Schedule: "*/5 * * * *", Command: "echo hello",
+	}, true)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if !strings.Contains(lastStaged, "# drovik-task:"+result.Task.ID) || !strings.Contains(lastStaged, "*/5 * * * * echo hello") {
+		t.Fatalf("unexpected staged crontab: %q", lastStaged)
+	}
+	if !strings.Contains(lastStaged, "0 3 * * * /usr/local/bin/backup") {
+		t.Fatalf("existing crontab entry was not preserved: %q", lastStaged)
+	}
+
+	overview, err := service.Schedules(ctx, env.User.ID, env.Server.ID)
+	if err != nil {
+		t.Fatalf("Schedules: %v", err)
+	}
+	if len(overview.ManagedTasks) != 1 || overview.ManagedTasks[0].ID != result.Task.ID {
+		t.Fatalf("unexpected managed tasks: %+v", overview.ManagedTasks)
+	}
+
+	if err := service.DeleteTask(ctx, env.User.ID, env.Server.ID, result.Task.ID, false); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("expected delete confirmation requirement, got %v", err)
+	}
+	if err := service.DeleteTask(ctx, env.User.ID, env.Server.ID, result.Task.ID, true); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+	if strings.Contains(lastStaged, taskMarkerPrefix+result.Task.ID) {
+		t.Fatalf("managed task marker still present: %q", lastStaged)
+	}
+	if !strings.Contains(lastStaged, "0 3 * * * /usr/local/bin/backup") {
+		t.Fatalf("existing crontab entry was lost: %q", lastStaged)
+	}
+}
+
+func TestTaskValidation(t *testing.T) {
+	for _, input := range []TaskInput{
+		{Schedule: "* * * *", Command: "echo hi"},
+		{Schedule: "* * * * * *", Command: "echo hi"},
+		{Schedule: "bad * * * *", Command: "echo hi"},
+		{Schedule: "* * * * *", Command: ""},
+		{Schedule: "* * * * *", Command: "echo %"},
+		{Schedule: "* * * * *", Command: "echo\nreboot"},
+	} {
+		if _, err := validateTask(input); !errors.Is(err, ErrInvalidTarget) {
+			t.Fatalf("expected %+v to be rejected, got %v", input, err)
+		}
 	}
 }

@@ -18,9 +18,15 @@ web session into unbounded root-equivalent authority by accident.
   socket into its own container. Only list/image/log/inspect and start/stop/restart/remove by
   validated container ID are exposed. Every action is confirmed, audited, blocked for read-only
   assignments and labelled as potentially root-equivalent.
-- **Storage, network, packages and scheduled tasks** are read-only. Destructive disk, firewall,
-  interface, package and cron mutations are intentionally absent until separately designed and
-  reviewed. Commands are fixed; package search filters a bounded local list rather than querying
+- **Storage and network** remain read-only. Destructive disk, firewall and interface mutations are
+  intentionally absent until separately designed and reviewed.
+- **Package lifecycle** exposes install, upgrade and remove for the detected package manager
+  (apt/dnf/apk/pacman). Package names are strictly validated, confirmation is required, commands
+  are enumerated, no sudo/escalation is attempted and every action is audited. Failures return the
+  remote output without claiming success.
+- **Scheduled tasks** support creating and deleting Drovik-marked entries in the SSH user's own
+  crontab. The schedule and command are validated, the full crontab is staged over SFTP and
+  installed with `crontab`, existing entries are preserved, and changes are audited. Commands are fixed; package search filters a bounded local list rather than querying
   repositories.
 - **Snippets** store a named command template and optional non-secret variables. Substitution
   shell-quotes every value and the client must render a substituted preview and confirm a target
@@ -44,8 +50,8 @@ The following Phase 9 candidates were reviewed and are not planned for the 1.x s
 
 - Mount, unmount, format, partition or other destructive storage operations.
 - Firewall, interface, route or other network changes.
-- Package install, upgrade, removal or repository configuration changes.
-- Cron, systemd timer or other scheduled-task editing.
+- Repository configuration changes and automatic update scheduling.
+- systemd timer or unit-file editing.
 - OIDC/SSO, MFA, external secret managers or other federated identity.
 - External notification channels (email, webhook, chat, paging).
 - macOS, BSD or Windows managed-host support.
