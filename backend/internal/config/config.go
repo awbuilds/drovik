@@ -86,6 +86,12 @@ type Config struct {
 	MetricsMaxSamples int
 
 	EnableDestructiveHostOps bool
+
+	OIDCEnabled      bool
+	OIDCIssuer       string
+	OIDCClientID     string
+	OIDCClientSecret string
+	OIDCRedirectURL  string
 }
 
 func Load() (*Config, error) {
@@ -355,6 +361,39 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	oidcEnabled, err := parseBool(lookup, "DROVIK_OIDC_ENABLED", false)
+	if err != nil {
+		return nil, err
+	}
+	oidcIssuer, err := parseString(lookup, "DROVIK_OIDC_ISSUER", "")
+	if err != nil {
+		return nil, err
+	}
+	oidcClientID, err := parseString(lookup, "DROVIK_OIDC_CLIENT_ID", "")
+	if err != nil {
+		return nil, err
+	}
+	oidcClientSecret, err := parseString(lookup, "DROVIK_OIDC_CLIENT_SECRET", "")
+	if err != nil {
+		return nil, err
+	}
+	oidcRedirect, err := parseString(lookup, "DROVIK_OIDC_REDIRECT_URL", "")
+	if err != nil {
+		return nil, err
+	}
+	if oidcEnabled {
+		if oidcIssuer == "" || oidcClientID == "" || oidcRedirect == "" {
+			return nil, errors.New("DROVIK_OIDC_ISSUER, DROVIK_OIDC_CLIENT_ID and DROVIK_OIDC_REDIRECT_URL are required when OIDC is enabled")
+		}
+		issuerURL, err := url.Parse(oidcIssuer)
+		if err != nil || (issuerURL.Scheme != "https" && issuerURL.Scheme != "http") {
+			return nil, errors.New("DROVIK_OIDC_ISSUER must be an absolute http(s) URL")
+		}
+		redirectURL, err := url.Parse(oidcRedirect)
+		if err != nil || (redirectURL.Scheme != "https" && redirectURL.Scheme != "http") {
+			return nil, errors.New("DROVIK_OIDC_REDIRECT_URL must be an absolute http(s) URL")
+		}
+	}
 
 	maxSessionsPerUser, err := parseInt(lookup, "DROVIK_SSH_MAX_SESSIONS_PER_USER", 2)
 	if err != nil {
@@ -439,6 +478,11 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		MetricsRetention:         metricsRetention,
 		MetricsMaxSamples:        metricsMaxSamples,
 		EnableDestructiveHostOps: destructiveHostOps,
+		OIDCEnabled:              oidcEnabled,
+		OIDCIssuer:               strings.TrimRight(oidcIssuer, "/"),
+		OIDCClientID:             oidcClientID,
+		OIDCClientSecret:         oidcClientSecret,
+		OIDCRedirectURL:          oidcRedirect,
 	}, nil
 }
 

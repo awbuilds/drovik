@@ -1,8 +1,18 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Check, ExternalLink, LogOut, Moon, ShieldCheck, Sun } from 'lucide-react'
-import { disableMFA, enableMFA, getMFAStatus, getVersion, setupMFA } from '@/api/client'
+import { Check, ExternalLink, KeyRound, LogOut, Moon, ShieldCheck, Sun } from 'lucide-react'
+import {
+  disableMFA,
+  enableMFA,
+  getMFAStatus,
+  getOIDCLinkStatus,
+  getSetupStatus,
+  getVersion,
+  setupMFA,
+  startOIDCLink,
+  unlinkOIDC,
+} from '@/api/client'
 import { useAuth } from '@/auth/useAuth'
 import { PageHeader } from '@/components/PageHeader'
 import { Alert } from '@/components/ui/Alert'
@@ -24,11 +34,29 @@ export function SettingsPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { theme, setTheme } = useThemeStore()
+  const [searchParams] = useSearchParams()
   const versionQuery = useQuery({
     queryKey: ['version'],
     queryFn: ({ signal }) => getVersion(signal),
     staleTime: 60_000,
   })
+  const setupQuery = useQuery({
+    queryKey: ['setup-status'],
+    queryFn: ({ signal }) => getSetupStatus(signal),
+    staleTime: 60_000,
+    retry: 0,
+  })
+  const oidcEnabled = setupQuery.data?.oidc_enabled === true
+  const oidcLinkQuery = useQuery({
+    queryKey: ['oidc-link'],
+    queryFn: ({ signal }) => getOIDCLinkStatus(signal),
+    enabled: oidcEnabled,
+    retry: 0,
+  })
+  const [ssoError, setSsoError] = useState<string | null>(null)
+  const [ssoBusy, setSsoBusy] = useState(false)
+  const [unlinkOpen, setUnlinkOpen] = useState(false)
+  const [unlinkPassword, setUnlinkPassword] = useState('')
   const mfaQuery = useQuery({
     queryKey: ['mfa-status'],
     queryFn: ({ signal }) => getMFAStatus(signal),
@@ -89,6 +117,42 @@ export function SettingsPage() {
       setMfaBusy(false)
     }
   }
+
+  const beginOIDCLink = async () => {
+    setSsoBusy(true)
+    setSsoError(null)
+    try {
+      const result = await startOIDCLink(csrfToken)
+      window.location.assign(result.url)
+    } catch (caught) {
+      setSsoError(userFacingError(caught))
+      setSsoBusy(false)
+    }
+  }
+
+  const confirmUnlinkOIDC = async () => {
+    setSsoBusy(true)
+    setSsoError(null)
+    try {
+      await unlinkOIDC(unlinkPassword, csrfToken)
+      setUnlinkOpen(false)
+      setUnlinkPassword('')
+      toast({ title: 'Single sign-on unlinked', variant: 'success' })
+      await oidcLinkQuery.refetch()
+    } catch (caught) {
+      setSsoError(userFacingError(caught))
+    } finally {
+      setSsoBusy(false)
+    }
+  }
+
+  const ssoNotice = searchParams.get('oidc_linked')
+    ? 'Single sign-on is now linked to this account.'
+    : searchParams.get('oidc_error') === 'already_linked'
+      ? 'This local account already has a different single sign-on identity.'
+      : searchParams.get('oidc_error')
+        ? 'Single sign-on linking failed. Try again or contact an administrator.'
+        : null
 
   const handleLogout = async () => {
     try {
@@ -219,6 +283,45 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
+        {oidcEnabled ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <KeyRound className="text-signal-400 h-4 w-4" aria-hidden="true" />
+                Single sign-on
+              </CardTitle>
+              <CardDescription>Link this local account to the configured OpenID Connect identity.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-5">
+              {ssoNotice ? <Alert variant={searchParams.get('oidc_linked') ? 'success' : 'error'}>{ssoNotice}</Alert> : null}
+              {ssoError ? <Alert variant="error">{ssoError}</Alert> : null}
+              {oidcLinkQuery.isError ? (
+                <Alert variant="warning">The single sign-on link status could not be read.</Alert>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge variant={oidcLinkQuery.data?.linked ? 'mint' : 'outline'}>
+                    {oidcLinkQuery.data?.linked ? 'linked' : 'not linked'}
+                  </Badge>
+                  {oidcLinkQuery.data?.linked ? (
+                    <Button variant="outline" size="sm" onClick={() => { setUnlinkOpen(true); setSsoError(null) }}>
+                      Unlink identity
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => void beginOIDCLink()} loading={ssoBusy}>
+                      Link identity
+                    </Button>
+                  )}
+                </div>
+              )}
+              <p className="text-ink-500 text-[11px] leading-5">
+                Single sign-on never creates an account. An administrator must create the local
+                account first, then you link it here. The identity provider's own policy is the
+                authentication boundary for SSO sign-in.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <Card>
           <CardHeader>
             <CardTitle>Appearance</CardTitle>
@@ -306,6 +409,27 @@ export function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={unlinkOpen}
+        onOpenChange={setUnlinkOpen}
+        title="Unlink single sign-on"
+        description="Confirm your password to remove the linked identity. Password sign-in keeps working."
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setUnlinkOpen(false)} disabled={ssoBusy}>Cancel</Button>
+            <Button variant="danger" onClick={() => void confirmUnlinkOIDC()} loading={ssoBusy} disabled={!unlinkPassword}>Unlink</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {ssoError ? <Alert variant="error">{ssoError}</Alert> : null}
+          <Field label="Password" htmlFor="oidc-unlink-password">
+            <Input id="oidc-unlink-password" type="password" value={unlinkPassword} onChange={(event) => setUnlinkPassword(event.target.value)} autoComplete="current-password" />
+          </Field>
+        </div>
+      </Dialog>
 
       <Dialog
         open={disableOpen}

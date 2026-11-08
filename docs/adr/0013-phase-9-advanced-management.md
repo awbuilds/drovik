@@ -40,6 +40,13 @@ web session into unbounded root-equivalent authority by accident.
 - **Local MFA:** users can enroll a TOTP authenticator with encrypted-at-rest secrets and eight
   single-use recovery codes. Login requires the second factor when enabled; recovery codes are
   hashed and consumed once. OIDC/SSO remains a separate identity decision.
+- **OIDC/SSO:** optional authorization-code flow with PKCE, discovery (issuer checked), no
+  redirects, bounded responses and single-use five-minute state. Accounts are never auto-provisioned
+  or matched by username: an authenticated user links their existing local account from Settings,
+  and login only succeeds for a stored `(issuer, subject)` pair. Link/unlink require a session and
+  password confirmation for unlink. The provider's policy is the SSO authentication boundary; local
+  TOTP is not also required for an SSO sign-in. State is in-process, which matches the
+  single-instance SQLite architecture.
 - **Users and assignments:** administrators manage local users and per-server `read`/`write`
   assignments. Owners and administrators always have write access. The account role `read_only` and
   a `read` assignment both block terminal, process/service actions, file mutations, Docker actions,
@@ -63,7 +70,7 @@ The following Phase 9 candidates were reviewed and are not planned for the 1.x s
 - Unattended or scheduled destructive operations (the flag remains manual and disabled by default).
 - Repository configuration changes and automatic update scheduling.
 - systemd timer or unit-file editing.
-- OIDC/SSO, external secret managers or other federated identity (local TOTP MFA is implemented).
+- External secret managers or additional federated identity providers.
 - External notification channels (email, webhook, chat, paging).
 - macOS, BSD or Windows managed-host support.
 

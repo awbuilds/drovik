@@ -29,7 +29,8 @@ type authResponse struct {
 }
 
 type setupStatusResponse struct {
-	Required bool `json:"required"`
+	Required    bool `json:"required"`
+	OIDCEnabled bool `json:"oidc_enabled"`
 }
 
 type setupRequest struct {
@@ -87,7 +88,7 @@ func (s *Server) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
 		return
 	}
-	writeJSON(w, http.StatusOK, setupStatusResponse{Required: count == 0})
+	writeJSON(w, http.StatusOK, setupStatusResponse{Required: count == 0, OIDCEnabled: s.cfg.OIDCEnabled})
 }
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {

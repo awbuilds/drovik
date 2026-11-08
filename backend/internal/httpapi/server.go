@@ -18,6 +18,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/files"
 	"github.com/awbuilds/drovik/backend/internal/logs"
 	"github.com/awbuilds/drovik/backend/internal/monitoring"
+	"github.com/awbuilds/drovik/backend/internal/oidc"
 	"github.com/awbuilds/drovik/backend/internal/processes"
 	"github.com/awbuilds/drovik/backend/internal/secrets"
 	"github.com/awbuilds/drovik/backend/internal/security"
@@ -50,8 +51,10 @@ type Server struct {
 	terminal     *terminal.Manager
 	userAdmin    *useradmin.Service
 	advanced     *advanced.Service
+	oidc         *oidc.Provider
 	limiter      *security.LoginLimiter
 	setupLimiter *security.LoginLimiter
+	oidcLimiter  *security.LoginLimiter
 	version      version.Info
 
 	staticHandler http.Handler
@@ -91,6 +94,13 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 	logService := logs.NewService(cfg, serverService, logger)
 	terminalManager := terminal.NewManager(cfg, serverService, logger)
 	userService := useradmin.NewService(users, sessions, auditService, logger)
+	var oidcProvider *oidc.Provider
+	if cfg.OIDCEnabled {
+		oidcProvider, err = oidc.New(cfg, logger)
+		if err != nil {
+			return nil, err
+		}
+	}
 	advancedService := advanced.NewService(
 		cfg,
 		serverService,
@@ -135,6 +145,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		terminal:   terminalManager,
 		userAdmin:  userService,
 		advanced:   advancedService,
+		oidc:       oidcProvider,
 		auth: auth.NewSessionManager(
 			sessions,
 			users,
@@ -146,6 +157,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		),
 		limiter:       security.NewLoginLimiter(cfg.LoginRateLimit, cfg.LoginRateWindow),
 		setupLimiter:  security.NewLoginLimiter(5, 10*time.Minute),
+		oidcLimiter:   security.NewLoginLimiter(30, time.Minute),
 		version:       version.Get(),
 		staticHandler: staticHandler,
 		indexHTML:     indexHTML,
@@ -171,6 +183,9 @@ func (s *Server) Handler() http.Handler {
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/version", s.handleVersion)
 		r.Get("/setup/status", s.handleSetupStatus)
+		r.Get("/auth/oidc/status", s.handleOIDCStatus)
+		r.Get("/auth/oidc/start", s.handleOIDCStart)
+		r.Get("/auth/oidc/callback", s.handleOIDCCallback)
 		r.With(s.originCheck).Post("/setup", s.handleSetup)
 		r.With(s.originCheck).Post("/auth/login", s.handleLogin)
 
@@ -181,6 +196,9 @@ func (s *Server) Handler() http.Handler {
 			r.With(s.requireCSRF).Post("/auth/mfa/setup", s.handleMFASetup)
 			r.With(s.requireCSRF).Post("/auth/mfa/enable", s.handleMFAEnable)
 			r.With(s.requireCSRF).Post("/auth/mfa/disable", s.handleMFADisable)
+			r.Get("/auth/oidc/link", s.handleOIDCLinkStatus)
+			r.With(s.requireCSRF).Post("/auth/oidc/link", s.handleOIDCLinkStart)
+			r.With(s.requireCSRF).Post("/auth/oidc/unlink", s.handleOIDCUnlink)
 			r.Get("/activity", s.handleActivity)
 			r.With(s.requireCSRF).Post("/auth/logout", s.handleLogout)
 

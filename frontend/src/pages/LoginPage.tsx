@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { LockKeyhole, UserRound } from 'lucide-react'
-import { ApiError } from '@/api/client'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { LockKeyhole, ShieldCheck, UserRound } from 'lucide-react'
+import { ApiError, getSetupStatus, oidcStartURL } from '@/api/client'
 import { useAuth } from '@/auth/useAuth'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -10,9 +11,25 @@ import { Input } from '@/components/ui/Input'
 import { AuthLayout } from '@/layout/AuthLayout'
 import { userFacingError } from '@/lib/errors'
 
+const oidcErrors: Record<string, string> = {
+  no_account: 'No local Drovik account is linked to that identity. Ask an administrator to create your account first.',
+  link: 'The local account could not be linked to this identity. Ask an administrator to check the linking.',
+  invalid: 'The sign-in request expired or was already used. Start again.',
+  failed: 'The identity provider could not complete sign-in. Try again or contact your administrator.',
+  disabled: 'Single sign-on is not enabled on this instance.',
+}
+
 export function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const oidcError = searchParams.get('oidc_error')
+  const setupQuery = useQuery({
+    queryKey: ['setup-status'],
+    queryFn: ({ signal }) => getSetupStatus(signal),
+    staleTime: 60_000,
+    retry: 0,
+  })
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [totp, setTotp] = useState('')
@@ -79,6 +96,11 @@ export function LoginPage() {
       }
     >
       <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+        {oidcError ? (
+          <Alert variant="error" title="Single sign-on failed">
+            {oidcErrors[oidcError] ?? oidcErrors.failed}
+          </Alert>
+        ) : null}
         {error ? (
           <Alert variant="error" title="Sign in failed">
             {error}
@@ -148,8 +170,18 @@ export function LoginPage() {
           Sign in
         </Button>
 
+        {setupQuery.data?.oidc_enabled ? (
+          <Button asChild variant="outline" className="w-full" size="lg">
+            <a href={oidcStartURL()}>
+              <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+              Sign in with single sign-on
+            </a>
+          </Button>
+        ) : null}
+
         <p className="text-ink-500 text-center text-[11px] leading-5">
-          Drovik never sends credentials to a third-party service.
+          Drovik never sends your password to the identity provider. Single sign-on links to a
+          pre-existing local account.
         </p>
       </form>
     </AuthLayout>
