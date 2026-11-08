@@ -3,7 +3,9 @@
 # ---- Frontend ---------------------------------------------------------------
 FROM node:22-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202 AS frontend
 WORKDIR /app
-RUN npm install -g pnpm@12.4.1
+# Corepack ships with Node and verifies the pnpm package integrity from the
+# registry; no unpinned global npm command is used.
+RUN corepack enable && corepack prepare pnpm@12.4.1 --activate
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY frontend/ ./

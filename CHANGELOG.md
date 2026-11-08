@@ -42,6 +42,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   package/scheduled-task diagnostics, command snippets, local users with roles and per-server
   assignments, retained metric history/charts and in-app threshold alerts.
 
+### Documentation
+
+- Added the static project website (`site/`) with product, security, install, documentation, FAQ,
+  changelog, privacy, terms, accessibility and 404 pages. It self-hosts the application's fonts,
+  makes no third-party requests, and is checked by `scripts/check-site.py` for links, metadata,
+  design-token parity and data hygiene.
+
 ### Security
 
 - Second security audit (Phase 9 tree): bounded snippet variable substitution, linear and
@@ -49,8 +56,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   non-finite metric rejection with fail-visible JSON encoding, deduplicated metric samples, an
   atomic last-active-administrator guard, sanitized Docker inspect output and bounded alert-rule
   cardinality/identifiers.
-- Supply chain: pinned container base images by digest, least-privilege workflow token
-  permissions and upgraded `golang.org/x/crypto` past GO-2026-5932.
+- Supply chain: pinned container base images by digest, Corepack-based pnpm provisioning,
+  least-privilege workflow token permissions and upgraded `golang.org/x/crypto` past GO-2026-5932.
 - Fixed a high-severity credential-exposure bug in `PATCH /api/v1/servers/{id}`: changing
   `auth_method` without a new credential could reinterpret a stored private key as a password.
 - Fixed terminal sessions surviving logout/expiry, IPv6 zone identifier egress bypass, upload
