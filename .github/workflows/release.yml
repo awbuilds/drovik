@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 12.4.1
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Build release archives
+        env:
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            package="drovik-${VERSION}-linux-${arch}"
+            mkdir -p "dist/${package}/public"
+            (
+              cd backend
+              CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" go build \
+                -trimpath \
+                -ldflags "-s -w \
+                  -X github.com/awbuilds/drovik/backend/internal/version.Version=${VERSION} \
+                  -X github.com/awbuilds/drovik/backend/internal/version.Commit=${COMMIT} \
+                  -X github.com/awbuilds/drovik/backend/internal/version.BuildDate=${build_date}" \
+                -o "../dist/${package}/drovik" ./cmd/drovik
+            )
+            cp -R frontend/dist/. "dist/${package}/public/"
+            tar -C dist -czf "dist/${package}.tar.gz" "${package}"
+            rm -rf "dist/${package}"
+          done
+          (
+            cd dist
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum ./*.tar.gz > SHA256SUMS
+            else
+              shasum -a 256 ./*.tar.gz > SHA256SUMS
+            fi
+          )
+
+      - name: Build and push container image
+        env:
+          REGISTRY: ghcr.io
+          IMAGE: ${{ github.repository }}
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login "${REGISTRY}" -u "${{ github.actor }}" --password-stdin
+          image="${REGISTRY}/${IMAGE}"
+          docker build \
+            --build-arg "VERSION=${VERSION}" \
+            --build-arg "COMMIT=${COMMIT}" \
+            --build-arg "BUILD_DATE=${build_date}" \
+            -f deploy/docker/Dockerfile \
+            -t "${image}:${VERSION}" \
+            .
+          docker push "${image}:${VERSION}"
+          if [[ "${VERSION}" != *-* ]]; then
+            docker tag "${image}:${VERSION}" "${image}:latest"
+            docker push "${image}:latest"
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          prerelease=""
+          if [[ "${VERSION}" == *-* ]]; then
+            prerelease="--prerelease"
+          fi
+          gh release create "${VERSION}" \
+            dist/*.tar.gz dist/SHA256SUMS \
+            --title "Drovik ${VERSION}" \
+            --generate-notes \
+            ${prerelease}

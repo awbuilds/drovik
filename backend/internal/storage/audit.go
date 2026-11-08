@@ -31,6 +31,26 @@ func (r *AuditRepository) Insert(ctx context.Context, event AuditEvent) error {
 	return nil
 }
 
+// ListRecentForUser returns recent events whose actor or affected server belongs
+// to the user. This keeps audit history scoped without requiring RBAC roles.
+func (r *AuditRepository) ListRecentForUser(ctx context.Context, userID string, limit int) ([]AuditEvent, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, actor_user_id, server_id, event_type, target_summary,
+		       outcome, safe_error_code, correlation_id, created_at
+		FROM audit_events
+		WHERE actor_user_id = ?
+		   OR server_id IN (SELECT id FROM servers WHERE owner_user_id = ?)
+		ORDER BY created_at DESC LIMIT ?`, userID, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list audit events for user: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	return scanAuditEvents(rows, limit)
+}
+
 func (r *AuditRepository) ListRecent(ctx context.Context, limit int) ([]AuditEvent, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
@@ -44,6 +64,10 @@ func (r *AuditRepository) ListRecent(ctx context.Context, limit int) ([]AuditEve
 	}
 	defer func() { _ = rows.Close() }()
 
+	return scanAuditEvents(rows, limit)
+}
+
+func scanAuditEvents(rows *sql.Rows, limit int) ([]AuditEvent, error) {
 	events := make([]AuditEvent, 0, limit)
 	for rows.Next() {
 		var (

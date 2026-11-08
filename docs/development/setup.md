@@ -156,3 +156,10 @@ Resetting deletes the local administrator and sessions. It is a development acti
 - Never point automated tests at a production server.
 - Do not disable host-key verification, CSRF or rate limits to make a demo work.
 - Do not commit screenshots containing real hosts, usernames or data.
+
+## Related guides
+
+- [Troubleshooting](troubleshooting.md)
+- [Backup and restore](backup-restore.md)
+- [Compatibility and supported platforms](compatibility.md)
+- [Security testing](../security/security-testing.md)

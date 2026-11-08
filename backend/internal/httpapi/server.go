@@ -148,6 +148,7 @@ func (s *Server) Handler() http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireAuth)
 			r.Get("/auth/me", s.handleMe)
+			r.Get("/activity", s.handleActivity)
 			r.With(s.requireCSRF).Post("/auth/logout", s.handleLogout)
 
 			r.Get("/servers", s.handleListServers)

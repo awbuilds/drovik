@@ -375,3 +375,59 @@ func TestCapabilitiesRepository(t *testing.T) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
+
+func TestAuditListScopesToUser(t *testing.T) {
+	db := newTestDatabase(t)
+	users := NewUserRepository(db)
+	first := createTestUser(t, db)
+	second := User{
+		ID: NewID(), Username: "second", PasswordHash: "hash", Role: "admin",
+		IsActive: true, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := users.Create(context.Background(), second); err != nil {
+		t.Fatalf("Create second user: %v", err)
+	}
+
+	servers := NewServerRepository(db)
+	audit := NewAuditRepository(db)
+	now := time.Now().UTC()
+	firstServer := Server{
+		ID: NewID(), OwnerUserID: first.ID, DisplayName: "first", Host: "192.0.2.10", Port: 22,
+		Username: "ops", AuthMethod: "password", EncryptedSecret: "x", SecretNonce: "x",
+		SecretVersion: 1, CreatedAt: now, UpdatedAt: now, IsActive: true,
+	}
+	secondServer := firstServer
+	secondServer.ID = NewID()
+	secondServer.OwnerUserID = second.ID
+	secondServer.DisplayName = "second"
+	secondServer.Host = "192.0.2.11"
+	for _, server := range []Server{firstServer, secondServer} {
+		if err := servers.Create(context.Background(), server); err != nil {
+			t.Fatalf("Create server: %v", err)
+		}
+	}
+	for index, event := range []AuditEvent{
+		{ID: NewID(), ActorUserID: &first.ID, ServerID: &firstServer.ID, EventType: "file.write", Outcome: "success", CreatedAt: now},
+		{ID: NewID(), ActorUserID: &second.ID, ServerID: &secondServer.ID, EventType: "process.signal", Outcome: "success", CreatedAt: now.Add(time.Second)},
+		{ID: NewID(), ActorUserID: &second.ID, EventType: "auth.login", Outcome: "success", CreatedAt: now.Add(2 * time.Second)},
+	} {
+		if err := audit.Insert(context.Background(), event); err != nil {
+			t.Fatalf("Insert event %d: %v", index, err)
+		}
+	}
+
+	events, err := audit.ListRecentForUser(context.Background(), first.ID, 100)
+	if err != nil {
+		t.Fatalf("ListRecentForUser: %v", err)
+	}
+	if len(events) != 1 || events[0].EventType != "file.write" {
+		t.Fatalf("expected only the first user's event, got %+v", events)
+	}
+	secondEvents, err := audit.ListRecentForUser(context.Background(), second.ID, 100)
+	if err != nil {
+		t.Fatalf("ListRecentForUser second: %v", err)
+	}
+	if len(secondEvents) != 2 {
+		t.Fatalf("expected the second user's events, got %+v", secondEvents)
+	}
+}
