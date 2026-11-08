@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Loader2, RefreshCw, TriangleAlert } from 'lucide-react'
@@ -15,6 +16,10 @@ import { ServersPage } from '@/pages/ServersPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
 import { WorkspacePage } from '@/pages/WorkspacePage'
+
+const TerminalPage = lazy(() =>
+  import('@/pages/TerminalPage').then((module) => ({ default: module.TerminalPage })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,6 +108,26 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/terminal"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading terminal" />}>
+              <TerminalPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/terminal/:id"
+        element={
+          <AppShell>
+            <Suspense fallback={<PageLoading label="Loading terminal" />}>
+              <TerminalPage />
+            </Suspense>
+          </AppShell>
+        }
+      />
+      <Route
         path="/settings"
         element={
           <AppShell>
@@ -160,5 +185,16 @@ function BootErrorScreen() {
         </p>
       </div>
     </main>
+  )
+}
+
+function PageLoading({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="text-ink-400 flex items-center gap-2 font-mono text-[11px] tracking-[0.18em] uppercase">
+        <Loader2 className="text-signal-400 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        {label}
+      </div>
+    </div>
   )
 }

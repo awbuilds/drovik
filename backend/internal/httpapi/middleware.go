@@ -1,10 +1,13 @@
 package httpapi
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -47,6 +50,18 @@ func (r *statusRecorder) Flush() {
 
 func (r *statusRecorder) Unwrap() http.ResponseWriter {
 	return r.ResponseWriter
+}
+
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("response writer does not support hijacking")
+	}
+	if !r.wroteHeader {
+		r.status = http.StatusSwitchingProtocols
+		r.wroteHeader = true
+	}
+	return hijacker.Hijack()
 }
 
 func (s *Server) requestID(next http.Handler) http.Handler {

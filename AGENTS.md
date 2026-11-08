@@ -355,11 +355,13 @@ covered.
   limiting, the React design system/workspace shell, deployment assets and tests.
 - Phase 2: complete. Encrypted SSH credentials, strict host-key trust, server CRUD, connection
   tests, egress policy and capability detection are implemented and tested.
-- Phase 3: next. Workspace/terminal session pool and interactive terminal.
-- SFTP, terminal, monitoring, process, service and log features are not implemented yet.
+- Phase 3: complete. Authenticated WebSocket PTY terminal, bounded session pool, resize, cleanup
+  and the xterm.js workspace panel are implemented and tested.
+- Phase 4: next. SFTP file manager, transfers and text editor.
+- SFTP, monitoring, process, service and log features are not implemented yet.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
-- Read the latest handoff in `docs/handoffs/` before starting Phase 3.
+- Read the latest handoff in `docs/handoffs/` before starting Phase 4.
 
 ## Decision inheritance
 

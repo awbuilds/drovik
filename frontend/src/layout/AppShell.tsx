@@ -31,13 +31,7 @@ const navigation = [
     items: [
       { to: '/', label: 'Overview', icon: LayoutDashboard, enabled: true },
       { to: '/servers', label: 'Servers', icon: Server, enabled: true },
-      {
-        to: '/terminal',
-        label: 'Terminal',
-        icon: SquareTerminal,
-        enabled: false,
-        phase: 'Phase 3',
-      },
+      { to: '/terminal', label: 'Terminal', icon: SquareTerminal, enabled: true },
       { to: '/files', label: 'Files', icon: FolderTree, enabled: false, phase: 'Phase 4' },
     ],
   },
@@ -271,7 +265,7 @@ function SidebarContent({
           </Tooltip>
         </div>
         <p className="text-ink-600 mt-2 px-1 font-mono text-[9px] tracking-wider uppercase">
-          Phase 2 · SSH connections
+          Phase 3 · Interactive terminal
         </p>
       </div>
     </>

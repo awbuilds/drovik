@@ -19,6 +19,7 @@ export default defineConfig({
       '/api': {
         target: backendURL,
         changeOrigin: false,
+        ws: true,
       },
       '/healthz': backendURL,
       '/readyz': backendURL,

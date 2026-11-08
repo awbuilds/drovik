@@ -22,6 +22,7 @@ tags:
   - name: Setup
   - name: Authentication
   - name: Servers
+  - name: Terminal
   - name: System
 
 paths:
@@ -419,6 +420,42 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /api/v1/servers/{id}/terminal:
+    parameters:
+      - $ref: "#/components/parameters/ServerID"
+    get:
+      tags: [Terminal]
+      operationId: openTerminal
+      summary: Upgrade to an authenticated SSH PTY WebSocket
+      description: |
+        HTTP Upgrade to a WebSocket carrying a JSON terminal protocol. The
+        `drovik_session` cookie authenticates the request and the `Origin`
+        header must match a configured trusted origin. See
+        `docs/api/terminal-protocol.md` for the message envelopes.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          description: Browser origin; must match DROVIK_TRUSTED_ORIGINS.
+          schema:
+            type: string
+            format: uri
+      responses:
+        "101":
+          description: Switching Protocols; the connection becomes a terminal WebSocket
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          description: Session or input limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
 components:
   securitySchemes:

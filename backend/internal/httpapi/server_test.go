@@ -88,6 +88,8 @@ func newTestApp(t *testing.T) *testApp {
 		SSHOperationTimeout:   5 * time.Second,
 		EgressAllowPrivate:    true,
 		EgressAllowedPrefixes: []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")},
+		SSHMaxSessionsPerUser: 2,
+		SSHMaxSessionsGlobal:  10,
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	auditService := audit.New(storage.NewAuditRepository(db), logger)

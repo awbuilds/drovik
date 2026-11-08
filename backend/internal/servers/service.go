@@ -298,6 +298,32 @@ func (s *Service) Delete(ctx context.Context, ownerID, id string) error {
 	return nil
 }
 
+// Connect opens a managed SSH client for a terminal or other long-lived
+// operation. The caller owns the returned client and must close it.
+func (s *Service) Connect(ctx context.Context, ownerID, id string) (*ssh.Client, *storage.Server, error) {
+	server, err := s.Get(ctx, ownerID, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	credentials, err := s.decryptCredentials(server)
+	if err != nil {
+		return nil, server, err
+	}
+	dialCtx, cancel := context.WithTimeout(ctx, s.cfg.SSHDialTimeout+s.cfg.SSHHandshakeTimeout)
+	defer cancel()
+	client, _, err := s.dialer.Dial(dialCtx, server, credentials)
+	if err != nil {
+		s.record(ctx, ownerID, &server.ID, "server.connected", "failure", safeSSHCode(err))
+		return nil, server, err
+	}
+	now := time.Now().UTC()
+	if err := s.repo.UpdateLastConnected(ctx, server.ID, now); err != nil {
+		s.logger.Warn("update last connected failed", "error", err, "server_id", server.ID)
+	}
+	s.record(ctx, ownerID, &server.ID, "server.connected", "success", "")
+	return client, server, nil
+}
+
 func (s *Service) TestConnection(ctx context.Context, ownerID, id string) (*ConnectionResult, error) {
 	server, err := s.Get(ctx, ownerID, id)
 	if err != nil {

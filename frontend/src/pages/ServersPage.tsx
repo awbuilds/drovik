@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { Cable, Plus, Server as ServerIcon, ShieldCheck } from 'lucide-react'
 import { ApiError } from '@/api/client'
 import {
@@ -54,6 +55,7 @@ export function ServersPage() {
   const { csrfToken } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Server | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
@@ -297,6 +299,7 @@ export function ServersPage() {
               capabilities={capabilities[server.id]}
               testing={testingId === server.id}
               onTest={() => void runTest(server)}
+              onTerminal={() => navigate(`/terminal/${server.id}`)}
               onEdit={() => {
                 setEditing(server)
                 setDialogOpen(true)
