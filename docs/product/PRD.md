@@ -1937,8 +1937,9 @@ The team can produce a release from a tagged commit, verify its artifacts, migra
 > **Implementation status:** Docker inspection/enumerated actions, read-only storage/network
 > diagnostics, package lifecycle, managed scheduled tasks, snippets, local users/server assignments,
 > bounded metric history and in-app alerts are implemented. Local TOTP MFA, alert webhooks, OIDC single sign-on, feature-flagged
-> destructive storage/network operations and macOS/BSD read-only monitoring are implemented.
-> Windows targets and external secret managers remain out of scope.
+> destructive storage/network operations, macOS/BSD read-only monitoring and Vault KV v2
+> credentials are implemented. Windows targets and additional secret-manager backends remain out of
+> scope.
 
 Features in this phase should be individually designed and threat-modeled.
 

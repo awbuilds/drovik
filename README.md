@@ -50,6 +50,7 @@ what it is doing:
 | Advanced | Read-only storage and network diagnostics; package lifecycle; managed cron tasks |
 | MFA | TOTP authenticator enrollment with single-use recovery codes |
 | SSO | Optional OpenID Connect sign-in with explicit account linking |
+| Secrets | Optional HashiCorp Vault KV v2 credentials; only the path is stored |
 | Alerts | In-app threshold rules with encrypted external webhooks |
 | Snippets | Reusable command templates with substituted preview and explicit confirmation |
 | Users | Local accounts, roles and per-server `read`/`write` assignments |

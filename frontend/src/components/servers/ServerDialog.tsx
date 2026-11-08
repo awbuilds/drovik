@@ -11,6 +11,7 @@ import {
   createServer,
   updateServer,
   type AuthMethod,
+  type SecretProvider,
   type Server,
   type UpdateServerInput,
 } from '@/api/servers'
@@ -21,6 +22,7 @@ interface ServerDialogProps {
   onOpenChange: (open: boolean) => void
   server: Server | null
   csrfToken: string
+  vaultEnabled: boolean
   onSaved: () => void
 }
 
@@ -30,6 +32,8 @@ interface FormState {
   port: string
   username: string
   authMethod: AuthMethod
+  secretProvider: SecretProvider
+  secretRef: string
   password: string
   privateKey: string
   passphrase: string
@@ -43,6 +47,8 @@ const emptyForm: FormState = {
   port: '22',
   username: '',
   authMethod: 'password',
+  secretProvider: 'stored',
+  secretRef: '',
   password: '',
   privateKey: '',
   passphrase: '',
@@ -60,6 +66,8 @@ function fromServer(server: Server | null): FormState {
     port: String(server.port),
     username: server.username,
     authMethod: server.auth_method,
+    secretProvider: server.secret_provider ?? 'stored',
+    secretRef: server.secret_ref ?? '',
     password: '',
     privateKey: '',
     passphrase: '',
@@ -73,6 +81,7 @@ export function ServerDialog({
   onOpenChange,
   server,
   csrfToken,
+  vaultEnabled,
   onSaved,
 }: ServerDialogProps) {
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -102,14 +111,16 @@ export function ServerDialog({
     if (!Number.isInteger(port) || port < 1 || port > 65535)
       next.port = 'Use a port between 1 and 65535.'
     if (!form.username.trim()) next.username = 'Enter the SSH username.'
-    if (form.authMethod === 'password') {
+    if (form.secretProvider === 'vault') {
+      if (!form.secretRef.trim()) next.secretRef = 'Enter the Vault KV path for this host.'
+    } else if (form.authMethod === 'password') {
       if (!server && !form.password) next.password = 'Enter the SSH password.'
-      if (server && server.auth_method !== 'password' && !form.password) {
+      if (server && (server.auth_method !== 'password' || server.secret_provider === 'vault') && !form.password) {
         next.password = 'Enter a password for the new authentication method.'
       }
     } else {
       if (!server && !form.privateKey) next.privateKey = 'Paste the private key.'
-      if (server && server.auth_method !== 'private_key' && !form.privateKey) {
+      if (server && (server.auth_method !== 'private_key' || server.secret_provider === 'vault') && !form.privateKey) {
         next.privateKey = 'Paste a private key for the new authentication method.'
       }
     }
@@ -128,23 +139,27 @@ export function ServerDialog({
         port: Number(form.port),
         username: form.username.trim(),
         auth_method: form.authMethod,
+        secret_provider: form.secretProvider,
+        secret_ref: form.secretProvider === 'vault' ? form.secretRef.trim() : '',
         tags: form.tags.trim(),
         notes: form.notes.trim(),
       }
       if (server) {
         const input: UpdateServerInput = base
-        if (form.password) input.password = form.password
-        if (form.privateKey) input.private_key = form.privateKey
-        if (form.passphrase) input.passphrase = form.passphrase
+        if (form.secretProvider === 'stored') {
+          if (form.password) input.password = form.password
+          if (form.privateKey) input.private_key = form.privateKey
+          if (form.passphrase) input.passphrase = form.passphrase
+        }
         await updateServer(server.id, input, csrfToken)
         toast({ title: 'Server updated', variant: 'success' })
       } else {
         await createServer(
           {
             ...base,
-            password: form.authMethod === 'password' ? form.password : undefined,
-            private_key: form.authMethod === 'private_key' ? form.privateKey : undefined,
-            passphrase: form.passphrase || undefined,
+            password: form.secretProvider === 'stored' && form.authMethod === 'password' ? form.password : undefined,
+            private_key: form.secretProvider === 'stored' && form.authMethod === 'private_key' ? form.privateKey : undefined,
+            passphrase: form.secretProvider === 'stored' ? form.passphrase || undefined : undefined,
           },
           csrfToken,
         )
@@ -264,7 +279,38 @@ export function ServerDialog({
           </Field>
         </div>
 
-        {form.authMethod === 'password' ? (
+        {vaultEnabled || form.secretProvider === 'vault' ? (
+          <Field label="Credential source" htmlFor="server-secret-provider" hint="Vault stores only the path in Drovik; the secret is fetched at connect time.">
+            <Select
+              id="server-secret-provider"
+              value={form.secretProvider}
+              onChange={(event) => update('secretProvider', event.target.value as SecretProvider)}
+            >
+              <option value="stored">Drovik (encrypted at rest)</option>
+              <option value="vault">HashiCorp Vault KV v2</option>
+            </Select>
+          </Field>
+        ) : null}
+
+        {form.secretProvider === 'vault' ? (
+          <Field
+            label="Vault KV path"
+            htmlFor="server-secret-ref"
+            error={errors.secretRef}
+            hint="Path inside the configured mount, for example drovik/hosts/prod-web-01. The secret must contain password or private_key."
+          >
+            <Input
+              id="server-secret-ref"
+              value={form.secretRef}
+              onChange={(event) => update('secretRef', event.target.value)}
+              placeholder="drovik/hosts/prod-web-01"
+              autoComplete="off"
+              spellCheck={false}
+              className="font-mono"
+              invalid={Boolean(errors.secretRef)}
+            />
+          </Field>
+        ) : form.authMethod === 'password' ? (
           <Field
             label="SSH password"
             htmlFor="server-password"

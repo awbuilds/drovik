@@ -20,11 +20,15 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/secrets"
 	"github.com/awbuilds/drovik/backend/internal/sshclient"
 	"github.com/awbuilds/drovik/backend/internal/storage"
+	"github.com/awbuilds/drovik/backend/internal/vault"
 )
 
 const (
 	AuthPassword   = "password"
 	AuthPrivateKey = "private_key"
+
+	SecretProviderStored = "stored"
+	SecretProviderVault  = "vault"
 
 	maxDisplayName = 120
 	maxHost        = 253
@@ -38,6 +42,8 @@ const (
 var (
 	ErrHostKeyAlreadyApproved = errors.New("a host key is already approved for this server")
 	ErrUnauthorized           = errors.New("server does not belong to this user")
+	ErrVaultUnavailable       = errors.New("vault is not enabled")
+	ErrSecretUnavailable      = errors.New("the external credential could not be resolved")
 )
 
 type ValidationError struct {
@@ -50,29 +56,33 @@ func (e *ValidationError) Error() string {
 }
 
 type CreateInput struct {
-	DisplayName string
-	Host        string
-	Port        int
-	Username    string
-	AuthMethod  string
-	Password    string
-	PrivateKey  string
-	Passphrase  string
-	Tags        string
-	Notes       string
+	DisplayName    string
+	Host           string
+	Port           int
+	Username       string
+	AuthMethod     string
+	Password       string
+	PrivateKey     string
+	Passphrase     string
+	SecretProvider string
+	SecretRef      string
+	Tags           string
+	Notes          string
 }
 
 type UpdateInput struct {
-	DisplayName *string
-	Host        *string
-	Port        *int
-	Username    *string
-	AuthMethod  *string
-	Password    *string
-	PrivateKey  *string
-	Passphrase  *string
-	Tags        *string
-	Notes       *string
+	DisplayName    *string
+	Host           *string
+	Port           *int
+	Username       *string
+	AuthMethod     *string
+	Password       *string
+	PrivateKey     *string
+	Passphrase     *string
+	SecretProvider *string
+	SecretRef      *string
+	Tags           *string
+	Notes          *string
 }
 
 type ConnectionResult struct {
@@ -87,6 +97,7 @@ type Service struct {
 	known       *storage.KnownHostRepository
 	caps        *storage.CapabilitiesRepository
 	cipher      *secrets.Cipher
+	vault       *vault.Client
 	dialer      *sshclient.Dialer
 	audit       *audit.Service
 	logger      *slog.Logger
@@ -101,6 +112,7 @@ func NewService(
 	known *storage.KnownHostRepository,
 	caps *storage.CapabilitiesRepository,
 	cipher *secrets.Cipher,
+	vaultClient *vault.Client,
 	dialer *sshclient.Dialer,
 	auditService *audit.Service,
 	logger *slog.Logger,
@@ -112,6 +124,7 @@ func NewService(
 		known:       known,
 		caps:        caps,
 		cipher:      cipher,
+		vault:       vaultClient,
 		dialer:      dialer,
 		audit:       auditService,
 		logger:      logger,
@@ -124,11 +137,17 @@ func (s *Service) Create(ctx context.Context, ownerID string, input CreateInput)
 	if err != nil {
 		return nil, err
 	}
+	if normalized.SecretProvider == SecretProviderVault && s.vault == nil {
+		return nil, &ValidationError{Field: "secret_provider", Message: "Vault is not enabled on this instance"}
+	}
 
 	id := storage.NewID()
-	secret, err := s.encryptSecret(id, normalized)
-	if err != nil {
-		return nil, err
+	secret := encryptedSecret{}
+	if normalized.SecretProvider != SecretProviderVault {
+		secret, err = s.encryptSecret(id, normalized)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	now := time.Now().UTC()
@@ -140,6 +159,8 @@ func (s *Service) Create(ctx context.Context, ownerID string, input CreateInput)
 		Port:            normalized.Port,
 		Username:        normalized.Username,
 		AuthMethod:      normalized.AuthMethod,
+		SecretProvider:  normalized.SecretProvider,
+		SecretRef:       normalized.SecretRef,
 		EncryptedSecret: secret.secret,
 		SecretNonce:     secret.nonce,
 		SecretVersion:   secrets.CurrentVersion,
@@ -325,16 +346,29 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 		methodChanged = server.AuthMethod != originalMethod
 	}
 
-	credentialChanged := input.Password != nil || input.PrivateKey != nil || input.Passphrase != nil || input.AuthMethod != nil
+	currentProvider := normalizeProvider(server.SecretProvider)
+	newProvider := currentProvider
+	if input.SecretProvider != nil {
+		newProvider = normalizeProvider(*input.SecretProvider)
+	}
+	newRef := server.SecretRef
+	if input.SecretRef != nil {
+		newRef = strings.TrimSpace(*input.SecretRef)
+	}
+	providerChanged := newProvider != currentProvider
+	credentialChanged := input.Password != nil || input.PrivateKey != nil || input.Passphrase != nil ||
+		input.AuthMethod != nil || providerChanged || input.SecretRef != nil
 	if credentialChanged {
 		createInput := CreateInput{
-			DisplayName: server.DisplayName,
-			Host:        server.Host,
-			Port:        server.Port,
-			Username:    server.Username,
-			AuthMethod:  server.AuthMethod,
-			Tags:        server.Tags,
-			Notes:       server.Notes,
+			DisplayName:    server.DisplayName,
+			Host:           server.Host,
+			Port:           server.Port,
+			Username:       server.Username,
+			AuthMethod:     server.AuthMethod,
+			SecretProvider: newProvider,
+			SecretRef:      newRef,
+			Tags:           server.Tags,
+			Notes:          server.Notes,
 		}
 		if methodChanged {
 			// A credential is bound to the method it was stored for. Never
@@ -349,11 +383,11 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 			if input.Passphrase != nil {
 				createInput.Passphrase = *input.Passphrase
 			}
-		} else {
+		} else if currentProvider == SecretProviderStored {
 			if input.Password != nil {
 				createInput.Password = *input.Password
-			} else if server.AuthMethod == AuthPassword {
-				credentials, err := s.decryptCredentials(server)
+			} else if server.AuthMethod == AuthPassword && newProvider == SecretProviderStored {
+				credentials, err := s.credentials(ctx, server)
 				if err != nil {
 					return nil, err
 				}
@@ -361,8 +395,8 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 			}
 			if input.PrivateKey != nil {
 				createInput.PrivateKey = *input.PrivateKey
-			} else if server.AuthMethod == AuthPrivateKey {
-				credentials, err := s.decryptCredentials(server)
+			} else if server.AuthMethod == AuthPrivateKey && newProvider == SecretProviderStored {
+				credentials, err := s.credentials(ctx, server)
 				if err != nil {
 					return nil, err
 				}
@@ -370,7 +404,7 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 			}
 			if input.Passphrase != nil {
 				createInput.Passphrase = *input.Passphrase
-			} else {
+			} else if newProvider == SecretProviderStored {
 				credentials, err := s.decryptCredentials(server)
 				if err == nil {
 					createInput.Passphrase = credentials.Passphrase
@@ -381,26 +415,40 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 		if err != nil {
 			return nil, err
 		}
+		if normalized.SecretProvider == SecretProviderVault && s.vault == nil {
+			return nil, &ValidationError{Field: "secret_provider", Message: "Vault is not enabled on this instance"}
+		}
 		server.DisplayName = normalized.DisplayName
 		server.Host = normalized.Host
 		server.Port = normalized.Port
 		server.Username = normalized.Username
 		server.AuthMethod = normalized.AuthMethod
+		server.SecretProvider = normalized.SecretProvider
+		server.SecretRef = normalized.SecretRef
 		server.Tags = normalized.Tags
 		server.Notes = normalized.Notes
 
-		secret, err := s.encryptSecret(server.ID, normalized)
-		if err != nil {
-			return nil, err
-		}
-		server.EncryptedSecret = secret.secret
-		server.SecretNonce = secret.nonce
-		server.SecretVersion = secrets.CurrentVersion
-		server.EncryptedPassphrase = secret.passphrase
-		server.PassphraseNonce = secret.passphraseNonce
-		server.PassphraseVersion = 0
-		if secret.passphrase != "" {
-			server.PassphraseVersion = secrets.CurrentVersion
+		if normalized.SecretProvider == SecretProviderVault {
+			server.EncryptedSecret = ""
+			server.SecretNonce = ""
+			server.SecretVersion = 0
+			server.EncryptedPassphrase = ""
+			server.PassphraseNonce = ""
+			server.PassphraseVersion = 0
+		} else {
+			secret, err := s.encryptSecret(server.ID, normalized)
+			if err != nil {
+				return nil, err
+			}
+			server.EncryptedSecret = secret.secret
+			server.SecretNonce = secret.nonce
+			server.SecretVersion = secrets.CurrentVersion
+			server.EncryptedPassphrase = secret.passphrase
+			server.PassphraseNonce = secret.passphraseNonce
+			server.PassphraseVersion = 0
+			if secret.passphrase != "" {
+				server.PassphraseVersion = secrets.CurrentVersion
+			}
 		}
 	} else {
 		if err := validateMetadata(server); err != nil {
@@ -438,7 +486,7 @@ func (s *Service) Connect(ctx context.Context, ownerID, id string) (*ssh.Client,
 	if err != nil {
 		return nil, nil, err
 	}
-	credentials, err := s.decryptCredentials(server)
+	credentials, err := s.credentials(ctx, server)
 	if err != nil {
 		return nil, server, err
 	}
@@ -462,7 +510,7 @@ func (s *Service) TestConnection(ctx context.Context, ownerID, id string) (*Conn
 	if err != nil {
 		return nil, err
 	}
-	credentials, err := s.decryptCredentials(server)
+	credentials, err := s.credentials(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -588,6 +636,44 @@ func (s *Service) encryptSecret(id string, input CreateInput) (encryptedSecret, 
 	return result, nil
 }
 
+func normalizeProvider(provider string) string {
+	if strings.TrimSpace(provider) == SecretProviderVault {
+		return SecretProviderVault
+	}
+	return SecretProviderStored
+}
+
+// credentials resolves a server's SSH credential. Vault-backed servers fetch
+// the secret at connect time; the database only stores the path.
+func (s *Service) credentials(ctx context.Context, server *storage.Server) (sshclient.Credentials, error) {
+	if normalizeProvider(server.SecretProvider) != SecretProviderVault {
+		return s.decryptCredentials(server)
+	}
+	if s.vault == nil {
+		return sshclient.Credentials{}, ErrVaultUnavailable
+	}
+	secret, err := s.vault.Get(ctx, server.SecretRef)
+	if err != nil {
+		return sshclient.Credentials{}, fmt.Errorf("%w: %v", ErrSecretUnavailable, err)
+	}
+	credentials := sshclient.Credentials{AuthMethod: server.AuthMethod, Passphrase: secret.Passphrase}
+	switch server.AuthMethod {
+	case AuthPassword:
+		if secret.Password == "" {
+			return sshclient.Credentials{}, fmt.Errorf("%w: the Vault secret has no password field", ErrSecretUnavailable)
+		}
+		credentials.Password = secret.Password
+	case AuthPrivateKey:
+		if secret.PrivateKey == "" {
+			return sshclient.Credentials{}, fmt.Errorf("%w: the Vault secret has no private_key field", ErrSecretUnavailable)
+		}
+		credentials.PrivateKey = []byte(secret.PrivateKey)
+	default:
+		return sshclient.Credentials{}, fmt.Errorf("unsupported authentication method")
+	}
+	return credentials, nil
+}
+
 func (s *Service) decryptCredentials(server *storage.Server) (sshclient.Credentials, error) {
 	nonce, err := base64.StdEncoding.DecodeString(server.SecretNonce)
 	if err != nil {
@@ -643,6 +729,8 @@ func validateCreate(input CreateInput) (CreateInput, error) {
 	input.Host = normalizeHost(input.Host)
 	input.Username = strings.TrimSpace(input.Username)
 	input.AuthMethod = strings.TrimSpace(input.AuthMethod)
+	input.SecretProvider = normalizeProvider(input.SecretProvider)
+	input.SecretRef = strings.TrimSpace(input.SecretRef)
 	input.Tags = strings.TrimSpace(input.Tags)
 	input.Notes = strings.TrimSpace(input.Notes)
 	if input.Port == 0 {
@@ -666,13 +754,20 @@ func validateCreate(input CreateInput) (CreateInput, error) {
 	if len(input.Notes) > maxNotes {
 		return input, &ValidationError{Field: "notes", Message: "must be at most 2000 characters"}
 	}
+	if input.SecretProvider == SecretProviderVault {
+		if input.SecretRef == "" || !vault.ValidRef(input.SecretRef) {
+			return input, &ValidationError{Field: "secret_ref", Message: "must be a Vault KV path up to 256 safe characters"}
+		}
+	} else {
+		input.SecretRef = ""
+	}
 	switch input.AuthMethod {
 	case AuthPassword:
-		if input.Password == "" || len(input.Password) > maxPassword {
+		if input.SecretProvider == SecretProviderStored && (input.Password == "" || len(input.Password) > maxPassword) {
 			return input, &ValidationError{Field: "password", Message: "must be 1 to 1024 characters"}
 		}
 	case AuthPrivateKey:
-		if input.PrivateKey == "" || len(input.PrivateKey) > maxPrivateKey {
+		if input.SecretProvider == SecretProviderStored && (input.PrivateKey == "" || len(input.PrivateKey) > maxPrivateKey) {
 			return input, &ValidationError{Field: "private_key", Message: "must be a private key up to 64 KiB"}
 		}
 		if len(input.Passphrase) > maxPassword {

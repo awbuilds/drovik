@@ -104,6 +104,7 @@ func New(dir string, sshServer *testssh.Server) (*Env, error) {
 		known,
 		storage.NewCapabilitiesRepository(db),
 		cipher,
+		nil,
 		sshclient.NewDialer(cfg, known, logger),
 		auditService,
 		logger,

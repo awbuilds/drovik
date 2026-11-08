@@ -38,6 +38,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- Optional HashiCorp Vault KV v2 credentials: Drovik stores only the Vault path and fetches the
+  password or private key at connect time. Vault failures fail closed.
 - Read-only macOS and BSD monitoring over SSH: host identity, load, memory, filesystems, network
   counters and uptime from portable collectors, with a clear Linux-only capability boundary.
 - OpenID Connect single sign-on: authorization-code + PKCE, discovery issuer check, single-use

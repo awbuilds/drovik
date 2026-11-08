@@ -16,29 +16,33 @@ import (
 )
 
 type createServerRequest struct {
-	DisplayName string `json:"display_name"`
-	Host        string `json:"host"`
-	Port        int    `json:"port"`
-	Username    string `json:"username"`
-	AuthMethod  string `json:"auth_method"`
-	Password    string `json:"password"`
-	PrivateKey  string `json:"private_key"`
-	Passphrase  string `json:"passphrase"`
-	Tags        string `json:"tags"`
-	Notes       string `json:"notes"`
+	DisplayName    string `json:"display_name"`
+	Host           string `json:"host"`
+	Port           int    `json:"port"`
+	Username       string `json:"username"`
+	AuthMethod     string `json:"auth_method"`
+	Password       string `json:"password"`
+	PrivateKey     string `json:"private_key"`
+	Passphrase     string `json:"passphrase"`
+	SecretProvider string `json:"secret_provider"`
+	SecretRef      string `json:"secret_ref"`
+	Tags           string `json:"tags"`
+	Notes          string `json:"notes"`
 }
 
 type updateServerRequest struct {
-	DisplayName *string `json:"display_name"`
-	Host        *string `json:"host"`
-	Port        *int    `json:"port"`
-	Username    *string `json:"username"`
-	AuthMethod  *string `json:"auth_method"`
-	Password    *string `json:"password"`
-	PrivateKey  *string `json:"private_key"`
-	Passphrase  *string `json:"passphrase"`
-	Tags        *string `json:"tags"`
-	Notes       *string `json:"notes"`
+	DisplayName    *string `json:"display_name"`
+	Host           *string `json:"host"`
+	Port           *int    `json:"port"`
+	Username       *string `json:"username"`
+	AuthMethod     *string `json:"auth_method"`
+	Password       *string `json:"password"`
+	PrivateKey     *string `json:"private_key"`
+	Passphrase     *string `json:"passphrase"`
+	SecretProvider *string `json:"secret_provider"`
+	SecretRef      *string `json:"secret_ref"`
+	Tags           *string `json:"tags"`
+	Notes          *string `json:"notes"`
 }
 
 type trustHostKeyRequest struct {
@@ -55,6 +59,8 @@ type serverResponse struct {
 	Port            int        `json:"port"`
 	Username        string     `json:"username"`
 	AuthMethod      string     `json:"auth_method"`
+	SecretProvider  string     `json:"secret_provider"`
+	SecretRef       string     `json:"secret_ref"`
 	Tags            string     `json:"tags"`
 	Notes           string     `json:"notes"`
 	CreatedAt       time.Time  `json:"created_at"`
@@ -101,16 +107,18 @@ func (s *Server) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	server, err := s.servers.Create(r.Context(), user.ID, servers.CreateInput{
-		DisplayName: request.DisplayName,
-		Host:        request.Host,
-		Port:        request.Port,
-		Username:    request.Username,
-		AuthMethod:  request.AuthMethod,
-		Password:    request.Password,
-		PrivateKey:  request.PrivateKey,
-		Passphrase:  request.Passphrase,
-		Tags:        request.Tags,
-		Notes:       request.Notes,
+		DisplayName:    request.DisplayName,
+		Host:           request.Host,
+		Port:           request.Port,
+		Username:       request.Username,
+		AuthMethod:     request.AuthMethod,
+		Password:       request.Password,
+		PrivateKey:     request.PrivateKey,
+		Passphrase:     request.Passphrase,
+		SecretProvider: request.SecretProvider,
+		SecretRef:      request.SecretRef,
+		Tags:           request.Tags,
+		Notes:          request.Notes,
 	})
 	if err != nil {
 		s.writeServerError(w, r, err)
@@ -141,16 +149,18 @@ func (s *Server) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	server, err := s.servers.Update(r.Context(), user.ID, chi.URLParam(r, "id"), servers.UpdateInput{
-		DisplayName: request.DisplayName,
-		Host:        request.Host,
-		Port:        request.Port,
-		Username:    request.Username,
-		AuthMethod:  request.AuthMethod,
-		Password:    request.Password,
-		PrivateKey:  request.PrivateKey,
-		Passphrase:  request.Passphrase,
-		Tags:        request.Tags,
-		Notes:       request.Notes,
+		DisplayName:    request.DisplayName,
+		Host:           request.Host,
+		Port:           request.Port,
+		Username:       request.Username,
+		AuthMethod:     request.AuthMethod,
+		Password:       request.Password,
+		PrivateKey:     request.PrivateKey,
+		Passphrase:     request.Passphrase,
+		SecretProvider: request.SecretProvider,
+		SecretRef:      request.SecretRef,
+		Tags:           request.Tags,
+		Notes:          request.Notes,
 	})
 	if err != nil {
 		s.writeServerError(w, r, err)
@@ -230,6 +240,8 @@ func toServerResponse(server storage.Server) serverResponse {
 		Port:            server.Port,
 		Username:        server.Username,
 		AuthMethod:      server.AuthMethod,
+		SecretProvider:  normalizeProviderResponse(server.SecretProvider),
+		SecretRef:       server.SecretRef,
 		Tags:            server.Tags,
 		Notes:           server.Notes,
 		CreatedAt:       server.CreatedAt,
@@ -250,6 +262,10 @@ func (s *Server) writeServerError(w http.ResponseWriter, r *http.Request, err er
 	}
 	if errors.Is(err, storage.ErrNotFound) {
 		writeError(w, r, NewAPIError(http.StatusNotFound, CodeServerNotFound, "Server not found."))
+		return
+	}
+	if errors.Is(err, servers.ErrVaultUnavailable) || errors.Is(err, servers.ErrSecretUnavailable) {
+		writeError(w, r, NewAPIError(http.StatusBadGateway, CodeSecretUnavailable, "The external credential could not be resolved from the secret manager."))
 		return
 	}
 	if errors.Is(err, servers.ErrUnauthorized) {
@@ -299,4 +315,11 @@ func (s *Server) writeServerError(w http.ResponseWriter, r *http.Request, err er
 		"request_id", RequestID(r.Context()),
 	)
 	writeError(w, r, NewAPIError(http.StatusBadGateway, CodeSSHConnectionFailed, "The SSH operation could not be completed."))
+}
+
+func normalizeProviderResponse(provider string) string {
+	if provider == servers.SecretProviderVault {
+		return servers.SecretProviderVault
+	}
+	return servers.SecretProviderStored
 }

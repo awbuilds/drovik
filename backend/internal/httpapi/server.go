@@ -28,6 +28,7 @@ import (
 	"github.com/awbuilds/drovik/backend/internal/storage"
 	"github.com/awbuilds/drovik/backend/internal/terminal"
 	useradmin "github.com/awbuilds/drovik/backend/internal/users"
+	"github.com/awbuilds/drovik/backend/internal/vault"
 	"github.com/awbuilds/drovik/backend/internal/version"
 )
 
@@ -70,6 +71,13 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 	if err != nil {
 		return nil, err
 	}
+	var vaultClient *vault.Client
+	if cfg.VaultEnabled {
+		vaultClient, err = vault.New(cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
 	knownHosts := storage.NewKnownHostRepository(db)
 	capabilities := storage.NewCapabilitiesRepository(db)
 	serverRepository := storage.NewServerRepository(db)
@@ -83,6 +91,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *sql.DB, auditService *audi
 		knownHosts,
 		capabilities,
 		cipher,
+		vaultClient,
 		dialer,
 		auditService,
 		logger,

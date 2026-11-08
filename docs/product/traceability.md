@@ -339,6 +339,7 @@ separate design and threat model before implementation.
 | 9.7 Server assignment/read-only | Tested | `server_assignments`, effective access checks, route guard |
 | 9.7 Local MFA | Tested | TOTP enrollment, encrypted secrets, recovery codes, login challenge; HTTP tests |
 | 9.7 OIDC/SSO | Tested | Authorization-code + PKCE, discovery issuer check, single-use state, explicit account linking, no auto-provision; mock-provider unit and HTTP tests |
+| 9.7 External secrets | Tested | HashiCorp Vault KV v2 paths, connect-time fetch, no DB credential, egress-checked, fail-closed; mock Vault and SSH tests |
 | 9.8 Metric retention/history | Implemented | SQLite samples, retention/cap, history API and chart |
 | 9.8 Threshold alerts | Implemented | In-app threshold rules; no external notifications |
 | 9.8 Notifications | Tested | Encrypted alert webhooks, egress-checked delivery, cooldown; delivery test |
@@ -355,8 +356,8 @@ separate design and threat model before implementation.
 - Read-only accounts and read-only server assignments are enforced by backend middleware, not only
   UI controls.
 - Package lifecycle, managed task editing, local TOTP MFA, destructive host operations, OIDC and
-  macOS/BSD read-only monitoring extend the original read-first surface. External secret managers
-  and Windows targets remain out of scope until separately designed.
+  macOS/BSD read-only monitoring and Vault KV v2 credentials extend the original read-first
+  surface. Additional secret-manager backends and Windows targets remain out of scope.
 - History is local, bounded and explicitly not a substitute for enterprise monitoring. Alert
   webhooks, OIDC and MFA are implemented; external secret managers remain out of scope.
 

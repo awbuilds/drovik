@@ -25,6 +25,7 @@ export interface VersionInfo {
   go_version: string
   schema_version: number
   destructive_host_ops: boolean
+  vault_enabled: boolean
 }
 
 export interface ApiErrorBody {

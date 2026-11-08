@@ -40,6 +40,7 @@ const (
 	CodeSFTPPermissionDenied   = "SFTP_PERMISSION_DENIED"
 	CodeCapabilityUnavailable  = "CAPABILITY_UNAVAILABLE"
 	CodeFeatureDisabled        = "FEATURE_DISABLED"
+	CodeSecretUnavailable      = "SECRET_UNAVAILABLE"
 	CodeProcessUnavailable     = "PROCESS_UNAVAILABLE"
 	CodeProcessNotFound        = "PROCESS_NOT_FOUND"
 	CodeProcessPermission      = "PROCESS_PERMISSION_DENIED"

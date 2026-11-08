@@ -1,6 +1,7 @@
 import { apiRequest } from './client'
 
 export type AuthMethod = 'password' | 'private_key'
+export type SecretProvider = 'stored' | 'vault'
 
 export interface Server {
   id: string
@@ -9,6 +10,8 @@ export interface Server {
   port: number
   username: string
   auth_method: AuthMethod
+  secret_provider: SecretProvider
+  secret_ref: string
   tags: string
   notes: string
   created_at: string
@@ -50,6 +53,8 @@ export interface CreateServerInput {
   port: number
   username: string
   auth_method: AuthMethod
+  secret_provider?: SecretProvider
+  secret_ref?: string
   password?: string
   private_key?: string
   passphrase?: string

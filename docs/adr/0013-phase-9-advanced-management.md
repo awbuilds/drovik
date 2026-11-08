@@ -40,6 +40,11 @@ web session into unbounded root-equivalent authority by accident.
 - **Local MFA:** users can enroll a TOTP authenticator with encrypted-at-rest secrets and eight
   single-use recovery codes. Login requires the second factor when enabled; recovery codes are
   hashed and consumed once. OIDC/SSO remains a separate identity decision.
+- **External secret managers:** optional HashiCorp Vault KV v2 support. A server records
+  `secret_provider=vault` and a validated path; the password, private key or passphrase is fetched
+  at connect time with a bounded timeout, no redirects and the shared egress policy. Credentials
+  are never written to the Drovik database, and Vault failures fail closed with
+  `SECRET_UNAVAILABLE`. Only the path is returned to the UI.
 - **OIDC/SSO:** optional authorization-code flow with PKCE, discovery (issuer checked), no
   redirects, bounded responses and single-use five-minute state. Accounts are never auto-provisioned
   or matched by username: an authenticated user links their existing local account from Settings,
@@ -74,7 +79,8 @@ The following Phase 9 candidates were reviewed and are not planned for the 1.x s
 - Unattended or scheduled destructive operations (the flag remains manual and disabled by default).
 - Repository configuration changes and automatic update scheduling.
 - systemd timer or unit-file editing.
-- External secret managers or additional federated identity providers.
+- Additional secret-manager backends beyond Vault KV v2 and additional federated identity
+  providers.
 - Email, chat or paging notification channels (webhooks are implemented).
 - Windows managed-host support.
 - Write operations on macOS/BSD hosts beyond read-only monitoring.

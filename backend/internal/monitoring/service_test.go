@@ -87,6 +87,7 @@ func newMonitoringTestEnv(t *testing.T) *monitoringTestEnv {
 		known,
 		storage.NewCapabilitiesRepository(db),
 		cipher,
+		nil,
 		sshclient.NewDialer(cfg, known, logger),
 		audit.New(storage.NewAuditRepository(db), logger),
 		logger,

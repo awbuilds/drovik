@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -92,6 +93,14 @@ type Config struct {
 	OIDCClientID     string
 	OIDCClientSecret string
 	OIDCRedirectURL  string
+
+	VaultEnabled   bool
+	VaultAddress   string
+	VaultToken     string
+	VaultTokenFile string
+	VaultNamespace string
+	VaultMount     string
+	VaultTimeout   time.Duration
 }
 
 func Load() (*Config, error) {
@@ -361,6 +370,47 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	vaultEnabled, err := parseBool(lookup, "DROVIK_VAULT_ENABLED", false)
+	if err != nil {
+		return nil, err
+	}
+	vaultAddress, err := parseString(lookup, "DROVIK_VAULT_ADDR", "")
+	if err != nil {
+		return nil, err
+	}
+	vaultToken, err := parseString(lookup, "DROVIK_VAULT_TOKEN", "")
+	if err != nil {
+		return nil, err
+	}
+	vaultTokenFile, err := parseString(lookup, "DROVIK_VAULT_TOKEN_FILE", "")
+	if err != nil {
+		return nil, err
+	}
+	vaultNamespace, err := parseString(lookup, "DROVIK_VAULT_NAMESPACE", "")
+	if err != nil {
+		return nil, err
+	}
+	vaultMount, err := parseString(lookup, "DROVIK_VAULT_MOUNT", "secret")
+	if err != nil {
+		return nil, err
+	}
+	vaultTimeout, err := parseDuration(lookup, "DROVIK_VAULT_TIMEOUT", 8*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if vaultEnabled {
+		parsed, err := url.Parse(vaultAddress)
+		if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
+			return nil, errors.New("DROVIK_VAULT_ADDR must be an absolute http(s) URL")
+		}
+		if vaultToken == "" && vaultTokenFile == "" {
+			return nil, errors.New("DROVIK_VAULT_TOKEN or DROVIK_VAULT_TOKEN_FILE is required when Vault is enabled")
+		}
+		if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9/_-]{0,63}$`).MatchString(vaultMount) {
+			return nil, errors.New("DROVIK_VAULT_MOUNT must be a simple mount name")
+		}
+	}
+
 	oidcEnabled, err := parseBool(lookup, "DROVIK_OIDC_ENABLED", false)
 	if err != nil {
 		return nil, err
@@ -483,6 +533,13 @@ func load(lookup func(string) (string, bool)) (*Config, error) {
 		OIDCClientID:             oidcClientID,
 		OIDCClientSecret:         oidcClientSecret,
 		OIDCRedirectURL:          oidcRedirect,
+		VaultEnabled:             vaultEnabled,
+		VaultAddress:             strings.TrimRight(vaultAddress, "/"),
+		VaultToken:               vaultToken,
+		VaultTokenFile:           vaultTokenFile,
+		VaultNamespace:           vaultNamespace,
+		VaultMount:               vaultMount,
+		VaultTimeout:             vaultTimeout,
 	}, nil
 }
 
