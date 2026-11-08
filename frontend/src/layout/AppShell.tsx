@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Activity,
@@ -15,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '@/auth/useAuth'
+import { listServers } from '@/api/servers'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Logo } from '@/components/ui/Logo'
@@ -28,7 +30,7 @@ const navigation = [
     label: 'Workspace',
     items: [
       { to: '/', label: 'Overview', icon: LayoutDashboard, enabled: true },
-      { to: '/servers', label: 'Servers', icon: Server, enabled: false, phase: 'Phase 2' },
+      { to: '/servers', label: 'Servers', icon: Server, enabled: true },
       {
         to: '/terminal',
         label: 'Terminal',
@@ -56,6 +58,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useThemeStore()
   const navigate = useNavigate()
+  const serversQuery = useQuery({
+    queryKey: ['servers'],
+    queryFn: ({ signal }) => listServers(signal),
+    staleTime: 30_000,
+  })
+  const serverCount = serversQuery.data?.servers.length ?? 0
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -116,8 +124,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Button>
 
           <div className="hidden items-center gap-2 sm:flex">
-            <StatusDot status="offline" label="No server connected" />
-            <Badge variant="outline">Phase 2</Badge>
+            <StatusDot
+              status={serverCount > 0 ? 'online' : 'offline'}
+              label={
+                serverCount > 0
+                  ? `${serverCount} server${serverCount === 1 ? '' : 's'} saved`
+                  : 'No server connected'
+              }
+            />
+            <Badge variant="outline">SSH</Badge>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
@@ -256,7 +271,7 @@ function SidebarContent({
           </Tooltip>
         </div>
         <p className="text-ink-600 mt-2 px-1 font-mono text-[9px] tracking-wider uppercase">
-          Phase 1 preview · AGPL-3.0
+          Phase 2 · SSH connections
         </p>
       </div>
     </>

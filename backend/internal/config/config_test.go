@@ -102,3 +102,41 @@ func TestLoadRejectsTrustedOriginWithPath(t *testing.T) {
 		t.Fatalf("expected origin path error, got %v", err)
 	}
 }
+
+func TestLoadSSHAndEgressConfiguration(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_SSH_DIAL_TIMEOUT"] = "5s"
+	env["DROVIK_SSH_HANDSHAKE_TIMEOUT"] = "7s"
+	env["DROVIK_SSH_OPERATION_TIMEOUT"] = "11s"
+	env["DROVIK_EGRESS_ALLOW_PRIVATE"] = "false"
+	env["DROVIK_EGRESS_ALLOWED_CIDRS"] = "127.0.0.1/32, 192.0.2.0/24"
+	env["DROVIK_EGRESS_DENIED_CIDRS"] = "10.0.0.0/8"
+	env["DROVIK_SSH_MAX_SESSIONS_PER_USER"] = "3"
+	env["DROVIK_SSH_MAX_SESSIONS_GLOBAL"] = "8"
+
+	cfg, err := load(lookupFrom(env))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.SSHDialTimeout != 5*time.Second || cfg.SSHHandshakeTimeout != 7*time.Second || cfg.SSHOperationTimeout != 11*time.Second {
+		t.Fatalf("unexpected SSH timeouts: %s %s %s", cfg.SSHDialTimeout, cfg.SSHHandshakeTimeout, cfg.SSHOperationTimeout)
+	}
+	if cfg.EgressAllowPrivate {
+		t.Fatal("expected private egress to be disabled")
+	}
+	if len(cfg.EgressAllowedPrefixes) != 2 || len(cfg.EgressDeniedPrefixes) != 1 {
+		t.Fatalf("unexpected egress prefixes: %v %v", cfg.EgressAllowedPrefixes, cfg.EgressDeniedPrefixes)
+	}
+	if cfg.SSHMaxSessionsPerUser != 3 || cfg.SSHMaxSessionsGlobal != 8 {
+		t.Fatalf("unexpected session limits: %d %d", cfg.SSHMaxSessionsPerUser, cfg.SSHMaxSessionsGlobal)
+	}
+}
+
+func TestLoadRejectsInvalidEgressCIDR(t *testing.T) {
+	env := validEnv()
+	env["DROVIK_EGRESS_ALLOWED_CIDRS"] = "not-a-cidr"
+	_, err := load(lookupFrom(env))
+	if err == nil || !strings.Contains(err.Error(), "invalid CIDR") {
+		t.Fatalf("expected CIDR error, got %v", err)
+	}
+}

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   Cable,
@@ -14,6 +15,7 @@ import {
   Server,
 } from 'lucide-react'
 import { getVersion } from '@/api/client'
+import { listServers } from '@/api/servers'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PageHeader } from '@/components/PageHeader'
 import { Badge } from '@/components/ui/Badge'
@@ -21,6 +23,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { StatusDot } from '@/components/ui/StatusDot'
+import { formatRelativeTime } from '@/lib/format'
 
 const nextSteps = [
   {
@@ -60,6 +63,12 @@ const posture = [
 ]
 
 export function WorkspacePage() {
+  const serversQuery = useQuery({
+    queryKey: ['servers'],
+    queryFn: ({ signal }) => listServers(signal),
+    staleTime: 30_000,
+  })
+  const servers = serversQuery.data?.servers ?? []
   const versionQuery = useQuery({
     queryKey: ['version'],
     queryFn: ({ signal }) => getVersion(signal),
@@ -75,11 +84,12 @@ export function WorkspacePage() {
         description="Your control surface is ready. Connect a Linux host to start working through SSH — no agent, no hidden privilege."
         actions={
           <>
-            <Badge variant="mint">Phase 1 live</Badge>
-            <Badge variant="outline">Phase 2</Badge>
-            <Button variant="outline" disabled title="Server connections arrive in Phase 2">
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Add server
+            <Badge variant="mint">Phase 2 live</Badge>
+            <Button asChild variant="outline">
+              <Link to="/servers">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Manage servers
+              </Link>
             </Button>
           </>
         }
@@ -116,47 +126,87 @@ export function WorkspacePage() {
             />
           )}
         </ErrorBoundary>
-        <StatCard label="Managed agents" value="0" detail="Agentless by design" status="online" />
+        <StatCard
+          label="Saved servers"
+          value={String(servers.length)}
+          detail="Agentless · no remote daemon"
+          status={servers.length > 0 ? 'online' : 'pending'}
+        />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-12">
         <Card className="xl:col-span-7">
           <CardHeader className="flex-row items-start justify-between gap-4">
             <div>
-              <CardTitle>Connection</CardTitle>
+              <CardTitle>{servers.length > 0 ? 'Saved servers' : 'Connection'}</CardTitle>
               <CardDescription>
-                The workspace is intentionally empty until you add a host.
+                {servers.length > 0
+                  ? `${servers.length} SSH connection${servers.length === 1 ? '' : 's'} configured. Test a host to verify its key and capabilities.`
+                  : 'The workspace is intentionally empty until you add a host.'}
               </CardDescription>
             </div>
-            <Badge variant="signal">Phase 2</Badge>
+            <Badge variant="signal">SSH</Badge>
           </CardHeader>
           <CardContent>
             <div className="border-ink-700 bg-ink-950/50 relative overflow-hidden rounded-lg border p-6">
               <div className="grid-backdrop absolute inset-0 opacity-40" aria-hidden="true" />
-              <div className="relative flex flex-col items-center py-6 text-center">
-                <div className="bg-ink-800 ring-ink-700 text-signal-300 flex h-14 w-14 items-center justify-center rounded-2xl ring-1">
-                  <Server className="h-7 w-7" aria-hidden="true" />
+              {servers.length > 0 ? (
+                <div className="relative space-y-2">
+                  {servers.slice(0, 4).map((server) => (
+                    <div
+                      key={server.id}
+                      className="border-ink-700 bg-ink-900/80 flex items-center gap-3 rounded-lg border px-3 py-2.5"
+                    >
+                      <div className="bg-ink-800 text-signal-300 flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
+                        <Server className="h-3.5 w-3.5" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-ink-100 truncate text-sm font-medium">
+                          {server.display_name}
+                        </p>
+                        <p className="text-ink-500 truncate font-mono text-[10px]">
+                          {server.username}@{server.host}:{server.port}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <StatusDot
+                          status={server.last_connected_at ? 'online' : 'pending'}
+                          label={server.last_connected_at ? 'verified' : 'untested'}
+                        />
+                        <p className="text-ink-600 mt-1 font-mono text-[9px]">
+                          {server.last_connected_at
+                            ? formatRelativeTime(server.last_connected_at)
+                            : 'never'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-2 text-right">
+                    <Button asChild size="sm" variant="outline">
+                      <Link to="/servers">Manage servers</Link>
+                    </Button>
+                  </div>
                 </div>
-                <h3 className="font-display text-ink-100 mt-4 text-lg font-semibold">
-                  No servers connected yet
-                </h3>
-                <p className="text-ink-400 mt-2 max-w-sm text-sm leading-6">
-                  Add a hostname, port and SSH identity. Drovik will show the host-key fingerprint
-                  before it trusts the server.
-                </p>
-                <Button
-                  variant="outline"
-                  className="mt-5"
-                  disabled
-                  title="Server connections arrive in Phase 2"
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Add your first server
-                </Button>
-                <p className="text-ink-600 mt-2 font-mono text-[10px] uppercase">
-                  Not available in this build
-                </p>
-              </div>
+              ) : (
+                <div className="relative flex flex-col items-center py-6 text-center">
+                  <div className="bg-ink-800 ring-ink-700 text-signal-300 flex h-14 w-14 items-center justify-center rounded-2xl ring-1">
+                    <Server className="h-7 w-7" aria-hidden="true" />
+                  </div>
+                  <h3 className="font-display text-ink-100 mt-4 text-lg font-semibold">
+                    No servers connected yet
+                  </h3>
+                  <p className="text-ink-400 mt-2 max-w-sm text-sm leading-6">
+                    Add a hostname, port and SSH identity. Drovik will show the host-key fingerprint
+                    before it trusts the server.
+                  </p>
+                  <Button asChild variant="outline" className="mt-5">
+                    <Link to="/servers">
+                      <Plus className="h-4 w-4" aria-hidden="true" />
+                      Add your first server
+                    </Link>
+                  </Button>
+                </div>
+              )}
 
               <div className="border-ink-700 relative mt-4 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 border-t pt-5">
                 <PathNode label="Browser" detail="React" />

@@ -11,6 +11,7 @@ import { TooltipProvider } from '@/components/ui/Tooltip'
 import { AppShell } from '@/layout/AppShell'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { ServersPage } from '@/pages/ServersPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
 import { WorkspacePage } from '@/pages/WorkspacePage'
@@ -90,6 +91,14 @@ function AppRoutes() {
         element={
           <AppShell>
             <WorkspacePage />
+          </AppShell>
+        }
+      />
+      <Route
+        path="/servers"
+        element={
+          <AppShell>
+            <ServersPage />
           </AppShell>
         }
       />

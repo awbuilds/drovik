@@ -7,10 +7,10 @@ saved SSH connections, an interactive terminal, SFTP file management, system hea
 systemd services, logs and audit history. It uses the SSH access you already have. It installs
 nothing on the servers you manage.
 
-> **Status:** early development. Phase 0 (project foundation) and Phase 1 (application skeleton and
-> authentication) are complete. Phase 2 (SSH connections and host-key trust) is next. The
-> remote-server features are not implemented yet. Drovik is a working name pending trademark
-> clearance.
+> **Status:** early development. Phase 0 (project foundation), Phase 1 (application skeleton and
+> authentication) and Phase 2 (SSH connections and host-key trust) are complete. Phase 3
+> (workspace and interactive terminal) is next. Terminal, files, monitoring and operations
+> features are not implemented yet. Drovik is a working name pending trademark clearance.
 
 ## Why Drovik
 
