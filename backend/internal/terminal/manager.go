@@ -147,7 +147,7 @@ func (m *Manager) Serve(ctx context.Context, conn *websocket.Conn, serverID, use
 			code = "SSH_AUTH_FAILED"
 			message = "SSH authentication failed."
 		}
-		m.logger.Warn("terminal connect failed", "error", err, "server_id", serverID, "user_id", userID)
+		m.logger.Warn("terminal connect failed", "code", code, "server_id", serverID, "user_id", userID)
 		m.closeWithError(conn, code, message)
 		return
 	}
@@ -155,7 +155,7 @@ func (m *Manager) Serve(ctx context.Context, conn *websocket.Conn, serverID, use
 
 	sshSession, err := client.NewSession()
 	if err != nil {
-		m.logger.Warn("terminal session creation failed", "error", err, "server_id", serverID)
+		m.logger.Warn("terminal session creation failed", "code", "SSH_CHANNEL_FAILURE", "server_id", serverID)
 		m.closeWithError(conn, "SSH_CHANNEL_FAILURE", "The SSH session could not be created.")
 		return
 	}
@@ -247,7 +247,7 @@ func (m *Manager) Serve(ctx context.Context, conn *websocket.Conn, serverID, use
 	}
 
 	if readErr != nil && ctx.Err() == nil {
-		m.logger.Debug("terminal read loop ended", "error", readErr, "server_id", serverID)
+		m.logger.Debug("terminal read loop ended", "code", "TERMINAL_CLOSED", "server_id", serverID)
 	}
 	_ = item.send(context.Background(), serverMessage{Type: serverTypeStatus, State: "closed"})
 	_ = conn.Close(websocket.StatusNormalClosure, "terminal closed")
