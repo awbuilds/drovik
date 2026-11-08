@@ -100,7 +100,7 @@ func newTestAppWith(t *testing.T, configure func(*config.Config)) *testApp {
 		SFTPMaxListEntries:      100,
 		SFTPMaxRecursiveEntries: 100,
 		SFTPOperationTimeout:    10 * time.Second,
-		MonitorRefreshInterval:  10 * time.Millisecond,
+		MonitorRefreshInterval:  time.Minute,
 		MonitorStaleAfter:       time.Second,
 		MonitorTimeout:          5 * time.Second,
 		MonitorMaxOutputBytes:   256 * 1024,
