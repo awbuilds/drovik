@@ -7,7 +7,7 @@ saved SSH connections, an interactive terminal, SFTP file management, system hea
 systemd services, logs and audit history. It uses the SSH access you already have. It installs
 nothing on the servers you manage.
 
-> **Status:** stable MVP (`v1.0.0`). Drovik provides authentication, strict SSH host-key trust,
+> **Status:** stable MVP (`v1.0.1`). Drovik provides authentication, strict SSH host-key trust,
 > terminal, SFTP files, agentless monitoring, process/service/log operations and scoped audit
 > history. Post-MVP features remain intentionally deferred. Drovik is a working name pending
 > trademark clearance.

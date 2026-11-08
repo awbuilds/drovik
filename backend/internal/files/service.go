@@ -234,6 +234,13 @@ func (s *Service) WriteFile(ctx context.Context, ownerID, serverID, rawPath, tex
 		if err != nil {
 			return mapSFTPError(err)
 		}
+		// Keep the empty staging file private while content is being written,
+		// then apply the final mode before the atomic rename.
+		if err := client.Chmod(temp, 0o600); err != nil {
+			_ = file.Close()
+			_ = client.Remove(temp)
+			return fmt.Errorf("secure staging file: %w", err)
+		}
 		if _, err := file.Write([]byte(text)); err != nil {
 			_ = file.Close()
 			_ = client.Remove(temp)
@@ -244,7 +251,8 @@ func (s *Service) WriteFile(ctx context.Context, ownerID, serverID, rawPath, tex
 			return fmt.Errorf("close remote file: %w", err)
 		}
 		if err := client.Chmod(temp, mode); err != nil {
-			s.logger.Warn("preserve file mode failed", "path", clean, "error", err)
+			_ = client.Remove(temp)
+			return fmt.Errorf("preserve file mode: %w", err)
 		}
 		if err := client.Rename(temp, clean); err != nil {
 			_ = client.Remove(temp)
@@ -410,12 +418,17 @@ func (s *Service) Upload(ctx context.Context, ownerID, serverID, rawPath string,
 		if err != nil || clean == "/" {
 			return ErrPathInvalid
 		}
-		if !overwrite {
-			if _, err := client.Lstat(clean); err == nil {
-				return ErrConflict
-			} else if !errors.Is(err, os.ErrNotExist) {
-				return mapSFTPError(err)
+		mode := os.FileMode(0o644)
+		if info, err := client.Lstat(clean); err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				return ErrSymlink
 			}
+			if !overwrite {
+				return ErrConflict
+			}
+			mode = info.Mode().Perm()
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return mapSFTPError(err)
 		}
 		temp, err := s.tempPath(clean)
 		if err != nil {
@@ -424,6 +437,11 @@ func (s *Service) Upload(ctx context.Context, ownerID, serverID, rawPath string,
 		file, err := client.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL)
 		if err != nil {
 			return mapSFTPError(err)
+		}
+		if err := client.Chmod(temp, 0o600); err != nil {
+			_ = file.Close()
+			_ = client.Remove(temp)
+			return fmt.Errorf("secure staging file: %w", err)
 		}
 		written, copyErr := io.Copy(file, io.LimitReader(&contextReader{ctx: ctx, reader: reader}, s.cfg.SFTPMaxUploadBytes+1))
 		closeErr := file.Close()
@@ -438,6 +456,10 @@ func (s *Service) Upload(ctx context.Context, ownerID, serverID, rawPath string,
 		if written > s.cfg.SFTPMaxUploadBytes {
 			_ = client.Remove(temp)
 			return ErrTooLarge
+		}
+		if err := client.Chmod(temp, mode); err != nil {
+			_ = client.Remove(temp)
+			return fmt.Errorf("preserve file mode: %w", err)
 		}
 		if err := client.Rename(temp, clean); err != nil {
 			_ = client.Remove(temp)

@@ -120,7 +120,12 @@ func (m *Manager) Close() {
 	}
 }
 
-func (m *Manager) Serve(ctx context.Context, conn *websocket.Conn, serverID, userID string) {
+func (m *Manager) Serve(
+	ctx context.Context,
+	conn *websocket.Conn,
+	serverID, userID, sessionID string,
+	validateSession func(context.Context) error,
+) {
 	conn.SetReadLimit(maxMessageSize)
 
 	release, err := m.Acquire(userID)
@@ -192,12 +197,13 @@ func (m *Manager) Serve(ctx context.Context, conn *websocket.Conn, serverID, use
 	}
 
 	item := &session{
-		conn:     conn,
-		client:   client,
-		ssh:      sshSession,
-		stdin:    stdin,
-		logger:   m.logger,
-		serverID: serverID,
+		conn:      conn,
+		client:    client,
+		ssh:       sshSession,
+		stdin:     stdin,
+		logger:    m.logger,
+		serverID:  serverID,
+		sessionID: sessionID,
 	}
 	m.mu.Lock()
 	if m.closed {
@@ -208,6 +214,9 @@ func (m *Manager) Serve(ctx context.Context, conn *websocket.Conn, serverID, use
 	}
 	m.sessions[item] = struct{}{}
 	m.mu.Unlock()
+	if validateSession != nil {
+		go m.watchSession(ctx, item, validateSession)
+	}
 	defer func() {
 		m.mu.Lock()
 		delete(m.sessions, item)
@@ -232,7 +241,7 @@ func (m *Manager) Serve(ctx context.Context, conn *websocket.Conn, serverID, use
 	}()
 
 	readErr := m.readLoop(ctx, item)
-	_ = stdin.Close()
+	item.closeInput()
 	_ = sshSession.Close()
 	_ = client.Close()
 
@@ -251,6 +260,45 @@ func (m *Manager) Serve(ctx context.Context, conn *websocket.Conn, serverID, use
 	}
 	_ = item.send(context.Background(), serverMessage{Type: serverTypeStatus, State: "closed"})
 	_ = conn.Close(websocket.StatusNormalClosure, "terminal closed")
+}
+
+// CloseSession closes every established terminal belonging to an application
+// session. It is called on logout so an already-open PTY cannot outlive the
+// session that authorized it.
+func (m *Manager) CloseSession(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	m.mu.Lock()
+	items := make([]*session, 0, 2)
+	for item := range m.sessions {
+		if item.sessionID == sessionID {
+			items = append(items, item)
+		}
+	}
+	m.mu.Unlock()
+	for _, item := range items {
+		item.Close()
+	}
+}
+
+func (m *Manager) watchSession(ctx context.Context, item *session, validate func(context.Context) error) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		err := validate(checkCtx)
+		cancel()
+		if err != nil {
+			item.Close()
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func (m *Manager) readLoop(ctx context.Context, item *session) error {
@@ -283,8 +331,11 @@ func (m *Manager) readLoop(ctx context.Context, item *session) error {
 			if len(message.Data) > maxMessageSize {
 				return fmt.Errorf("terminal input exceeds message limit")
 			}
-			if _, err := item.stdin.Write([]byte(message.Data)); err != nil {
-				return err
+			item.inputMu.Lock()
+			_, writeErr := item.stdin.Write([]byte(message.Data))
+			item.inputMu.Unlock()
+			if writeErr != nil {
+				return writeErr
 			}
 		case clientTypeResize:
 			cols, rows := message.Cols, message.Rows
@@ -317,15 +368,26 @@ func copyOutput(ctx context.Context, item *session, reader io.Reader) {
 }
 
 type session struct {
-	conn     *websocket.Conn
-	client   *ssh.Client
-	ssh      *ssh.Session
-	stdin    io.WriteCloser
-	logger   *slog.Logger
-	serverID string
+	conn      *websocket.Conn
+	client    *ssh.Client
+	ssh       *ssh.Session
+	stdin     io.WriteCloser
+	logger    *slog.Logger
+	serverID  string
+	sessionID string
 
 	writeMu   sync.Mutex
 	closeOnce sync.Once
+	inputMu   sync.Mutex
+	inputOnce sync.Once
+}
+
+func (s *session) closeInput() {
+	s.inputOnce.Do(func() {
+		s.inputMu.Lock()
+		defer s.inputMu.Unlock()
+		_ = s.stdin.Close()
+	})
 }
 
 func (s *session) send(ctx context.Context, message serverMessage) error {
@@ -343,7 +405,7 @@ func (s *session) send(ctx context.Context, message serverMessage) error {
 func (s *session) Close() {
 	s.closeOnce.Do(func() {
 		_ = s.conn.CloseNow()
-		_ = s.stdin.Close()
+		s.closeInput()
 		_ = s.ssh.Close()
 		_ = s.client.Close()
 	})

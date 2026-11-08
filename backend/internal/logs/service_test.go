@@ -143,3 +143,21 @@ func BenchmarkParseJournalEntry(b *testing.B) {
 		}
 	}
 }
+
+func TestReadStopsAtRequestedLineCount(t *testing.T) {
+	line := `{"__REALTIME_TIMESTAMP":"1700000000123456","PRIORITY":"6","MESSAGE":"x"}`
+	flood := strings.Repeat(line+"\n", 1000)
+	env, service := newLogsEnv(t, func(command string) (string, string, int, bool) {
+		if strings.Contains(command, "journalctl") {
+			return flood, "", 0, true
+		}
+		return "", "", 0, false
+	})
+	result, err := service.Read(context.Background(), env.User.ID, env.Server.ID, "", "1h", 50)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if len(result.Entries) != 50 || !result.Truncated {
+		t.Fatalf("expected 50 entries and truncation, got %d (truncated=%v)", len(result.Entries), result.Truncated)
+	}
+}

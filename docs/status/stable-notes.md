@@ -21,6 +21,13 @@ SQLite schema; upgrades are forward-only and require a database backup.
 Only the latest stable minor release and the current beta line receive security fixes. See
 [`SECURITY.md`](../../SECURITY.md) and [`SUPPORT.md`](../../SUPPORT.md).
 
+## Security patch
+
+`v1.0.1` fixes five issues found by the first source-first audit. The high-severity issue could
+expose a stored private key when changing authentication method; the other fixes cover terminal
+logout/expiry, IPv6 zone egress bypass, upload permission widening and journal entry-count
+exhaustion. See [`docs/security/audit-2026-11-08.md`](../security/audit-2026-11-08.md).
+
 ## Known limitations
 
 The beta limitations remain accurate unless noted: single operator, no historical metrics, no

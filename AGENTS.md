@@ -370,6 +370,9 @@ covered.
 - Phase 8: complete. Tag-driven release pipeline, stable release notes, versioned support policy,
   release runbook and parser benchmarks are in place.
 - Phase 9 is post-MVP and deferred; its features require individual design and threat modeling.
+- Security audit 2026-11-08 complete: five confirmed findings fixed in `v1.0.1`; twelve leads and
+  their validation plans are recorded outside the repository and summarized in
+  `docs/security/audit-2026-11-08.md`.
 - The UI is React + Tailwind, inspired by the Rune/OpenCode design language; the Rune Rust
   framework itself is not used.
 - Read the latest handoff in `docs/handoffs/` before starting any post-MVP work.

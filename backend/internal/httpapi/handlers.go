@@ -235,6 +235,9 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, NewAPIError(http.StatusInternalServerError, CodeInternal, "An internal error occurred."))
 		return
 	}
+	if session := CurrentSession(r.Context()); session != nil {
+		s.terminal.CloseSession(session.ID)
+	}
 	s.auth.ClearSessionCookie(w)
 	if user != nil {
 		s.record(r, user.ID, "auth.logout", user.Username, "success", "")

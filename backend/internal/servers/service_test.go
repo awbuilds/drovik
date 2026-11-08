@@ -3,6 +3,7 @@ package servers
 import (
 	"context"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"io"
 	"log/slog"
@@ -270,5 +271,47 @@ func TestDeleteServer(t *testing.T) {
 	}
 	if _, err := env.service.Get(context.Background(), env.users.ID, server.ID); !errors.Is(err, storage.ErrNotFound) {
 		t.Fatalf("expected not found, got %v", err)
+	}
+}
+
+func TestAuthMethodChangeRequiresNewCredential(t *testing.T) {
+	sshServer, err := testssh.Start(t.TempDir())
+	if err != nil {
+		t.Fatalf("testssh.Start: %v", err)
+	}
+	defer sshServer.Close()
+	env := newServiceTestEnv(t, sshServer)
+
+	input := testCreateInput(t, sshServer)
+	input.AuthMethod = AuthPrivateKey
+	block, err := ssh.MarshalPrivateKey(sshServer.ClientPrivateKey, "")
+	if err != nil {
+		t.Fatalf("MarshalPrivateKey: %v", err)
+	}
+	input.PrivateKey = string(pem.EncodeToMemory(block))
+	input.Password = ""
+	server, err := env.service.Create(context.Background(), env.users.ID, input)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	password := AuthPassword
+	if _, err := env.service.Update(context.Background(), env.users.ID, server.ID, UpdateInput{AuthMethod: &password}); err == nil {
+		t.Fatal("expected a method change without a new password to be rejected")
+	}
+	stored, err := env.servers.GetByID(context.Background(), server.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if stored.AuthMethod != AuthPrivateKey {
+		t.Fatalf("auth method changed despite rejected update: %s", stored.AuthMethod)
+	}
+
+	newPassword := "a-new-password-for-the-host"
+	if _, err := env.service.Update(context.Background(), env.users.ID, server.ID, UpdateInput{
+		AuthMethod: &password,
+		Password:   &newPassword,
+	}); err != nil {
+		t.Fatalf("Update with new password: %v", err)
 	}
 }

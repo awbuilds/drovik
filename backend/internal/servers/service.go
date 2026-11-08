@@ -177,6 +177,8 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 		return nil, err
 	}
 
+	originalMethod := server.AuthMethod
+	methodChanged := false
 	hostOrPortChanged := false
 	if input.DisplayName != nil {
 		server.DisplayName = strings.TrimSpace(*input.DisplayName)
@@ -205,6 +207,7 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 	}
 	if input.AuthMethod != nil {
 		server.AuthMethod = *input.AuthMethod
+		methodChanged = server.AuthMethod != originalMethod
 	}
 
 	credentialChanged := input.Password != nil || input.PrivateKey != nil || input.Passphrase != nil || input.AuthMethod != nil
@@ -218,30 +221,45 @@ func (s *Service) Update(ctx context.Context, ownerID, id string, input UpdateIn
 			Tags:        server.Tags,
 			Notes:       server.Notes,
 		}
-		if input.Password != nil {
-			createInput.Password = *input.Password
-		} else if server.AuthMethod == AuthPassword {
-			credentials, err := s.decryptCredentials(server)
-			if err != nil {
-				return nil, err
+		if methodChanged {
+			// A credential is bound to the method it was stored for. Never
+			// decrypt an old secret under a newly selected method; require the
+			// caller to provide a credential of the new type.
+			if input.Password != nil {
+				createInput.Password = *input.Password
 			}
-			createInput.Password = credentials.Password
-		}
-		if input.PrivateKey != nil {
-			createInput.PrivateKey = *input.PrivateKey
-		} else if server.AuthMethod == AuthPrivateKey {
-			credentials, err := s.decryptCredentials(server)
-			if err != nil {
-				return nil, err
+			if input.PrivateKey != nil {
+				createInput.PrivateKey = *input.PrivateKey
 			}
-			createInput.PrivateKey = string(credentials.PrivateKey)
-		}
-		if input.Passphrase != nil {
-			createInput.Passphrase = *input.Passphrase
+			if input.Passphrase != nil {
+				createInput.Passphrase = *input.Passphrase
+			}
 		} else {
-			credentials, err := s.decryptCredentials(server)
-			if err == nil {
-				createInput.Passphrase = credentials.Passphrase
+			if input.Password != nil {
+				createInput.Password = *input.Password
+			} else if server.AuthMethod == AuthPassword {
+				credentials, err := s.decryptCredentials(server)
+				if err != nil {
+					return nil, err
+				}
+				createInput.Password = credentials.Password
+			}
+			if input.PrivateKey != nil {
+				createInput.PrivateKey = *input.PrivateKey
+			} else if server.AuthMethod == AuthPrivateKey {
+				credentials, err := s.decryptCredentials(server)
+				if err != nil {
+					return nil, err
+				}
+				createInput.PrivateKey = string(credentials.PrivateKey)
+			}
+			if input.Passphrase != nil {
+				createInput.Passphrase = *input.Passphrase
+			} else {
+				credentials, err := s.decryptCredentials(server)
+				if err == nil {
+					createInput.Passphrase = credentials.Passphrase
+				}
 			}
 		}
 		normalized, err := validateCreate(createInput)

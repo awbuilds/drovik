@@ -249,3 +249,27 @@ func TestInvalidPathAndSymlink(t *testing.T) {
 		t.Fatalf("expected symlink error, got %v", err)
 	}
 }
+
+func TestUploadPreservesRestrictiveMode(t *testing.T) {
+	env := newFilesTestEnv(t)
+	target := filepath.Join(env.workDir, "secret.txt")
+	if err := os.WriteFile(target, []byte("old"), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	if err := os.Chmod(target, 0o600); err != nil {
+		t.Fatalf("chmod fixture: %v", err)
+	}
+	if err := env.service.Upload(
+		context.Background(), env.userID, env.server.ID,
+		target, strings.NewReader("replacement"), 11, true,
+	); err != nil {
+		t.Fatalf("Upload: %v", err)
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("expected mode 0600 after upload, got %04o", info.Mode().Perm())
+	}
+}
