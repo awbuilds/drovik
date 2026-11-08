@@ -50,10 +50,11 @@ jobs:
 
       - name: Lint
         if: hashFiles('backend/go.mod') != '' && hashFiles('backend/.golangci.yml') != ''
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.15.0
-          working-directory: backend
+        # Install from the Go module proxy instead of downloading a release
+        # asset at run time, so a GitHub release outage cannot fail CI.
+        run: |
+          cd backend
+          go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run
 
       - name: Skip notice
         if: hashFiles('backend/go.mod') == ''
