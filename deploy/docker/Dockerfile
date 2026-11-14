@@ -29,7 +29,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /out/drovik ./cmd/drovik
 
 # ---- Runtime ----------------------------------------------------------------
-FROM alpine:3.22@sha256:bfe7ceb9f09ec0566c48fb93356e45a47a00be5a1dd14fa5b909e7709c66b034 AS dirs
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS dirs
 RUN mkdir -p /data
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
